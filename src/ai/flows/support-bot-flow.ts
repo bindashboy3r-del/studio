@@ -9,7 +9,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, collection, query, where, getDocs, limit, collectionGroup } from 'firebase/firestore';
+import { getFirestore, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { firebaseConfig } from '@/firebase/config';
 
 /**
@@ -41,45 +41,25 @@ const getOrderDetails = ai.defineTool(
       // Clean the Order ID
       const cleanId = input.orderId.trim().toUpperCase();
       
-      // Step 1: Search the user's specific collection (No index required)
+      // Primary Search: Search the user's specific collection (Most reliable & No index required)
       const userOrdersRef = collection(db, 'users', input.userId, 'orders');
       const qUser = query(userOrdersRef, where('orderId', '==', cleanId), limit(1));
       const snapshotUser = await getDocs(qUser);
       
-      let orderDoc = !snapshotUser.empty ? snapshotUser.docs[0] : null;
-
-      // Step 2: Fallback to collection group (Requires index, so we handle failure gracefully)
-      if (!orderDoc) {
-        try {
-          const qGroup = query(
-            collectionGroup(db, 'orders'),
-            where('orderId', '==', cleanId),
-            limit(1)
-          );
-          const snapshotGroup = await getDocs(qGroup);
-          if (!snapshotGroup.empty) {
-            orderDoc = snapshotGroup.docs[0];
-          }
-        } catch (groupError) {
-          // If collection group index is missing, we just proceed with the null result from Step 1
-          console.warn("Collection group search skipped or failed:", groupError);
-        }
-      }
-      
-      if (!orderDoc) {
-        return { 
-          found: false, 
-          message: `Aapka order ${cleanId} abhi nahi mil pa raha hai. Kripya thodi der baad phir se koshish karein ya @social_boost.bot ko Instagram par contact karein. 😔` 
+      if (!snapshotUser.empty) {
+        const data = snapshotUser.docs[0].data();
+        return {
+          found: true,
+          status: data.status || 'Pending',
+          service: data.service,
+          quantity: data.quantity,
+          price: data.price,
         };
       }
       
-      const data = orderDoc.data();
-      return {
-        found: true,
-        status: data.status || 'Pending',
-        service: data.service,
-        quantity: data.quantity,
-        price: data.price,
+      return { 
+        found: false, 
+        message: `Aapka order ${cleanId} abhi nahi mil pa raha hai. Kripya check karein ki ID sahi hai ya thodi der baad koshish karein. Aap @social_boost.bot ko Instagram par bhi contact kar sakte hain. 😔` 
       };
     } catch (e: any) {
       console.error("Support bot tool error:", e);
@@ -116,7 +96,7 @@ Your goal is to help users with their SMM orders and wallet balances.
 GUIDELINES:
 1. If a user provides an Order ID (e.g., SB-123456), ALWAYS use the getOrderDetails tool. Pass both the Order ID and the current User ID to the tool.
 2. If the tool finds the order, explain the current status (Pending, Processing, Completed, or Rejected) clearly to the user.
-3. If the tool returns found: false or if there is any error, use the exact Hinglish message provided by the tool to inform the user.
+3. If the tool returns found: false or if there is any error, use the message provided by the tool to inform the user.
 4. If they ask how to add money or for a QR code, provide the UPI ID "smmxpressbot@slc" and suggest they click the "Add Funds" button in the header.
 5. If they ask for help or the bot is confused, suggest contacting the owner @social_boost.bot on Instagram.
 6. Keep responses concise and friendly. Use Hinglish (Hindi written in English script) as the user prefers. Use emojis! 🚀
