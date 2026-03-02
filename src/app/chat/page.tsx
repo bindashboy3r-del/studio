@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -18,6 +19,8 @@ import { useRouter } from "next/navigation";
 import { PLATFORMS, SERVICES, Platform, SMMService } from "@/app/lib/constants";
 import { intelligentOrderParsing } from "@/ai/flows/intelligent-order-parsing";
 import { useAuth, useFirestore, useUser } from "@/firebase";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 
 type ChatState = 
   | 'idle' 
@@ -55,8 +58,9 @@ export default function ChatPage() {
   useEffect(() => {
     if (!user || !db) return;
 
+    // Path must match firestore.rules: /users/{userId}/chatMessages/{chatMessageId}
     const q = query(
-      collection(db, "messages", user.uid, "user_messages"),
+      collection(db, "users", user.uid, "chatMessages"),
       orderBy("timestamp", "asc")
     );
 
@@ -68,6 +72,12 @@ export default function ChatPage() {
       }));
       setMessages(msgs);
       setTimeout(scrollToBottom, 100);
+    }, (error) => {
+      const contextualError = new FirestorePermissionError({
+        path: `users/${user.uid}/chatMessages`,
+        operation: 'list'
+      });
+      errorEmitter.emit('permission-error', contextualError);
     });
 
     return () => unsubscribe();
@@ -81,11 +91,23 @@ export default function ChatPage() {
 
   const addMessage = async (sender: 'user' | 'bot', text: string) => {
     if (!user || !db) return;
-    addDoc(collection(db, "messages", user.uid, "user_messages"), {
+    const path = `users/${user.uid}/chatMessages`;
+    const data = {
+      userId: user.uid, // Required field in security rules
       sender,
       text,
       timestamp: serverTimestamp()
-    });
+    };
+
+    addDoc(collection(db, "users", user.uid, "chatMessages"), data)
+      .catch(async (error) => {
+        const permissionError = new FirestorePermissionError({
+          path,
+          operation: 'create',
+          requestResourceData: data,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      });
   };
 
   const botReply = async (text: string) => {
@@ -119,27 +141,30 @@ export default function ChatPage() {
       return;
     }
 
+    // Attempt AI parsing if the bot is in a flexible state
     if (chatState === 'choosing_platform' || chatState === 'idle') {
       try {
-        const parsed = await intelligentOrderParsing({ requestText: text });
-        if (parsed && parsed.platform && parsed.service && parsed.quantity && parsed.link) {
-          const platformServices = SERVICES[parsed.platform as Platform];
-          const service = platformServices.find(s => s.id === parsed.service);
-          if (service) {
-            const price = (parsed.quantity / 1000) * service.pricePer1000;
-            setCurrentOrder({
-              platform: parsed.platform as Platform,
-              service: service,
-              link: parsed.link,
-              quantity: parsed.quantity
-            });
-            setChatState('confirming');
-            botReply(`I've prepared your order! 🛒\n\nPlatform: ${PLATFORMS[parsed.platform as Platform]}\nService: ${service.name}\nLink: ${parsed.link}\nQuantity: ${parsed.quantity}\nTotal Price: $${price.toFixed(2)}\n\nReply "Confirm" to proceed or "Cancel" to abort.`);
-            return;
+        if (text.length > 5) { // Only try AI for longer inputs
+          const parsed = await intelligentOrderParsing({ requestText: text });
+          if (parsed && parsed.platform && parsed.service && parsed.quantity && parsed.link) {
+            const platformServices = SERVICES[parsed.platform as Platform];
+            const service = platformServices.find(s => s.id === parsed.service);
+            if (service) {
+              const price = (parsed.quantity / 1000) * service.pricePer1000;
+              setCurrentOrder({
+                platform: parsed.platform as Platform,
+                service: service,
+                link: parsed.link,
+                quantity: parsed.quantity
+              });
+              setChatState('confirming');
+              botReply(`I've prepared your order! 🛒\n\nPlatform: ${PLATFORMS[parsed.platform as Platform]}\nService: ${service.name}\nLink: ${parsed.link}\nQuantity: ${parsed.quantity}\nTotal Price: $${price.toFixed(2)}\n\nReply "Confirm" to proceed or "Cancel" to abort.`);
+              return;
+            }
           }
         }
       } catch (e) {
-        // Fallback to guided flow
+        // Fallback to guided flow if AI parsing fails or doesn't find a match
       }
     }
 
@@ -162,7 +187,12 @@ export default function ChatPage() {
 
       case 'choosing_service':
         const index = parseInt(text) - 1;
-        const platform = currentOrder.platform!;
+        const platform = currentOrder.platform;
+        if (!platform) {
+          botReply("Something went wrong. Let's start over.");
+          startOrderFlow();
+          return;
+        }
         const service = SERVICES[platform][index];
         if (service) {
           setCurrentOrder({ ...currentOrder, service });
@@ -193,8 +223,8 @@ export default function ChatPage() {
 
       case 'confirming':
         if (text.toLowerCase() === 'confirm') {
-          addDoc(collection(db, "orders"), {
-            uid: user?.uid,
+          const orderData = {
+            userId: user.uid, // Required field in security rules
             platform: currentOrder.platform,
             service: currentOrder.service?.id,
             link: currentOrder.link,
@@ -202,7 +232,18 @@ export default function ChatPage() {
             price: (currentOrder.quantity! / 1000) * currentOrder.service!.pricePer1000,
             status: 'Pending',
             createdAt: serverTimestamp()
-          });
+          };
+          
+          addDoc(collection(db, "users", user.uid, "orders"), orderData)
+            .catch(async (error) => {
+              const permissionError = new FirestorePermissionError({
+                path: `users/${user.uid}/orders`,
+                operation: 'create',
+                requestResourceData: orderData,
+              });
+              errorEmitter.emit('permission-error', permissionError);
+            });
+
           setChatState('idle');
           botReply("Order placed successfully! 🎉\nWe are processing it now. Check back soon for updates.");
           setTimeout(() => startOrderFlow(), 3000);
@@ -224,7 +265,7 @@ export default function ChatPage() {
     <div className="flex flex-col h-screen dark chat-bg max-w-md mx-auto relative overflow-hidden">
       <header className="bg-card border-b p-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
+          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground border border-primary/20">
             <Rocket size={20} />
           </div>
           <div>
@@ -236,7 +277,7 @@ export default function ChatPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="ghost" size="icon" onClick={() => auth?.signOut()}>
+          <Button variant="ghost" size="icon" onClick={() => auth?.signOut()} className="hover:bg-destructive/10 hover:text-destructive">
             <LogOut size={18} />
           </Button>
         </div>
@@ -256,7 +297,7 @@ export default function ChatPage() {
       </main>
 
       <footer className="p-3 bg-background border-t">
-        <div className="flex items-center gap-2 max-w-lg mx-auto bg-muted/30 rounded-full px-2 py-1 shadow-inner border">
+        <div className="flex items-center gap-2 max-w-lg mx-auto bg-muted/30 rounded-full px-2 py-1 shadow-inner border border-primary/10">
           <Input 
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
@@ -267,7 +308,7 @@ export default function ChatPage() {
           <Button 
             onClick={handleSend}
             size="icon" 
-            className="rounded-full h-9 w-9 bg-primary hover:bg-primary/90 transition-transform active:scale-90"
+            className="rounded-full h-9 w-9 bg-primary hover:bg-primary/90 transition-transform active:scale-95 shrink-0"
           >
             <Send size={18} className="ml-0.5" />
           </Button>

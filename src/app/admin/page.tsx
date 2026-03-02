@@ -1,8 +1,9 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
 import { 
-  collection, 
+  collectionGroup, 
   query, 
   orderBy, 
   onSnapshot, 
@@ -30,6 +31,8 @@ import {
 import { format } from "date-fns";
 import { Download, RefreshCw, LayoutDashboard, LogOut } from "lucide-react";
 import { useAuth, useFirestore, useUser } from "@/firebase";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 
 export default function AdminDashboard() {
   const { user, isUserLoading } = useUser();
@@ -47,29 +50,52 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (!user || !db) return;
-    const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
+
+    // Path matches firestore.rules: users/{userId}/orders/{orderId}
+    // We use collectionGroup to fetch all orders across all users
+    const q = query(collectionGroup(db, "orders"), orderBy("createdAt", "desc"));
+    
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const ords = snapshot.docs.map(doc => ({
         id: doc.id,
+        path: doc.ref.path, // Store the full path for updates
         ...doc.data(),
         createdAt: doc.data().createdAt?.toDate() || new Date()
       }));
       setOrders(ords);
       setLoading(false);
+    }, (error) => {
+      const contextualError = new FirestorePermissionError({
+        path: 'orders (collectionGroup)',
+        operation: 'list'
+      });
+      errorEmitter.emit('permission-error', contextualError);
+      setLoading(false);
     });
+    
     return () => unsubscribe();
   }, [user, db]);
 
-  const updateStatus = async (orderId: string, status: string) => {
+  const updateStatus = async (orderPath: string, status: string) => {
     if (!db) return;
-    await updateDoc(doc(db, "orders", orderId), { status });
+    // We must use the full path to update documents in subcollections
+    const orderRef = doc(db, orderPath);
+    updateDoc(orderRef, { status })
+      .catch((error) => {
+        const contextualError = new FirestorePermissionError({
+          path: orderPath,
+          operation: 'update',
+          requestResourceData: { status }
+        });
+        errorEmitter.emit('permission-error', contextualError);
+      });
   };
 
   const exportOrders = () => {
     const csv = [
-      ["Order ID", "UID", "Platform", "Service", "Link", "Quantity", "Price", "Status", "Date"].join(","),
+      ["Order ID", "User ID", "Platform", "Service", "Link", "Quantity", "Price", "Status", "Date"].join(","),
       ...orders.map(o => [
-        o.id, o.uid, o.platform, o.service, o.link, o.quantity, o.price, o.status, o.createdAt.toISOString()
+        o.id, o.userId, o.platform, o.service, o.link, o.quantity, o.price, o.status, o.createdAt.toISOString()
       ].join(","))
     ].join("\n");
     
@@ -99,7 +125,7 @@ export default function AdminDashboard() {
             <h1 className="text-2xl font-bold">Admin Dashboard</h1>
           </div>
           <div className="flex items-center gap-4">
-            <Button variant="outline" size="sm" onClick={exportOrders} className="gap-2 border-slate-700">
+            <Button variant="outline" size="sm" onClick={exportOrders} className="gap-2 border-slate-700 bg-slate-800 hover:bg-slate-700">
               <Download size={16} /> Export CSV
             </Button>
             <Button variant="ghost" size="sm" onClick={() => auth?.signOut()} className="text-red-400 hover:text-red-300 hover:bg-red-950/30">
@@ -144,13 +170,14 @@ export default function AdminDashboard() {
                     <Badge variant={order.status === 'Completed' ? 'default' : 'secondary'} className={
                       order.status === 'Pending' ? 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30' : 
                       order.status === 'Processing' ? 'bg-blue-500/20 text-blue-500 border-blue-500/30' :
+                      order.status === 'Cancelled' ? 'bg-red-500/20 text-red-500 border-red-500/30' :
                       'bg-green-500/20 text-green-500 border-green-500/30'
                     }>
                       {order.status}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Select defaultValue={order.status} onValueChange={(val) => updateStatus(order.id, val)}>
+                    <Select defaultValue={order.status} onValueChange={(val) => updateStatus(order.path, val)}>
                       <SelectTrigger className="w-[130px] h-8 bg-slate-950 border-slate-700 text-xs">
                         <SelectValue />
                       </SelectTrigger>
