@@ -15,7 +15,9 @@ interface Message {
 }
 
 export function SupportBot() {
-  const { user } = useUser();
+  const { user } = userHook();
+  function userHook() { return useUser(); }
+  
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     { role: 'bot', text: 'Hi! I am the SocialBoost Assistant. How can I help you today? 🚀' }
@@ -29,6 +31,14 @@ export function SupportBot() {
       scrollRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isLoading]);
+
+  // Clear history when the bot is closed
+  const toggleBot = () => {
+    if (isOpen) {
+      setMessages([{ role: 'bot', text: 'Hi! I am the SocialBoost Assistant. How can I help you today? 🚀' }]);
+    }
+    setIsOpen(!isOpen);
+  };
 
   const handleSend = async () => {
     if (!input.trim() || !user || isLoading) return;
@@ -50,8 +60,7 @@ export function SupportBot() {
 
       setMessages(prev => [...prev, { role: 'bot', text: response.reply }]);
     } catch (error) {
-      console.error("Support Bot Error:", error);
-      setMessages(prev => [...prev, { role: 'bot', text: "Sorry, I'm having trouble connecting. Please try again later." }]);
+      setMessages(prev => [...prev, { role: 'bot', text: "Aapka request abhi process nahi ho pa raha hai. Kripya thodi der baad phir se koshish karein ya @bindash_boy3 ko Instagram par contact karein. 🙏" }]);
     } finally {
       setIsLoading(false);
     }
@@ -60,7 +69,7 @@ export function SupportBot() {
   if (!user) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end">
+    <div className="fixed bottom-6 left-6 z-[100] flex flex-col items-start">
       {/* Chat Window */}
       {isOpen && (
         <div className="mb-4 w-[320px] sm:w-[380px] h-[500px] bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-800 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300">
@@ -74,7 +83,7 @@ export function SupportBot() {
                 <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest">Always Online</p>
               </div>
             </div>
-            <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+            <button onClick={toggleBot} className="p-2 hover:bg-white/10 rounded-full transition-colors">
               <X size={20} />
             </button>
           </header>
@@ -110,7 +119,7 @@ export function SupportBot() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                placeholder="Ask about orders..."
+                placeholder="Order ID search karein..."
                 className="h-12 bg-white dark:bg-slate-800 border-none rounded-2xl px-4 text-sm font-bold shadow-inner"
               />
               <Button 
@@ -128,7 +137,7 @@ export function SupportBot() {
 
       {/* Toggle Button */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={toggleBot}
         className={cn(
           "w-16 h-16 rounded-full flex items-center justify-center text-white shadow-2xl transition-all active:scale-90 hover:scale-105",
           isOpen ? "bg-red-500 rotate-90" : "bg-[#312ECB]"

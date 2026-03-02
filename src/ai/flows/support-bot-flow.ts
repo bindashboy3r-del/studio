@@ -53,7 +53,7 @@ const getOrderDetails = ai.defineTool(
       if (snapshot.empty) {
         return { 
           found: false, 
-          message: `Maaf kijiye, humein Order ID ${cleanId} ke liye koi record nahi mila. Kripya Order ID check karke dobara batayein.` 
+          message: `Aapka order ${cleanId} abhi nahi mil pa raha hai, database mein kuch error aa raha hai. Kripya thodi der baad phir se koshish karein ya @bindash_boy3 ko Instagram par contact karein.` 
         };
       }
       
@@ -66,8 +66,7 @@ const getOrderDetails = ai.defineTool(
         price: data.price,
       };
     } catch (e: any) {
-      console.error("SupportBot Tool Error:", e);
-      return { found: false, message: "Database access error. Please try again later." };
+      return { found: false, message: "Database search failed. Kripya thodi der baad phir se koshish karein ya @bindash_boy3 ko Instagram par contact karein." };
     }
   }
 );
@@ -97,10 +96,10 @@ Your goal is to help users with their SMM orders and wallet balances.
 GUIDELINES:
 1. If a user provides an Order ID (e.g., SB-123456), ALWAYS use the getOrderDetails tool to check the live status. 
 2. If the tool finds the order, explain the current status (Pending, Processing, Completed, or Rejected) clearly to the user.
-3. If an order is "Rejected" or "Cancelled", suggest they check their "Order History" for a specific rejection message or contact admin on WhatsApp.
+3. If an order is NOT found or if there is any error, say: "Aapka order [ORDER_ID] abhi nahi mil pa raha hai, database mein kuch error aa raha hai. Kripya thodi der baad phir se koshish karein ya @bindash_boy3 ko Instagram par contact karein."
 4. If they ask how to add money or for a QR code, provide the UPI ID "smmxpressbot@slc" and suggest they click the "Add Funds" button in the header.
 5. If they ask for help or the bot is confused, suggest contacting the owner @bindash_boy3 on Instagram.
-6. Keep responses concise and friendly. Use Hindi/Hinglish if the user asks in Hindi. Use emojis! 🚀
+6. Keep responses concise and friendly. Use Hinglish (Hindi written in English script) as the user prefers. Use emojis! 🚀
 
 User Message: "{{{message}}}"
 User ID: "{{{userId}}}"`,
