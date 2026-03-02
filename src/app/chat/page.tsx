@@ -70,7 +70,6 @@ export default function ChatPage() {
   const hasInitialGreeted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Theme Toggle Logic
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
     if (savedTheme) {
@@ -119,13 +118,14 @@ export default function ChatPage() {
     }
   };
 
-  const addMessage = async (sender: 'user' | 'bot', text: string) => {
+  const addMessage = async (sender: 'user' | 'bot', text: string, options?: string[]) => {
     if (!user || !db) return;
     const path = `users/${user.uid}/chatMessages`;
     const data = {
       userId: user.uid,
       sender,
       text,
+      options: options || [],
       timestamp: serverTimestamp()
     };
 
@@ -140,10 +140,10 @@ export default function ChatPage() {
       });
   };
 
-  const botReply = async (text: string) => {
+  const botReply = async (text: string, options?: string[]) => {
     setIsTyping(true);
     setTimeout(async () => {
-      await addMessage('bot', text);
+      await addMessage('bot', text, options);
       setIsTyping(false);
     }, 800);
   };
@@ -156,15 +156,19 @@ export default function ChatPage() {
     }
   }, [user, isMessagesLoading]);
 
-  const handleSend = async () => {
-    if (!inputValue.trim() || !db || !user) return;
-    const text = inputValue.trim();
-    setInputValue("");
+  const handleSend = async (manualText?: string) => {
+    const text = manualText || inputValue.trim();
+    if (!text || !db || !user) return;
+    
+    if (!manualText) setInputValue("");
     await addMessage('user', text);
 
     if (chatState === 'initial' && text.toLowerCase() === 'hi') {
       setChatState('choosing_platform');
-      botReply(`What can I help you with today?\n\n1️⃣ Instagram Services\n2️⃣ YouTube Services`);
+      botReply(
+        "👋 Welcome to SocialBoost Bot!\n\nNiche di gayi list mein se koi bhi service select karein:",
+        ["1. Instagram Services", "2. YouTube Services"]
+      );
       return;
     } else if (chatState === 'initial') {
       botReply("Send 'Hi' to start create order");
@@ -173,7 +177,7 @@ export default function ChatPage() {
 
     if (chatState === 'choosing_platform' || chatState === 'idle') {
       try {
-        if (text.length > 5) {
+        if (text.length > 5 && !manualText) {
           const parsed = await intelligentOrderParsing({ requestText: text });
           if (parsed && parsed.platform && parsed.service && parsed.quantity && parsed.link) {
             const platformServices = SERVICES[parsed.platform as Platform];
@@ -187,7 +191,10 @@ export default function ChatPage() {
                 quantity: parsed.quantity
               });
               setChatState('confirming');
-              botReply(`I've prepared your order! 🛒\n\nPlatform: ${PLATFORMS[parsed.platform as Platform]}\nService: ${service.name}\nLink: ${parsed.link}\nQuantity: ${parsed.quantity}\nTotal Price: $${price.toFixed(2)}\n\nReply "Confirm" to proceed or "Cancel" to abort.`);
+              botReply(
+                `I've prepared your order! 🛒\n\nPlatform: ${PLATFORMS[parsed.platform as Platform]}\nService: ${service.name}\nLink: ${parsed.link}\nQuantity: ${parsed.quantity}\nTotal Price: $${price.toFixed(2)}\n\nReply "Confirm" to proceed or "Cancel" to abort.`,
+                ["Confirm", "Cancel"]
+              );
               return;
             }
           }
@@ -197,18 +204,18 @@ export default function ChatPage() {
 
     switch (chatState) {
       case 'choosing_platform':
-        if (text === "1" || text.toLowerCase().includes("instagram")) {
+        if (text.includes("1") || text.toLowerCase().includes("instagram")) {
           setCurrentOrder({ platform: 'instagram' });
           setChatState('choosing_service');
-          const svcList = SERVICES.instagram.map((s, i) => `${i + 1}️⃣ ${s.name}`).join('\n');
-          botReply(`Perfect. Select an Instagram service:\n\n${svcList}`);
-        } else if (text === "2" || text.toLowerCase().includes("youtube")) {
+          const options = SERVICES.instagram.map((s, i) => `${i + 1}. Instagram ${s.name}`);
+          botReply("Perfect. Niche di gayi Instagram service select karein:", options);
+        } else if (text.includes("2") || text.toLowerCase().includes("youtube")) {
           setCurrentOrder({ platform: 'youtube' });
           setChatState('choosing_service');
-          const svcList = SERVICES.youtube.map((s, i) => `${i + 1}️⃣ ${s.name}`).join('\n');
-          botReply(`Perfect. Select a YouTube service:\n\n${svcList}`);
+          const options = SERVICES.youtube.map((s, i) => `${i + 1}. YouTube ${s.name}`);
+          botReply("Perfect. Niche di gayi YouTube service select karein:", options);
         } else {
-          botReply("Please enter 1 for Instagram or 2 for YouTube.");
+          botReply("Please select from the options provided.");
         }
         break;
 
@@ -243,7 +250,10 @@ export default function ChatPage() {
           const price = (qty / 1000) * currentOrder.service!.pricePer1000;
           setCurrentOrder({ ...currentOrder, quantity: qty });
           setChatState('confirming');
-          botReply(`Order Details 📝\n\nPlatform: ${PLATFORMS[currentOrder.platform!]}\nService: ${currentOrder.service!.name}\nLink: ${currentOrder.link}\nQuantity: ${qty}\nTotal Price: $${price.toFixed(2)}\n\nType "Confirm" to place order or "Cancel" to start over.`);
+          botReply(
+            `Order Details 📝\n\nPlatform: ${PLATFORMS[currentOrder.platform!]}\nService: ${currentOrder.service!.name}\nLink: ${currentOrder.link}\nQuantity: ${qty}\nTotal Price: $${price.toFixed(2)}\n\nType "Confirm" to place order or "Cancel" to start over.`,
+            ["Confirm", "Cancel"]
+          );
         }
         break;
 
@@ -291,7 +301,6 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-screen max-w-lg mx-auto overflow-hidden relative shadow-2xl bg-white dark:bg-slate-950 font-body">
-      {/* 1. TOP BAR (WHITE) */}
       <div className="bg-white dark:bg-slate-900 px-4 py-3 flex items-center justify-between border-b border-gray-100 dark:border-slate-800 z-40">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-[#312ECB] flex items-center justify-center text-white shadow-md">
@@ -328,7 +337,6 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {/* 2. SUB-HEADER BAR (WHITE) */}
       <div className="bg-white dark:bg-slate-900 px-5 py-2 flex items-center justify-between border-b border-gray-100 dark:border-slate-800 z-30">
         <span className="text-[10px] font-black italic text-[#312ECB]/40 dark:text-white/40 tracking-widest uppercase">
           Automated Assistant
@@ -344,7 +352,6 @@ export default function ChatPage() {
         </Button>
       </div>
 
-      {/* 3. BOT BANNER (DEEP BLUE) */}
       <div className="bg-[#312ECB] px-5 py-4 flex items-center gap-4 z-20 shadow-md">
         <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
           <Bot size={28} className="text-white/80" />
@@ -358,13 +365,14 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {/* 4. CHAT AREA */}
       <main className="flex-1 overflow-y-auto p-4 flex flex-col whatsapp-bg scroll-smooth">
         {messages.map((m: any) => (
           <MessageBubble 
             key={m.id} 
             sender={m.sender} 
             text={m.text} 
+            options={m.options}
+            onOptionClick={(option) => handleSend(option)}
             timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} 
           />
         ))}
@@ -372,7 +380,6 @@ export default function ChatPage() {
         <div ref={scrollRef} />
       </main>
 
-      {/* INPUT BAR */}
       <footer className="p-3 bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800">
         <div className="flex items-center gap-3">
           <div className="flex-1 bg-[#F0F2F5] dark:bg-slate-800 rounded-full flex items-center px-5 py-1">
@@ -381,11 +388,11 @@ export default function ChatPage() {
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               placeholder="Type a message"
-              className="border-none bg-transparent focus-visible:ring-0 shadow-none text-[15px] h-10 p-0 text-black dark:text-white font-semibold placeholder:text-gray-400"
+              className="border-none bg-transparent focus-visible:ring-0 shadow-none text-[15px] h-10 p-0 text-black dark:text-white font-bold placeholder:text-gray-400"
             />
           </div>
           <Button 
-            onClick={handleSend}
+            onClick={() => handleSend()}
             size="icon" 
             className="rounded-full h-12 w-12 bg-[#25D366] hover:bg-[#20bd5b] shadow-lg shrink-0"
           >
