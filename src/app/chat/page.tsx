@@ -297,6 +297,7 @@ export default function ChatPage() {
 
     const cleanText = text.toLowerCase();
 
+    // GLOBAL NAVIGATION MATCHERS
     if (cleanText === 'hi' || cleanText.includes("main menu")) {
       setChatState('choosing_platform');
       setCurrentOrder({});
@@ -304,6 +305,36 @@ export default function ChatPage() {
         "👋 Welcome to SocialBoost Bot!\n\nNiche di gayi list mein se koi bhi platform select karein:",
         ["1. INSTAGRAM SERVICES", "2. YOUTUBE SERVICES"]
       );
+      return;
+    }
+
+    // Redirect to Platform Choosing (allows jumping from anywhere)
+    if (cleanText.includes("instagram services")) {
+      setCurrentOrder({ platform: 'instagram' });
+      setChatState('choosing_service');
+      const options = SERVICES.instagram.map((s, i) => `${i + 1}. INSTAGRAM ${s.name.toUpperCase()}`);
+      botReply("Perfect. Niche di gayi Instagram service select karein:", options);
+      return;
+    }
+
+    if (cleanText.includes("youtube services")) {
+      setCurrentOrder({ platform: 'youtube' });
+      setChatState('choosing_service');
+      const options = SERVICES.youtube.map((s, i) => `${i + 1}. YOUTUBE ${s.name.toUpperCase()}`);
+      botReply("Perfect. Niche di gayi YouTube service select karein:", options);
+      return;
+    }
+
+    // Redirect to Specific Service (allows jumping if clicking old service buttons)
+    // Check if the text matches any known service (e.g. "1. INSTAGRAM FOLLOWERS")
+    const allServices = [...SERVICES.instagram, ...SERVICES.youtube];
+    const matchedService = allServices.find(s => cleanText.includes(s.name.toLowerCase()));
+    
+    if (matchedService && (cleanText.includes("instagram") || cleanText.includes("youtube"))) {
+      const detectedPlatform: Platform = cleanText.includes("instagram") ? 'instagram' : 'youtube';
+      setCurrentOrder({ platform: detectedPlatform, service: matchedService });
+      setChatState('entering_quantity');
+      botReply(`📊 Aapne ${PLATFORMS[detectedPlatform]} ${matchedService.name} select kiya hai.\n\nKitni quantity chahiye? (Minimum 100)`);
       return;
     }
 
