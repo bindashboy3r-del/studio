@@ -5,24 +5,24 @@
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 200 32% 10%; /* Darker text #111b21 */
+    --foreground: 0 0% 0%; /* Pure black for maximum contrast #000000 */
     --card: 0 0% 100%;
-    --card-foreground: 200 32% 10%;
+    --card-foreground: 0 0% 0%;
     --popover: 0 0% 100%;
-    --popover-foreground: 200 32% 10%;
-    --primary: 165 80% 21%; /* WhatsApp Teal #075E54 */
+    --popover-foreground: 0 0% 0%;
+    --primary: 165 80% 15%; /* Deeper WhatsApp Teal #054640 */
     --primary-foreground: 0 0% 100%;
-    --secondary: 142 70% 49%; /* WhatsApp Green #25D366 */
+    --secondary: 142 70% 45%; /* WhatsApp Green #25D366 */
     --secondary-foreground: 0 0% 100%;
     --muted: 0 0% 96%;
-    --muted-foreground: 204 8% 45%; /* #667781 */
+    --muted-foreground: 200 10% 30%; /* Darker gray for secondary text #4a4a4a */
     --accent: 74 65% 87%; /* WhatsApp User Bubble Color #DCF8C6 */
-    --accent-foreground: 200 32% 10%;
+    --accent-foreground: 0 0% 0%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
-    --ring: 165 80% 21%;
+    --border: 0 0% 85%;
+    --input: 0 0% 85%;
+    --ring: 165 80% 15%;
     --radius: 0.75rem;
   }
 }
@@ -46,11 +46,11 @@
 
 /* WhatsApp Message Bubbles */
 .bubble-bot {
-  @apply bg-white text-[#111B21] rounded-2xl rounded-tl-none shadow-sm border-none;
+  @apply bg-white text-black rounded-2xl rounded-tl-none shadow-sm border-none;
 }
 
 .bubble-user {
-  @apply bg-[#DCF8C6] text-[#111B21] rounded-2xl rounded-tr-none shadow-sm border-none;
+  @apply bg-[#DCF8C6] text-black rounded-2xl rounded-tr-none shadow-sm border-none;
 }
 
 /* Status Dot */
@@ -68,7 +68,7 @@
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  @apply bg-muted-foreground mx-0.5;
+  @apply bg-gray-600 mx-0.5;
   animation: typing 1s infinite ease-in-out;
 }
 

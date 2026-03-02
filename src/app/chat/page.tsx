@@ -119,12 +119,12 @@ export default function ChatPage() {
 
   // Bot initialization logic - fires once per session mount
   useEffect(() => {
-    if (user && !isMessagesLoading && !hasInitialGreeted.current && chatState === 'idle') {
+    if (user && !isMessagesLoading && !hasInitialGreeted.current) {
       hasInitialGreeted.current = true;
       setChatState('initial');
       botReply("Send 'Hi' to start create order");
     }
-  }, [user, isMessagesLoading, chatState]);
+  }, [user, isMessagesLoading]);
 
   const handleSend = async () => {
     if (!inputValue.trim() || !db || !user) return;
@@ -267,14 +267,14 @@ export default function ChatPage() {
   return (
     <div className="flex flex-col h-screen whatsapp-bg max-w-lg mx-auto overflow-hidden relative shadow-2xl">
       {/* WhatsApp Header */}
-      <header className="bg-[#0F5C53] text-white p-3 px-4 flex items-center justify-between sticky top-0 z-20 shadow-md h-[60px]">
+      <header className="bg-[#054640] text-white p-3 px-4 flex items-center justify-between sticky top-0 z-20 shadow-md h-[60px]">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center border border-white/10">
             <Rocket size={20} className="text-white" />
           </div>
           <div>
             <h1 className="font-bold text-base leading-tight">SocialBoost</h1>
-            <p className="text-[12px] text-white/80 flex items-center">
+            <p className="text-[12px] text-white/80 flex items-center font-medium">
               <span className="status-dot" />
               Active Server
             </p>
@@ -287,7 +287,7 @@ export default function ChatPage() {
             <div className="hidden group-hover:block absolute right-0 top-full mt-2 bg-white rounded-md shadow-xl border w-32 py-1 text-[#111B21] z-30">
               <button 
                 onClick={() => auth?.signOut()}
-                className="w-full px-4 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2"
+                className="w-full px-4 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2 font-semibold"
               >
                 <LogOut size={14} /> Log out
               </button>
@@ -298,7 +298,7 @@ export default function ChatPage() {
 
       {/* Chat Area */}
       <main className="flex-1 overflow-y-auto p-4 flex flex-col scroll-smooth">
-        <div className="mx-auto bg-[#D9FDD3]/80 px-4 py-1.5 rounded-lg text-[12px] text-[#111B21]/80 shadow-sm mb-6 uppercase tracking-wider font-semibold">
+        <div className="mx-auto bg-[#D9FDD3]/80 px-4 py-1.5 rounded-lg text-[12px] text-black shadow-sm mb-6 uppercase tracking-wider font-bold">
           Messages are secured
         </div>
         
@@ -323,7 +323,7 @@ export default function ChatPage() {
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               placeholder="Type a message"
-              className="border-none bg-transparent focus-visible:ring-0 shadow-none text-[15px] h-9 p-0 text-[#111B21] font-medium"
+              className="border-none bg-transparent focus-visible:ring-0 shadow-none text-[15px] h-9 p-0 text-black font-semibold placeholder:text-gray-500"
             />
           </div>
           <Button 
