@@ -162,7 +162,7 @@ export default function ChatPage() {
     if (!link || !utr || !db || !user) return;
     
     const finalPrice = (currentOrder.quantity! / 1000) * currentOrder.service!.pricePer1000;
-    const orderId = `INSTA-${Math.floor(100000 + Math.random() * 900000)}`;
+    const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}`;
     
     const orderData = {
       userId: user.uid,
@@ -176,7 +176,6 @@ export default function ChatPage() {
       createdAt: serverTimestamp()
     };
 
-    // Save to Firestore
     addDoc(collection(db, "users", user.uid, "orders"), orderData)
       .catch(async (error) => {
         const permissionError = new FirestorePermissionError({
@@ -190,7 +189,7 @@ export default function ChatPage() {
     await addMessage('user', `Link: ${link}, UTR: ${utr}`);
     
     setChatState('idle');
-    botReply("Order created successfully!", [], {
+    botReply("Order submitted successfully!", [], {
       isSuccessCard: true,
       successDetails: {
         orderId,
@@ -213,24 +212,39 @@ export default function ChatPage() {
 
     const cleanText = text.toLowerCase();
 
-    if (cleanText.includes("main menu")) {
-      setChatState('initial');
-      botReply("Send 'Hi' to start create order");
-      return;
-    }
-
-    if (chatState === 'initial' && cleanText === 'hi') {
+    // Reset flow if "Hi" or "Main Menu" is detected
+    if (cleanText === 'hi' || cleanText.includes("main menu")) {
       setChatState('choosing_platform');
+      setCurrentOrder({});
       botReply(
-        "👋 Welcome to SocialBoost Bot!\n\nNiche di gayi list mein se koi bhi service select karein:",
+        "👋 Welcome to SocialBoost Bot!\n\nNiche di gayi list mein se koi bhi platform select karein:",
         ["1. INSTAGRAM SERVICES", "2. YOUTUBE SERVICES"]
       );
       return;
-    } else if (chatState === 'initial') {
-      botReply("Send 'Hi' to start create order");
+    }
+
+    // State jumping logic: If user clicks a specific service button from a previous message
+    const instaServices = SERVICES.instagram;
+    const youtubeServices = SERVICES.youtube;
+
+    const matchedInstaService = instaServices.find(s => cleanText.includes(s.name.toLowerCase()) && cleanText.includes("instagram"));
+    const matchedYoutubeService = youtubeServices.find(s => cleanText.includes(s.name.toLowerCase()) && cleanText.includes("youtube"));
+
+    if (matchedInstaService) {
+      setCurrentOrder({ platform: 'instagram', service: matchedInstaService });
+      setChatState('entering_quantity');
+      botReply(`📊 Aapne Instagram ${matchedInstaService.name} select kiya hai.\n\nKitni quantity chahiye? (Minimum 100)`);
       return;
     }
 
+    if (matchedYoutubeService) {
+      setCurrentOrder({ platform: 'youtube', service: matchedYoutubeService });
+      setChatState('entering_quantity');
+      botReply(`📊 Aapne YouTube ${matchedYoutubeService.name} select kiya hai.\n\nKitni quantity chahiye? (Minimum 100)`);
+      return;
+    }
+
+    // Standard State Machine
     switch (chatState) {
       case 'choosing_platform':
         if (cleanText.includes("1") || cleanText.includes("instagram")) {
@@ -253,6 +267,7 @@ export default function ChatPage() {
         const sPlatform = currentOrder.platform;
         if (!sPlatform) {
           setChatState('initial');
+          botReply("Something went wrong. Send 'Hi' to start again.");
           return;
         }
         const sService = SERVICES[sPlatform][sIndex];
@@ -290,13 +305,17 @@ export default function ChatPage() {
           });
         } else {
           setChatState('initial');
+          setCurrentOrder({});
           botReply("Order cancelled. Send 'Hi' to start create order");
         }
         break;
 
       default:
-        botReply("I didn't understand that. Send 'Hi' to start create order");
-        setChatState('initial');
+        if (chatState === 'initial') {
+           botReply("Send 'Hi' to start create order");
+        } else {
+           botReply("I didn't understand that. Send 'Hi' to go to Main Menu.");
+        }
         break;
     }
   };
