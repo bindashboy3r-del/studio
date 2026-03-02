@@ -16,14 +16,9 @@ import {
   User as UserIcon,
   CheckCircle2,
   MessageCircle,
+  Instagram,
   X
 } from "lucide-react";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import {
   Dialog,
   DialogContent,
@@ -157,33 +152,53 @@ export default function ProfilePage() {
             <HelpCircle size={14} /> Support & Terms
           </div>
           <Card className="border-none shadow-[0_10px_40px_rgba(0,0,0,0.03)] rounded-[2.5rem] p-6 space-y-3">
-            {/* Support Button (as Accordion for context or just Button) */}
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="support" className="border-none">
-                <AccordionTrigger className="text-[12px] font-black uppercase tracking-widest text-[#111B21] hover:no-underline px-4 bg-slate-50 rounded-2xl mb-2">
+            
+            {/* Support Dialog (Contact Options) */}
+            <Dialog>
+              <DialogTrigger asChild>
+                <button className="w-full flex items-center justify-between text-[12px] font-black uppercase tracking-widest text-[#111B21] px-4 py-4 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-colors">
                   <div className="flex items-center gap-3">
                     <HelpCircle size={16} className="text-[#312ECB]" />
                     Support Center
                   </div>
-                </AccordionTrigger>
-                <AccordionContent className="px-6 py-4 flex flex-col gap-4">
-                  <p className="text-xs font-semibold text-slate-500 leading-relaxed">
-                    Need help with your orders? Our growth team is available 24/7 to assist you. Click the button below to message us directly on WhatsApp.
+                  <ChevronLeft size={16} className="rotate-180 text-slate-300" />
+                </button>
+              </DialogTrigger>
+              <DialogContent className="max-w-[90%] sm:max-w-[400px] rounded-[3rem] p-8 border-none bg-[#F3F4F9] shadow-2xl">
+                <DialogHeader className="text-center mb-8">
+                  <DialogTitle className="text-2xl font-black uppercase tracking-tight text-[#111B21]">
+                    CONTACT SUPPORT
+                  </DialogTitle>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    HOW CAN WE HELP YOU TODAY?
                   </p>
+                </DialogHeader>
+
+                <div className="space-y-4">
                   <Button 
                     asChild
-                    className="w-full h-12 bg-[#25D366] hover:bg-[#20bd5b] text-white font-black text-[11px] uppercase tracking-widest rounded-2xl shadow-[0_8px_16px_rgba(37,211,102,0.2)]"
+                    className="w-full h-14 bg-gradient-to-r from-[#833ab4] via-[#fd1d1d] to-[#fcb045] hover:opacity-90 text-white font-black text-[11px] uppercase tracking-widest rounded-2xl shadow-lg border-none"
                   >
-                    <a href="https://wa.me/919116399517" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2">
-                      <MessageCircle size={18} />
-                      Chat on WhatsApp
+                    <a href="https://www.instagram.com/social_boost.bot?igsh=MWg4OXI2N2E0Ynltdg==" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-3">
+                      <Instagram size={20} />
+                      Instagram Support
                     </a>
                   </Button>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
 
-            {/* Terms & Conditions Button that opens Dialog */}
+                  <Button 
+                    asChild
+                    className="w-full h-14 bg-[#25D366] hover:bg-[#20bd5b] text-white font-black text-[11px] uppercase tracking-widest rounded-2xl shadow-lg border-none"
+                  >
+                    <a href="https://wa.me/919116399517" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-3">
+                      <MessageCircle size={20} />
+                      WhatsApp Support
+                    </a>
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Terms & Conditions Dialog */}
             <Dialog>
               <DialogTrigger asChild>
                 <button className="w-full flex items-center justify-between text-[12px] font-black uppercase tracking-widest text-[#111B21] px-4 py-4 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-colors">
