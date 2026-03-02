@@ -20,18 +20,17 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { 
   Send, 
-  LogOut, 
   Bell, 
   Moon, 
   Sun,
-  Rocket,
   History,
-  Bot,
-  User as UserIcon,
+  Rocket,
   X,
   Megaphone,
+  User as UserIcon,
   Zap,
-  Clock
+  Clock,
+  Circle
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PLATFORMS, SERVICES, Platform, SMMService } from "@/app/lib/constants";
@@ -43,12 +42,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { format, isValid } from "date-fns";
+import { cn } from "@/lib/utils";
 
 type ChatState = 
   | 'idle' 
@@ -101,7 +98,6 @@ export default function ChatPage() {
     document.documentElement.classList.toggle('dark', newTheme === 'dark');
   };
 
-  // Global Broadcast Listener - Finds the first active slot
   useEffect(() => {
     if (!db) return;
     const broadcastQuery = query(
@@ -120,7 +116,6 @@ export default function ChatPage() {
     return () => unsubscribe();
   }, [db]);
 
-  // Real-time Notifications Listener
   const notificationsQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
     return query(
@@ -159,18 +154,16 @@ export default function ChatPage() {
 
   const clearAllNotifications = async () => {
     if (!db || !user || !notificationsData || notificationsData.length === 0) return;
-    
     const batch = writeBatch(db);
     notificationsData.forEach(n => {
       const ref = doc(db, "users", user.uid, "notifications", n.id);
       batch.delete(ref);
     });
-    
     await batch.commit().then(() => {
       toast({ title: "Notifications Cleared" });
     }).catch(e => {
       console.error("Failed to clear", e);
-      toast({ variant: "destructive", title: "Clear Failed", description: "Could not remove notifications." });
+      toast({ variant: "destructive", title: "Clear Failed" });
     });
   };
 
@@ -198,14 +191,10 @@ export default function ChatPage() {
   }, [user, isUserLoading, router]);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, isTyping, activeBroadcast]);
-
-  const scrollToBottom = () => {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  };
+  }, [messages, isTyping, activeBroadcast]);
 
   const addMessage = async (sender: 'user' | 'bot', text: string, options?: string[], extraData?: any) => {
     if (!user || !db) return;
@@ -220,12 +209,11 @@ export default function ChatPage() {
 
     addDoc(collection(db, "users", user.uid, "chatMessages"), data)
       .catch(async (error) => {
-        const permissionError = new FirestorePermissionError({
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: `users/${user.uid}/chatMessages`,
           operation: 'create',
           requestResourceData: data,
-        });
-        errorEmitter.emit('permission-error', permissionError);
+        }));
       });
   };
 
@@ -241,16 +229,14 @@ export default function ChatPage() {
     if (user && !isMessagesLoading && !hasInitialGreeted.current) {
       hasInitialGreeted.current = true;
       setChatState('initial');
-      botReply("Send 'Hi' to start creating your order or check history.");
+      botReply("Send 'Hi' to start create order");
     }
   }, [user, isMessagesLoading]);
 
   const handlePaymentSubmit = async (link: string, utr: string) => {
     if (!link || !utr || !db || !user) return;
-    
     const finalPrice = (currentOrder.quantity! / 1000) * currentOrder.service!.pricePer1000;
     const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}`;
-    
     const orderData = {
       userId: user.uid,
       orderId: orderId,
@@ -266,12 +252,11 @@ export default function ChatPage() {
 
     addDoc(collection(db, "users", user.uid, "orders"), orderData)
       .catch(async (error) => {
-        const permissionError = new FirestorePermissionError({
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: `users/${user.uid}/orders`,
           operation: 'create',
           requestResourceData: orderData,
-        });
-        errorEmitter.emit('permission-error', permissionError);
+        }));
       });
 
     setChatState('idle');
@@ -292,13 +277,10 @@ export default function ChatPage() {
   const handleSend = async (manualText?: string) => {
     const text = manualText || inputValue.trim();
     if (!text || !db || !user) return;
-    
     if (!manualText) setInputValue("");
     await addMessage('user', text);
-
     const cleanText = text.toLowerCase();
 
-    // GLOBAL NAVIGATION MATCHERS
     if (cleanText === 'hi' || cleanText.includes("main menu") || cleanText.includes("start")) {
       setChatState('choosing_platform');
       setCurrentOrder({});
@@ -314,7 +296,6 @@ export default function ChatPage() {
       return;
     }
 
-    // Redirect to Platform Choosing (allows jumping from anywhere)
     if (cleanText.includes("instagram services")) {
       setCurrentOrder({ platform: 'instagram' });
       setChatState('choosing_service');
@@ -331,10 +312,8 @@ export default function ChatPage() {
       return;
     }
 
-    // Redirect to Specific Service
     const allServices = [...SERVICES.instagram, ...SERVICES.youtube];
     const matchedService = allServices.find(s => cleanText.includes(s.name.toLowerCase()));
-    
     if (matchedService && (cleanText.includes("instagram") || cleanText.includes("youtube"))) {
       const detectedPlatform: Platform = cleanText.includes("instagram") ? 'instagram' : 'youtube';
       setCurrentOrder({ platform: detectedPlatform, service: matchedService });
@@ -355,21 +334,14 @@ export default function ChatPage() {
           setChatState('choosing_service');
           const options = SERVICES.youtube.map((s, i) => `${i + 1}. YOUTUBE ${s.name.toUpperCase()}`);
           botReply("Perfect. Niche di gayi YouTube service select karein:", options);
-        } else if (cleanText.includes("3") || cleanText.includes("history")) {
-          router.push("/orders");
         } else {
           botReply("Please select from the options provided.");
         }
         break;
-
       case 'choosing_service':
         const sIndex = parseInt(text) - 1;
         const sPlatform = currentOrder.platform;
-        if (!sPlatform) {
-          setChatState('initial');
-          botReply("Something went wrong. Send 'Hi' to start again.");
-          return;
-        }
+        if (!sPlatform) return;
         const sService = SERVICES[sPlatform][sIndex];
         if (sService) {
           setCurrentOrder({ ...currentOrder, service: sService });
@@ -379,7 +351,6 @@ export default function ChatPage() {
           botReply("Invalid selection. Please choose from the list.");
         }
         break;
-
       case 'entering_quantity':
         const qty = parseInt(text);
         if (isNaN(qty) || qty < 100) {
@@ -394,7 +365,6 @@ export default function ChatPage() {
           );
         }
         break;
-
       case 'confirming_price':
         if (cleanText.includes("yes") || cleanText.includes("proceed")) {
           setChatState('awaiting_payment');
@@ -406,10 +376,9 @@ export default function ChatPage() {
         } else {
           setChatState('initial');
           setCurrentOrder({});
-          botReply("Order cancelled. Send 'Hi' to start creating your order.");
+          botReply("Order cancelled. Send 'Hi' to start create order");
         }
         break;
-
       default:
         botReply("Send 'Hi' to see the main menu or 'History' to view your orders.");
         break;
@@ -418,31 +387,25 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-screen max-w-lg mx-auto overflow-hidden relative shadow-2xl bg-white dark:bg-slate-950 font-body">
-      {/* Header */}
-      <div className="bg-white dark:bg-slate-900 px-4 py-3 flex items-center justify-between border-b border-gray-100 dark:border-slate-800 z-40">
+      {/* Top Header - Matches Screenshot */}
+      <header className="bg-white dark:bg-slate-900 px-5 py-4 flex items-center justify-between border-b border-gray-50 dark:border-slate-800 z-50">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#312ECB] flex items-center justify-center text-white shadow-md">
-            <Rocket size={24} className="fill-current" />
+          <div className="w-10 h-10 rounded-[14px] bg-[#312ECB] flex items-center justify-center text-white shadow-lg">
+            <Zap className="fill-current" size={20} />
           </div>
-          <h1 className="text-xl font-black italic tracking-tighter text-[#312ECB] dark:text-white">SOCIALBOOST</h1>
+          <h1 className="text-[20px] font-black italic tracking-tighter text-[#312ECB] dark:text-white uppercase">INSTAFLOW</h1>
         </div>
-
-        <div className="flex items-center gap-2">
-          {/* History Icon Shortcut */}
-          <Button variant="ghost" size="icon" onClick={() => router.push('/orders')} className="w-10 h-10 rounded-full text-slate-400 hover:text-[#312ECB] transition-colors">
-            <History size={20} />
-          </Button>
-          
-          <Button variant="ghost" size="icon" onClick={toggleTheme} className="w-8 h-8 rounded-full text-slate-400 hover:text-[#312ECB]">
-            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
-          </Button>
+        <div className="flex items-center gap-4">
+          <button onClick={toggleTheme} className="text-slate-400 hover:text-[#312ECB] transition-colors">
+            {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+          </button>
           
           <DropdownMenu onOpenChange={(open) => open && markAllAsRead()}>
             <DropdownMenuTrigger asChild>
-              <button className="relative w-8 h-8 rounded-full text-slate-400 hover:text-[#312ECB] flex items-center justify-center transition-colors">
-                <Bell size={18} />
+              <button className="relative text-slate-400 hover:text-[#312ECB] flex items-center justify-center transition-colors">
+                <Bell size={22} />
                 {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-900 animate-pulse" />
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-900 animate-pulse" />
                 )}
               </button>
             </DropdownMenuTrigger>
@@ -451,16 +414,12 @@ export default function ChatPage() {
                 <span className="text-[10px] font-black uppercase tracking-widest text-[#111B21] dark:text-white">Notifications</span>
               </div>
               <ScrollArea className="h-[300px]">
-                {notificationsData && notificationsData.length > 0 ? (
+                {notificationsData.length > 0 ? (
                   <div className="divide-y divide-gray-100 dark:divide-slate-800">
                     {notificationsData.map((notif) => (
-                      <div key={notif.id} className={`p-4 transition-colors ${notif.read ? 'opacity-60' : 'bg-blue-50/30 dark:bg-blue-900/10'}`}>
-                        <div className="flex justify-between items-start mb-1">
-                          <h4 className="text-[11px] font-black uppercase text-[#312ECB]">{notif.title}</h4>
-                        </div>
-                        <p className="text-[12px] font-semibold text-slate-600 dark:text-slate-300 leading-snug">
-                          {notif.message}
-                        </p>
+                      <div key={notif.id} className={cn("p-4 transition-colors", notif.read ? 'opacity-60' : 'bg-blue-50/30 dark:bg-blue-900/10')}>
+                        <h4 className="text-[11px] font-black uppercase text-[#312ECB] mb-1">{notif.title}</h4>
+                        <p className="text-[12px] font-semibold text-slate-600 dark:text-slate-300 leading-snug">{notif.message}</p>
                       </div>
                     ))}
                   </div>
@@ -470,38 +429,61 @@ export default function ChatPage() {
                   </div>
                 )}
               </ScrollArea>
-              {notificationsData && notificationsData.length > 0 && (
-                <div className="p-2 border-t border-gray-100 dark:border-slate-800 text-center">
-                  <button onClick={clearAllNotifications} className="text-[9px] font-black uppercase tracking-widest text-[#312ECB] hover:underline">
-                    Clear All
-                  </button>
+              {notificationsData.length > 0 && (
+                <div className="p-3 border-t border-gray-100 dark:border-slate-800 text-center">
+                  <button onClick={clearAllNotifications} className="text-[9px] font-black uppercase tracking-widest text-[#312ECB] hover:underline">Clear All</button>
                 </div>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button variant="ghost" size="icon" onClick={() => router.push('/profile')} className="w-10 h-10 rounded-full bg-[#312ECB] text-white font-bold text-xs shadow-lg ml-1">
+          <button onClick={() => router.push('/profile')} className="w-10 h-10 rounded-full bg-[#312ECB] text-white font-black text-sm shadow-md flex items-center justify-center">
             {user?.displayName?.[0] || 'U'}
-          </Button>
+          </button>
+        </div>
+      </header>
+
+      {/* Sub-Header - Matches Screenshot */}
+      <div className="bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 px-6 py-3 flex items-center justify-between z-40">
+        <h2 className="text-[11px] font-black italic uppercase tracking-[0.2em] text-[#312ECB]">AUTOMATED ASSISTANT</h2>
+        <button 
+          onClick={() => router.push('/orders')}
+          className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-[#312ECB] hover:opacity-70 transition-opacity"
+        >
+          <History size={16} /> RECENT ORDERS
+        </button>
+      </div>
+
+      {/* Bot Identity Bar - Green Bar from Screenshot */}
+      <div className="bg-[#005B41] px-6 py-4 flex items-center gap-4 z-40 shadow-sm">
+        <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
+          <BotIcon className="text-white w-6 h-6" />
+        </div>
+        <div className="flex flex-col">
+          <h3 className="text-[14px] font-black text-white uppercase tracking-tight">INSTAFLOW BOT</h3>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-[#25D366] animate-pulse" />
+            <span className="text-[9px] font-black text-[#25D366] uppercase tracking-widest">ACTIVE SERVER</span>
+          </div>
         </div>
       </div>
 
-      <main className="flex-1 overflow-y-auto p-4 flex flex-col whatsapp-bg scroll-smooth relative">
-        {/* Stylish Broadcast Card */}
+      <main className="flex-1 overflow-y-auto p-4 flex flex-col whatsapp-bg relative">
+        {/* Stylish Broadcast Card - Glassmorphism Style */}
         {activeBroadcast && (
-          <div className="sticky top-4 self-center w-full max-w-[90%] z-50 mb-8 animate-in zoom-in-95 duration-500">
-            <div className="backdrop-blur-xl bg-white/20 dark:bg-[#312ECB]/20 border border-white/30 dark:border-white/10 rounded-[2.5rem] p-6 shadow-[0_20px_40px_rgba(0,0,0,0.1)] flex flex-col items-center text-center space-y-3 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-20 h-20 bg-[#312ECB]/20 blur-3xl rounded-full -mr-10 -mt-10" />
-              <div className="w-12 h-12 rounded-2xl bg-[#312ECB] flex items-center justify-center text-white shadow-lg">
-                <Megaphone size={24} className="fill-current" />
+          <div className="sticky top-4 self-center w-full max-w-[92%] z-50 mb-8 animate-in zoom-in-95 duration-500">
+            <div className="backdrop-blur-xl bg-white/25 dark:bg-[#312ECB]/25 border border-white/40 dark:border-white/10 rounded-[2.5rem] p-6 shadow-2xl flex flex-col items-center text-center space-y-3 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-[#312ECB]/30 blur-3xl rounded-full -mr-12 -mt-12" />
+              <div className="w-12 h-12 rounded-2xl bg-[#312ECB] flex items-center justify-center text-white shadow-xl relative z-10">
+                <Megaphone size={24} />
               </div>
-              <div>
-                <span className="text-[10px] font-black text-[#312ECB] dark:text-white/40 uppercase tracking-[0.3em] mb-1 block">Announcement</span>
+              <div className="relative z-10">
+                <span className="text-[9px] font-black text-[#312ECB] dark:text-white/50 uppercase tracking-[0.4em] mb-1.5 block">Important Announcement</span>
                 <p className="text-[15px] font-black text-[#111B21] dark:text-white leading-relaxed whitespace-pre-wrap">
                   {activeBroadcast.text}
                 </p>
               </div>
-              <button onClick={() => setActiveBroadcast(null)} className="absolute top-4 right-4 text-slate-400 hover:text-[#312ECB] transition-colors">
+              <button onClick={() => setActiveBroadcast(null)} className="absolute top-4 right-4 text-slate-400 hover:text-[#312ECB] transition-colors p-1">
                 <X size={20} />
               </button>
             </div>
@@ -527,7 +509,7 @@ export default function ChatPage() {
         <div ref={scrollRef} />
       </main>
 
-      <footer className="p-3 bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800">
+      <footer className="p-3 bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800 z-50">
         <div className="flex items-center gap-3">
           <div className="flex-1 bg-[#F0F2F5] dark:bg-slate-800 rounded-full flex items-center px-5 py-1">
             <Input 
@@ -535,18 +517,39 @@ export default function ChatPage() {
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               placeholder="Type 'Hi' for Main Menu..."
-              className="border-none bg-transparent focus-visible:ring-0 shadow-none text-[15px] h-10 p-0 text-black dark:text-white font-bold placeholder:text-gray-400"
+              className="border-none bg-transparent focus-visible:ring-0 shadow-none text-[15px] h-11 p-0 text-black dark:text-white font-bold placeholder:text-gray-400"
             />
           </div>
           <Button 
             onClick={() => handleSend()}
             size="icon" 
-            className="rounded-full h-12 w-12 bg-[#25D366] hover:bg-[#20bd5b] shadow-lg shrink-0"
+            className="rounded-full h-12 w-12 bg-[#25D366] hover:bg-[#20bd5b] shadow-lg shrink-0 transition-transform active:scale-90"
           >
             <Send size={22} className="text-white ml-1" />
           </Button>
         </div>
       </footer>
     </div>
+  );
+}
+
+function BotIcon({ className }: { className?: string }) {
+  return (
+    <svg 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round" 
+      className={className}
+    >
+      <path d="M12 8V4H8" />
+      <rect width="16" height="12" x="4" y="8" rx="2" />
+      <path d="M2 14h2" />
+      <path d="M20 14h2" />
+      <path d="M15 13v2" />
+      <path d="M9 13v2" />
+    </svg>
   );
 }
