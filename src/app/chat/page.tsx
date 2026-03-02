@@ -350,12 +350,18 @@ export default function ChatPage() {
         let apiError = null;
 
         if (apiData) {
-          const serviceId = apiData.serviceMappings?.[item.service.id];
-          if (apiData.apiUrl && apiData.apiKey && serviceId) {
+          // Multi-Provider Routing logic
+          const mapping = apiData.mappings?.[item.service.id];
+          const providerId = mapping?.providerId;
+          const remoteServiceId = mapping?.remoteServiceId;
+          
+          const provider = apiData.providers?.find((p: any) => p.id === providerId);
+
+          if (provider && provider.url && provider.key && remoteServiceId) {
             const apiResult = await placeApiOrder({
-              apiUrl: apiData.apiUrl,
-              apiKey: apiData.apiKey,
-              serviceId: serviceId,
+              apiUrl: provider.url,
+              apiKey: provider.key,
+              serviceId: remoteServiceId,
               link: link,
               quantity: item.quantity
             });
@@ -516,7 +522,6 @@ export default function ChatPage() {
           }));
           setChatState('choosing_payment_method');
           
-          // Use validated qty directly to avoid stale state in calculation
           let total = (qty / 1000) * currentService.pricePer1000;
           if (currentOrder.type === 'bulk' && currentOrder.bulkLinks) {
             total *= currentOrder.bulkLinks.length;

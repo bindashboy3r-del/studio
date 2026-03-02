@@ -19,6 +19,5 @@ export const SERVICES: Record<Platform, SMMService[]> = {
     { id: 'comments', name: 'Comments', pricePer1000: 260.0, minQuantity: 50 },
     { id: 'shares', name: 'Shares', pricePer1000: 7.0, minQuantity: 100 },
     { id: 'story_views', name: 'Story Views', pricePer1000: 65.0, minQuantity: 100 },
-    { id: 'reel_views', name: 'Reel Views', pricePer1000: 0.56, minQuantity: 500 },
   ],
 };
