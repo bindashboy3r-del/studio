@@ -2,19 +2,75 @@
 /**
  * @fileOverview Genkit flow for the SocialBoost Support Bot.
  * Handles order status lookups and payment information queries.
+ *
+ * - supportBot - Main function to handle support queries.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { getFirestore } from 'firebase-admin/firestore';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { initializeApp, getApps } from 'firebase/app';
+import { getFirestore, collectionGroup, query, where, getDocs, limit } from 'firebase/firestore';
+import { firebaseConfig } from '@/firebase/config';
 
-// Note: In a real production environment, service account would be configured.
-// For this prototype, we assume the environment is pre-configured for Admin SDK access 
-// or we use the client-side context passed from the frontend.
-// Since we are in a server action, we can use admin SDK to check orders if needed,
-// but for simplicity and safety in this studio environment, we will process logic 
-// and let the frontend handle the final data display if complex.
+// Initialize Firebase for server-side tool usage
+if (!getApps().length) {
+  initializeApp(firebaseConfig);
+}
+const db = getFirestore();
+
+/**
+ * Tool to retrieve order details from the database.
+ */
+const getOrderDetails = ai.defineTool(
+  {
+    name: 'getOrderDetails',
+    description: 'Retrieves details for a specific SocialBoost order using its Order ID (e.g., SB-123456). Use this whenever a user provides an Order ID to check their status.',
+    inputSchema: z.object({
+      orderId: z.string().describe('The Order ID to look up (starts with SB-).'),
+    }),
+    outputSchema: z.object({
+      found: z.boolean().describe('Whether the order was found.'),
+      status: z.string().optional().describe('The current status of the order.'),
+      service: z.string().optional().describe('The name of the service ordered.'),
+      quantity: z.number().optional().describe('The quantity ordered.'),
+      price: z.number().optional().describe('The price paid for the order.'),
+      message: z.string().optional().describe('Additional information or error message.'),
+    }),
+  },
+  async (input) => {
+    try {
+      // Clean the Order ID
+      const cleanId = input.orderId.trim().toUpperCase();
+      
+      const q = query(
+        collectionGroup(db, 'orders'),
+        where('orderId', '==', cleanId),
+        limit(1)
+      );
+      
+      const snapshot = await getDocs(q);
+      
+      if (snapshot.empty) {
+        return { 
+          found: false, 
+          message: `Maaf kijiye, humein Order ID ${cleanId} ke liye koi record nahi mila. Kripya Order ID check karke dobara batayein.` 
+        };
+      }
+      
+      const data = snapshot.docs[0].data();
+      return {
+        found: true,
+        status: data.status || 'Pending',
+        service: data.service,
+        quantity: data.quantity,
+        price: data.price,
+      };
+    } catch (e: any) {
+      console.error("SupportBot Tool Error:", e);
+      return { found: false, message: "Database access error. Please try again later." };
+    }
+  }
+);
 
 const SupportBotInputSchema = z.object({
   message: z.string().describe('The user\'s message to the support bot.'),
@@ -30,23 +86,21 @@ const SupportBotOutputSchema = z.object({
   action: z.enum(['none', 'show_qr', 'redirect_orders']).default('none').describe('Special UI actions to trigger.'),
 });
 
-export async function supportBot(input: z.infer<typeof SupportBotInputSchema>) {
-  return supportBotFlow(input);
-}
-
 const supportBotPrompt = ai.definePrompt({
   name: 'supportBotPrompt',
   input: { schema: SupportBotInputSchema },
   output: { schema: SupportBotOutputSchema },
+  tools: [getOrderDetails],
   prompt: `You are the SocialBoost Support Bot, a helpful and professional AI assistant.
 Your goal is to help users with their SMM orders and wallet balances.
 
 GUIDELINES:
-1. If a user asks about an order (especially a cancelled one), ask for their Order ID.
-2. If they provide an Order ID (e.g., SB-123456), tell them you can't look up live DB data directly yet but they should check the "Order History" page for the specific rejection reason left by the admin.
-3. If they ask how to add money, add funds, or for a QR code, provide the UPI ID "smmxpressbot@slc" and suggest they click the "Add Funds" button in the chat header for an automated QR.
-4. Keep responses concise and friendly.
-5. Use emojis to be engaging.
+1. If a user provides an Order ID (e.g., SB-123456), ALWAYS use the getOrderDetails tool to check the live status. 
+2. If the tool finds the order, explain the current status (Pending, Processing, Completed, or Rejected) clearly to the user.
+3. If an order is "Rejected" or "Cancelled", suggest they check their "Order History" for a specific rejection message or contact admin on WhatsApp.
+4. If they ask how to add money or for a QR code, provide the UPI ID "smmxpressbot@slc" and suggest they click the "Add Funds" button in the header.
+5. If they ask for help or the bot is confused, suggest contacting the owner @bindash_boy3 on Instagram.
+6. Keep responses concise and friendly. Use Hindi/Hinglish if the user asks in Hindi. Use emojis! 🚀
 
 User Message: "{{{message}}}"
 User ID: "{{{userId}}}"`,
@@ -60,6 +114,13 @@ const supportBotFlow = ai.defineFlow(
   },
   async (input) => {
     const { output } = await supportBotPrompt(input);
-    return output!;
+    if (!output) {
+      throw new Error('Failed to generate response from Support Bot.');
+    }
+    return output;
   }
 );
+
+export async function supportBot(input: z.infer<typeof SupportBotInputSchema>): Promise<z.infer<typeof SupportBotOutputSchema>> {
+  return supportBotFlow(input);
+}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Bot, Loader2, QrCode, History } from 'lucide-react';
+import { X, Send, Bot, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useUser } from '@/firebase';
@@ -50,6 +50,7 @@ export function SupportBot() {
 
       setMessages(prev => [...prev, { role: 'bot', text: response.reply }]);
     } catch (error) {
+      console.error("Support Bot Error:", error);
       setMessages(prev => [...prev, { role: 'bot', text: "Sorry, I'm having trouble connecting. Please try again later." }]);
     } finally {
       setIsLoading(false);
@@ -59,7 +60,7 @@ export function SupportBot() {
   if (!user) return null;
 
   return (
-    <div className="fixed bottom-6 left-6 z-[100] flex flex-col items-start">
+    <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end">
       {/* Chat Window */}
       {isOpen && (
         <div className="mb-4 w-[320px] sm:w-[380px] h-[500px] bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-800 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300">
