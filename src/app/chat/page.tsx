@@ -30,7 +30,8 @@ import {
   User as UserIcon,
   X,
   Megaphone,
-  Zap
+  Zap,
+  Clock
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PLATFORMS, SERVICES, Platform, SMMService } from "@/app/lib/constants";
@@ -303,8 +304,13 @@ export default function ChatPage() {
       setCurrentOrder({});
       botReply(
         "👋 Welcome to SocialBoost Bot!\n\nNiche di gayi list mein se koi bhi platform select karein:",
-        ["1. INSTAGRAM SERVICES", "2. YOUTUBE SERVICES"]
+        ["1. INSTAGRAM SERVICES", "2. YOUTUBE SERVICES", "3. ORDER HISTORY"]
       );
+      return;
+    }
+
+    if (cleanText.includes("order history")) {
+      router.push("/orders");
       return;
     }
 
@@ -325,8 +331,7 @@ export default function ChatPage() {
       return;
     }
 
-    // Redirect to Specific Service (allows jumping if clicking old service buttons)
-    // Check if the text matches any known service (e.g. "1. INSTAGRAM FOLLOWERS")
+    // Redirect to Specific Service
     const allServices = [...SERVICES.instagram, ...SERVICES.youtube];
     const matchedService = allServices.find(s => cleanText.includes(s.name.toLowerCase()));
     
@@ -350,6 +355,8 @@ export default function ChatPage() {
           setChatState('choosing_service');
           const options = SERVICES.youtube.map((s, i) => `${i + 1}. YOUTUBE ${s.name.toUpperCase()}`);
           botReply("Perfect. Niche di gayi YouTube service select karein:", options);
+        } else if (cleanText.includes("3") || cleanText.includes("history")) {
+          router.push("/orders");
         } else {
           botReply("Please select from the options provided.");
         }
@@ -367,7 +374,7 @@ export default function ChatPage() {
         if (sService) {
           setCurrentOrder({ ...currentOrder, service: sService });
           setChatState('entering_quantity');
-          botReply(`📊 Aapne ${PLATFORMS[sPlatform]} ${sService.name} select kiya hai.\n\nKitni quantity chahiye? (Minimum 100)`);
+          botReply(`📊 Aapne ${PLATFORMS[sPlatform]} ${sService.name} select kiye hain.\n\nKitni quantity chahiye? (Minimum 100)`);
         } else {
           botReply("Invalid selection. Please choose from the list.");
         }
@@ -411,7 +418,7 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-screen max-w-lg mx-auto overflow-hidden relative shadow-2xl bg-white dark:bg-slate-950 font-body">
-      {/* Header matching screenshot */}
+      {/* Header */}
       <div className="bg-white dark:bg-slate-900 px-4 py-3 flex items-center justify-between border-b border-gray-100 dark:border-slate-800 z-40">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-[#312ECB] flex items-center justify-center text-white shadow-md">
@@ -420,7 +427,10 @@ export default function ChatPage() {
           <h1 className="text-xl font-black italic tracking-tighter text-[#312ECB] dark:text-white">SOCIALBOOST</h1>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => router.push('/orders')} className="w-8 h-8 rounded-full text-slate-400 hover:text-[#312ECB]">
+            <History size={18} />
+          </Button>
           <Button variant="ghost" size="icon" onClick={toggleTheme} className="w-8 h-8 rounded-full text-slate-400 hover:text-[#312ECB]">
             {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
           </Button>
@@ -468,34 +478,28 @@ export default function ChatPage() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button variant="ghost" size="icon" onClick={() => router.push('/profile')} className="w-10 h-10 rounded-full bg-[#312ECB] text-white font-bold text-xs shadow-lg">
+          <Button variant="ghost" size="icon" onClick={() => router.push('/profile')} className="w-10 h-10 rounded-full bg-[#312ECB] text-white font-bold text-xs shadow-lg ml-1">
             {user?.displayName?.[0] || 'U'}
           </Button>
         </div>
       </div>
 
       <main className="flex-1 overflow-y-auto p-4 flex flex-col whatsapp-bg scroll-smooth relative">
-        {/* Stylish Broadcast Card - Centered Glassmorphism */}
+        {/* Stylish Broadcast Card */}
         {activeBroadcast && (
           <div className="sticky top-4 self-center w-full max-w-[90%] z-50 mb-8 animate-in zoom-in-95 duration-500">
             <div className="backdrop-blur-xl bg-white/20 dark:bg-[#312ECB]/20 border border-white/30 dark:border-white/10 rounded-[2.5rem] p-6 shadow-[0_20px_40px_rgba(0,0,0,0.1)] flex flex-col items-center text-center space-y-3 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-20 h-20 bg-[#312ECB]/20 blur-3xl rounded-full -mr-10 -mt-10" />
-              
               <div className="w-12 h-12 rounded-2xl bg-[#312ECB] flex items-center justify-center text-white shadow-lg">
                 <Megaphone size={24} className="fill-current" />
               </div>
-              
               <div>
-                <span className="text-[10px] font-black text-[#312ECB] dark:text-white/40 uppercase tracking-[0.3em] mb-1 block">Important Announcement</span>
+                <span className="text-[10px] font-black text-[#312ECB] dark:text-white/40 uppercase tracking-[0.3em] mb-1 block">Announcement</span>
                 <p className="text-[15px] font-black text-[#111B21] dark:text-white leading-relaxed whitespace-pre-wrap">
                   {activeBroadcast.text}
                 </p>
               </div>
-
-              <button 
-                onClick={() => setActiveBroadcast(null)}
-                className="absolute top-4 right-4 text-slate-400 hover:text-[#312ECB] transition-colors"
-              >
+              <button onClick={() => setActiveBroadcast(null)} className="absolute top-4 right-4 text-slate-400 hover:text-[#312ECB] transition-colors">
                 <X size={20} />
               </button>
             </div>
