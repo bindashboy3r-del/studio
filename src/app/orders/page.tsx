@@ -161,7 +161,7 @@ export default function OrdersHistoryPage() {
               updateDoc(orderRef, { 
                 status: apiStatus,
                 apiStatusLastChecked: serverTimestamp()
-              });
+              }).catch(e => console.error("Update status failed", e));
             }
           }
         }
@@ -236,7 +236,7 @@ export default function OrdersHistoryPage() {
                       order.effectiveStatus === 'Processing' || order.effectiveStatus === 'In progress' ? 'bg-blue-50 text-blue-600' :
                       order.effectiveStatus === 'Completed' ? 'bg-emerald-50 text-emerald-600' :
                       order.effectiveStatus === 'Refunded' ? 'bg-amber-100 text-amber-700' :
-                      order.effectiveStatus === 'Cancelled' || order.effectiveStatus === 'Canceled' || order.effectiveStatus === 'Refunded' ? 'bg-red-50 text-red-600' :
+                      order.effectiveStatus === 'Cancelled' || order.effectiveStatus === 'Canceled' ? 'bg-red-50 text-red-600' :
                       'bg-slate-100 text-slate-400'
                     }`}>
                       {(order.effectiveStatus === 'Processing' || order.effectiveStatus === 'In progress') && <Clock size={10} className="mr-1 inline animate-spin" />}
