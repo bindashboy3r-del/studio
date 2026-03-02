@@ -19,8 +19,8 @@ export type IntelligentOrderParsingInput = z.infer<typeof IntelligentOrderParsin
 const IntelligentOrderParsingOutputSchema = z.object({
   platform: z.literal('instagram').describe('The social media platform for the service. Must be "instagram".'),
   service: z.enum([
-    'followers', 'likes', 'views', 'comments', 'shares', 'story_views', 'reel_views',
-  ]).describe('The specific SMM service requested. Valid services: "followers", "likes", "views", "comments", "shares", "story_views", "reel_views".'),
+    'followers', 'likes', 'views', 'comments', 'shares', 'story_views',
+  ]).describe('The specific SMM service requested. Valid services: "followers", "likes", "views", "comments", "shares", "story_views".'),
   quantity: z.number().int().positive().describe('The desired quantity for the service (e.g., 1000 for 1000 followers).'),
   link: z.string().url().or(z.string().regex(/^@[a-zA-Z0-9_.]+$/)).describe('The link (URL to post/profile) or username (starting with @) related to the service.'),
 }).describe('Parsed service request details including platform, service type, quantity, and associated link.');
@@ -42,10 +42,9 @@ Supported Instagram services:
 - Comments: "comments"
 - Shares: "shares"
 - Story Views: "story_views"
-- Reel Views: "reel_views"
 
 For the 'link' field:
-The link can be a URL to a post/profile/story/reel, or an Instagram username starting with '@' (e.g., "@myprofile").
+The link can be a URL to a post/profile/story, or an Instagram username starting with '@' (e.g., "@myprofile").
 
 Extract the details accurately in a JSON object.
 

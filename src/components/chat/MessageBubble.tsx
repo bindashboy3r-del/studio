@@ -1,4 +1,3 @@
-
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { 
@@ -100,9 +99,9 @@ export function MessageBubble({
   const [currentBulkLink, setCurrentBulkLink] = useState("");
 
   const [comboItems, setComboItems] = useState<{ serviceId: string, quantity: number }[]>([
-    { serviceId: 'likes', quantity: 0 },
-    { serviceId: 'views', quantity: 0 },
-    { serviceId: 'comments', quantity: 0 }
+    { serviceId: 'likes', quantity: 100 },
+    { serviceId: 'views', quantity: 500 },
+    { serviceId: 'comments', quantity: 50 }
   ]);
   const [comboLink, setComboLink] = useState("");
 
@@ -197,7 +196,7 @@ export function MessageBubble({
 
   const isComboValid = comboItems.length >= 1 && comboItems.every(item => {
     const s = SERVICES.instagram.find(sv => sv.id === item.serviceId);
-    return item.quantity >= (s?.minQuantity || 10);
+    return item.quantity >= (s?.minQuantity || 50);
   }) && comboLink.trim() !== "";
 
   return (
@@ -408,11 +407,11 @@ export function MessageBubble({
             </div>
 
             <div className="space-y-4">
-              <ScrollArea className="max-h-[550px] pr-2">
+              <ScrollArea className="max-h-[450px] pr-2">
                 <div className="space-y-3">
                   {comboItems.map((item, idx) => {
                     const s = SERVICES.instagram.find(sv => sv.id === item.serviceId);
-                    const min = s?.minQuantity || 10;
+                    const min = s?.minQuantity || 50;
                     return (
                       <div key={idx} className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 animate-in slide-in-from-bottom-2 duration-300">
                         <div className="flex items-center justify-between mb-3">
@@ -441,6 +440,7 @@ export function MessageBubble({
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" className="w-full h-12 border-dashed border-2 border-slate-200 dark:border-slate-800 text-slate-400 hover:text-[#312ECB] rounded-2xl text-[10px] font-black uppercase tracking-widest gap-2">
                       <Plus size={14} /> Add Service
+                      <ChevronDown size={14} />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="center" className="w-[200px] bg-white dark:bg-slate-900 rounded-2xl border-gray-100 dark:border-slate-800 shadow-xl">
