@@ -20,7 +20,8 @@ import {
   Moon, 
   Rocket,
   History,
-  Bot
+  Bot,
+  User as UserIcon
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PLATFORMS, SERVICES, Platform, SMMService } from "@/app/lib/constants";
@@ -317,7 +318,11 @@ export default function ChatPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>Account</DropdownMenuLabel>
+              <DropdownMenuLabel>Account Settings</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => router.push('/profile')}>
+                <UserIcon size={16} className="mr-2" /> View Profile
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => auth?.signOut()} className="text-red-600 font-bold">
                 <LogOut size={16} className="mr-2" /> Log Out
