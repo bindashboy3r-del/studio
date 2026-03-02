@@ -241,7 +241,7 @@ export default function ChatPage() {
     if (user && !isMessagesLoading && !hasInitialGreeted.current) {
       hasInitialGreeted.current = true;
       setChatState('initial');
-      botReply("Send 'Hi' to start create order");
+      botReply("Send 'Hi' to start creating your order or check history.");
     }
   }, [user, isMessagesLoading]);
 
@@ -299,7 +299,7 @@ export default function ChatPage() {
     const cleanText = text.toLowerCase();
 
     // GLOBAL NAVIGATION MATCHERS
-    if (cleanText === 'hi' || cleanText.includes("main menu")) {
+    if (cleanText === 'hi' || cleanText.includes("main menu") || cleanText.includes("start")) {
       setChatState('choosing_platform');
       setCurrentOrder({});
       botReply(
@@ -309,7 +309,7 @@ export default function ChatPage() {
       return;
     }
 
-    if (cleanText.includes("order history")) {
+    if (cleanText.includes("order history") || cleanText.includes("history") || cleanText === "3") {
       router.push("/orders");
       return;
     }
@@ -406,12 +406,12 @@ export default function ChatPage() {
         } else {
           setChatState('initial');
           setCurrentOrder({});
-          botReply("Order cancelled. Send 'Hi' to start create order");
+          botReply("Order cancelled. Send 'Hi' to start creating your order.");
         }
         break;
 
       default:
-        botReply("Send 'Hi' to start create order");
+        botReply("Send 'Hi' to see the main menu or 'History' to view your orders.");
         break;
     }
   };
@@ -428,9 +428,11 @@ export default function ChatPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/orders')} className="w-8 h-8 rounded-full text-slate-400 hover:text-[#312ECB]">
-            <History size={18} />
+          {/* History Icon Shortcut */}
+          <Button variant="ghost" size="icon" onClick={() => router.push('/orders')} className="w-10 h-10 rounded-full text-slate-400 hover:text-[#312ECB] transition-colors">
+            <History size={20} />
           </Button>
+          
           <Button variant="ghost" size="icon" onClick={toggleTheme} className="w-8 h-8 rounded-full text-slate-400 hover:text-[#312ECB]">
             {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
           </Button>
@@ -532,7 +534,7 @@ export default function ChatPage() {
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              placeholder="Type a message (Hi)"
+              placeholder="Type 'Hi' for Main Menu..."
               className="border-none bg-transparent focus-visible:ring-0 shadow-none text-[15px] h-10 p-0 text-black dark:text-white font-bold placeholder:text-gray-400"
             />
           </div>

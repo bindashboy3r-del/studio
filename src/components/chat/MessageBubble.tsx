@@ -1,11 +1,12 @@
 
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { SendHorizonal, Rocket, Home, QrCode, Download, MessageCircle, Copy, CheckCircle, Loader2 } from "lucide-react";
+import { SendHorizonal, Rocket, Home, QrCode, Download, MessageCircle, Copy, CheckCircle, Loader2, History } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
 
 interface SuccessDetails {
   orderId: string;
@@ -44,6 +45,7 @@ export function MessageBubble({
 }: MessageBubbleProps) {
   const isUser = sender === 'user';
   const { toast } = useToast();
+  const router = useRouter();
   const [link, setLink] = useState("");
   const [utr, setUtr] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
@@ -60,7 +62,6 @@ export function MessageBubble({
   const handleDownloadQR = async () => {
     setIsDownloading(true);
     try {
-      // Direct browser-safe download method
       const response = await fetch(qrUrl);
       if (!response.ok) throw new Error('Failed to fetch image');
       const blob = await response.blob();
@@ -79,7 +80,6 @@ export function MessageBubble({
       toast({ title: "Success", description: "QR Code download started." });
     } catch (error) {
       console.error('Download failed:', error);
-      // Absolute fallback: Open in new tab
       window.open(qrUrl, '_blank');
       toast({ 
         title: "Download Help", 
@@ -149,11 +149,18 @@ export function MessageBubble({
                 </Button>
               </div>
 
-              <div className="flex justify-center">
+              <div className="grid grid-cols-2 gap-3 mt-4">
                 <Button 
-                  variant="ghost" 
+                  variant="outline" 
+                  onClick={() => router.push('/orders')}
+                  className="h-12 border-slate-200 dark:border-slate-700 text-[#312ECB] dark:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest gap-2"
+                >
+                  <History size={14} /> My History
+                </Button>
+                <Button 
+                  variant="outline" 
                   onClick={() => onOptionClick?.("Main Menu")}
-                  className="text-[11px] font-black uppercase text-[#312ECB] dark:text-white tracking-[0.2em] gap-2"
+                  className="h-12 border-slate-200 dark:border-slate-700 text-[#111B21] dark:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest gap-2"
                 >
                   <Home size={14} /> Main Menu
                 </Button>
