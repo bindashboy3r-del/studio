@@ -32,7 +32,8 @@ service cloud.firestore {
     match /users/{userId}/orders/{orderId} {
       allow get, list: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId);
-      allow update, delete: if isAdmin();
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
     }
 
     match /users/{userId}/chatMessages/{chatMessageId} {

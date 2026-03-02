@@ -199,6 +199,9 @@ export function MessageBubble({
     return item.quantity >= (s?.minQuantity || 50);
   }) && comboLink.trim() !== "";
 
+  // Helper to check if an option is numeric
+  const isNumericOption = (option: string) => /^\d+$/.test(option);
+
   return (
     <div className={cn("flex w-full mb-4", isUser ? "justify-end" : "justify-start")}>
       <div className={cn(
@@ -531,19 +534,32 @@ export function MessageBubble({
         )}
 
         {options && options.length > 0 && !isPaymentCard && !isSuccessCard && !isFundPaymentCard && !isBulkLinkCard && !isComboCard && !isWalletCard && (
-          <div className="mt-4 space-y-2">
+          <div className={cn(
+            "mt-4",
+            options.every(isNumericOption) ? "flex flex-wrap gap-2" : "space-y-2"
+          )}>
             {options.map((option, idx) => (
               <button
                 key={idx}
                 onClick={() => onOptionClick?.(option)}
-                className="w-full flex items-center justify-between px-5 py-4 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-700 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all group shadow-sm active:scale-98"
+                className={cn(
+                  "flex items-center justify-between transition-all group shadow-sm active:scale-95 border border-slate-100 dark:border-slate-700",
+                  options.every(isNumericOption) 
+                    ? "px-4 py-2 bg-[#312ECB]/5 text-[#312ECB] dark:text-blue-400 rounded-xl text-[10px] font-black uppercase tracking-tighter" 
+                    : "w-full px-5 py-4 bg-white dark:bg-slate-900 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800"
+                )}
               >
-                <span className="text-[11px] font-black uppercase tracking-widest text-[#312ECB] dark:text-blue-400">
+                <span className={cn(
+                  "uppercase tracking-widest",
+                  options.every(isNumericOption) ? "" : "text-[11px] font-black text-[#312ECB] dark:text-blue-400"
+                )}>
                   {option}
                 </span>
-                <div className="text-[#312ECB] group-hover:translate-x-1 transition-transform">
-                  <SendHorizonal size={14} />
-                </div>
+                {!options.every(isNumericOption) && (
+                  <div className="text-[#312ECB] group-hover:translate-x-1 transition-transform">
+                    <SendHorizonal size={14} />
+                  </div>
+                )}
               </button>
             ))}
           </div>
