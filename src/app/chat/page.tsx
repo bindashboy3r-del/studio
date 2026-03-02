@@ -49,6 +49,7 @@ export default function ChatPage() {
   
   // Track when this specific session started to "clear" old messages visually
   const [sessionStartTime] = useState(() => Date.now());
+  const hasInitialGreeted = useRef(false);
   
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -67,7 +68,6 @@ export default function ChatPage() {
   const messages = useMemo(() => {
     if (!messagesData) return [];
     return messagesData.filter((m: any) => {
-      // If no timestamp yet (optimistic update), assume it's current session
       if (!m.timestamp) return true;
       const msgTime = m.timestamp.toDate ? m.timestamp.toDate().getTime() : m.timestamp;
       return msgTime >= sessionStartTime;
@@ -117,14 +117,14 @@ export default function ChatPage() {
     }, 800);
   };
 
-  // Bot initialization logic - fires when session starts and no messages are visible
+  // Bot initialization logic - fires once per session mount
   useEffect(() => {
-    if (user && !isMessagesLoading && messages.length === 0 && chatState === 'idle') {
+    if (user && !isMessagesLoading && !hasInitialGreeted.current && chatState === 'idle') {
+      hasInitialGreeted.current = true;
       setChatState('initial');
-      // Only show the prompt to start the order as requested
       botReply("Send 'Hi' to start create order");
     }
-  }, [user, isMessagesLoading, messages.length, chatState]);
+  }, [user, isMessagesLoading, chatState]);
 
   const handleSend = async () => {
     if (!inputValue.trim() || !db || !user) return;
@@ -284,7 +284,7 @@ export default function ChatPage() {
           <Search size={20} className="text-white/80 cursor-pointer" />
           <div className="group relative">
             <MoreVertical size={20} className="text-white/80 cursor-pointer" />
-            <div className="hidden group-hover:block absolute right-0 top-full mt-2 bg-white rounded-md shadow-xl border w-32 py-1 text-[#2E2E2E] z-30">
+            <div className="hidden group-hover:block absolute right-0 top-full mt-2 bg-white rounded-md shadow-xl border w-32 py-1 text-[#111B21] z-30">
               <button 
                 onClick={() => auth?.signOut()}
                 className="w-full px-4 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2"
@@ -298,7 +298,7 @@ export default function ChatPage() {
 
       {/* Chat Area */}
       <main className="flex-1 overflow-y-auto p-4 flex flex-col scroll-smooth">
-        <div className="mx-auto bg-[#D9FDD3]/80 px-4 py-1.5 rounded-lg text-[12px] text-[#2E2E2E]/80 shadow-sm mb-6 uppercase tracking-wider font-semibold">
+        <div className="mx-auto bg-[#D9FDD3]/80 px-4 py-1.5 rounded-lg text-[12px] text-[#111B21]/80 shadow-sm mb-6 uppercase tracking-wider font-semibold">
           Messages are secured
         </div>
         
@@ -323,7 +323,7 @@ export default function ChatPage() {
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               placeholder="Type a message"
-              className="border-none bg-transparent focus-visible:ring-0 shadow-none text-[15px] h-9 p-0 text-[#2E2E2E]"
+              className="border-none bg-transparent focus-visible:ring-0 shadow-none text-[15px] h-9 p-0 text-[#111B21] font-medium"
             />
           </div>
           <Button 
