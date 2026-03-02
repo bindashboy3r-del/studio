@@ -53,7 +53,7 @@ export function MessageBubble({
   // Construct UPI link for QR generation
   const upiLink = `upi://pay?pa=${upiId}&pn=SocialBoost&am=${price.toFixed(2)}&cu=INR`;
   
-  // Using QRServer for high reliability and simple parameters
+  // Using a stable QR generation service
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(upiLink)}`;
 
   const handleDownloadQR = async () => {
@@ -77,7 +77,6 @@ export function MessageBubble({
       toast({ title: "Success", description: "QR Code saved to your gallery." });
     } catch (error) {
       console.error('Download failed:', error);
-      // Fallback: Open in new tab for manual long-press save
       window.open(qrUrl, '_blank');
       toast({ title: "Note", description: "Please long-press the QR code in the new tab to save it." });
     } finally {
@@ -134,7 +133,7 @@ export function MessageBubble({
             <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-700">
               <div className="text-center">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 leading-relaxed">
-                  Important: Please send these details to Admin via WhatsApp to confirm your payment.
+                  Important: Please send these details to Admin via WhatsApp to confirm your order.
                 </p>
                 <Button 
                   onClick={handleWhatsAppSend}
