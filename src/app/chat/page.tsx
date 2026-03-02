@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -43,8 +44,8 @@ type ChatState =
   | 'initial'
   | 'choosing_platform' 
   | 'choosing_service' 
-  | 'entering_link' 
   | 'entering_quantity' 
+  | 'entering_link' 
   | 'confirming';
 
 interface OrderInProgress {
@@ -220,26 +221,20 @@ export default function ChatPage() {
         break;
 
       case 'choosing_service':
-        const index = parseInt(text) - 1;
-        const platform = currentOrder.platform;
-        if (!platform) {
+        const sIndex = parseInt(text) - 1;
+        const sPlatform = currentOrder.platform;
+        if (!sPlatform) {
           setChatState('initial');
           return;
         }
-        const service = SERVICES[platform][index];
-        if (service) {
-          setCurrentOrder({ ...currentOrder, service });
-          setChatState('entering_link');
-          botReply(`Please provide the ${platform === 'instagram' ? 'Profile handle (@username) or Post URL' : 'Channel or Video URL'}:`);
+        const sService = SERVICES[sPlatform][sIndex];
+        if (sService) {
+          setCurrentOrder({ ...currentOrder, service: sService });
+          setChatState('entering_quantity');
+          botReply(`📊 Aapne ${PLATFORMS[sPlatform]} ${sService.name} select kiya hai.\n\nKitni quantity chahiye? (Minimum 100)`);
         } else {
           botReply("Invalid selection. Please choose from the list.");
         }
-        break;
-
-      case 'entering_link':
-        setCurrentOrder({ ...currentOrder, link: text });
-        setChatState('entering_quantity');
-        botReply("How many would you like? (Minimum 100)");
         break;
 
       case 'entering_quantity':
@@ -249,12 +244,19 @@ export default function ChatPage() {
         } else {
           const price = (qty / 1000) * currentOrder.service!.pricePer1000;
           setCurrentOrder({ ...currentOrder, quantity: qty });
-          setChatState('confirming');
-          botReply(
-            `Order Details 📝\n\nPlatform: ${PLATFORMS[currentOrder.platform!]}\nService: ${currentOrder.service!.name}\nLink: ${currentOrder.link}\nQuantity: ${qty}\nTotal Price: $${price.toFixed(2)}\n\nType "Confirm" to place order or "Cancel" to start over.`,
-            ["Confirm", "Cancel"]
-          );
+          setChatState('entering_link');
+          botReply(`Price is $${price.toFixed(2)} ✅\n\nAb niche apne ${currentOrder.platform === 'instagram' ? 'Profile handle (@username) or Post URL' : 'Channel or Video URL'} ka link paste karein:`);
         }
+        break;
+
+      case 'entering_link':
+        const finalPrice = (currentOrder.quantity! / 1000) * currentOrder.service!.pricePer1000;
+        setCurrentOrder({ ...currentOrder, link: text });
+        setChatState('confirming');
+        botReply(
+          `Order Details 📝\n\nPlatform: ${PLATFORMS[currentOrder.platform!]}\nService: ${currentOrder.service!.name}\nLink: ${text}\nQuantity: ${currentOrder.quantity}\nTotal Price: $${finalPrice.toFixed(2)}\n\nType "Confirm" to place order or "Cancel" to start over.`,
+          ["Confirm", "Cancel"]
+        );
         break;
 
       case 'confirming':
