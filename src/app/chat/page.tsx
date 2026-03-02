@@ -478,6 +478,15 @@ export default function ChatPage() {
       return;
     }
 
+    if (cleanText.includes("re-enter quantity")) {
+      const currentService = currentOrder.items[0]?.service;
+      if (currentService) {
+        setChatState('entering_quantity');
+        botReply(`📊 Quantity for ${currentService.name}? (Min ${currentService.minQuantity})`);
+      }
+      return;
+    }
+
     switch (chatState) {
       case 'choosing_order_type':
         if (cleanText.includes("single")) {
@@ -539,7 +548,7 @@ export default function ChatPage() {
             `📊 Quantity: ${qty}\n` +
             `💰 Total Price: ₹${total.toFixed(2)}\n\n` +
             `💳 Aapka Wallet: ₹${walletBalance.toFixed(2)}`, 
-            ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]
+            ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR", "🔄 RE-ENTER QUANTITY"]
           );
         }
         break;
