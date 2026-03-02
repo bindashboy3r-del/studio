@@ -1,16 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged, User } from "firebase/auth";
 import { 
   collection, 
   query, 
   orderBy, 
   onSnapshot, 
   updateDoc, 
-  doc, 
-  getDocs 
+  doc 
 } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { 
@@ -32,23 +29,24 @@ import {
 } from "@/components/ui/select";
 import { format } from "date-fns";
 import { Download, RefreshCw, LayoutDashboard, LogOut } from "lucide-react";
+import { useAuth, useFirestore, useUser } from "@/firebase";
 
 export default function AdminDashboard() {
-  const [user, setUser] = useState<User | null>(null);
+  const { user, isUserLoading } = useUser();
+  const auth = useAuth();
+  const db = useFirestore();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      if (!u || !u.email) router.push("/admin/login");
-      else setUser(u);
-    });
-    return () => unsubscribe();
-  }, [router]);
+    if (!isUserLoading && (!user || !user.email)) {
+      router.push("/admin/login");
+    }
+  }, [user, isUserLoading, router]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !db) return;
     const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const ords = snapshot.docs.map(doc => ({
@@ -60,9 +58,10 @@ export default function AdminDashboard() {
       setLoading(false);
     });
     return () => unsubscribe();
-  }, [user]);
+  }, [user, db]);
 
   const updateStatus = async (orderId: string, status: string) => {
+    if (!db) return;
     await updateDoc(doc(db, "orders", orderId), { status });
   };
 
@@ -103,7 +102,7 @@ export default function AdminDashboard() {
             <Button variant="outline" size="sm" onClick={exportOrders} className="gap-2 border-slate-700">
               <Download size={16} /> Export CSV
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => auth.signOut()} className="text-red-400 hover:text-red-300 hover:bg-red-950/30">
+            <Button variant="ghost" size="sm" onClick={() => auth?.signOut()} className="text-red-400 hover:text-red-300 hover:bg-red-950/30">
               <LogOut size={16} /> Sign Out
             </Button>
           </div>
@@ -140,7 +139,7 @@ export default function AdminDashboard() {
                     </a>
                   </TableCell>
                   <TableCell>{order.quantity}</TableCell>
-                  <TableCell>${order.price.toFixed(2)}</TableCell>
+                  <TableCell>${order.price ? order.price.toFixed(2) : '0.00'}</TableCell>
                   <TableCell>
                     <Badge variant={order.status === 'Completed' ? 'default' : 'secondary'} className={
                       order.status === 'Pending' ? 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30' : 

@@ -1,20 +1,19 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { auth, db } from "@/lib/firebase";
 import { 
   RecaptchaVerifier, 
   signInWithPhoneNumber, 
-  ConfirmationResult,
-  onAuthStateChanged 
+  ConfirmationResult
 } from "firebase/auth";
-import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
 import { ShoppingCart, Phone, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth, useFirestore, useUser } from "@/firebase";
 
 declare global {
   interface Window {
@@ -29,18 +28,18 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   
+  const auth = useAuth();
+  const db = useFirestore();
+  const { user } = useUser();
   const router = useRouter();
   const { toast } = useToast();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) router.push("/chat");
-    });
-    return () => unsubscribe();
-  }, [router]);
+    if (user) router.push("/chat");
+  }, [user, router]);
 
   const setupRecaptcha = () => {
-    if (!window.recaptchaVerifier) {
+    if (!window.recaptchaVerifier && auth) {
       window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
         size: 'invisible',
       });
@@ -48,7 +47,7 @@ export default function LoginPage() {
   };
 
   const onSendCode = async () => {
-    if (!phoneNumber) return;
+    if (!phoneNumber || !auth) return;
     setLoading(true);
     try {
       setupRecaptcha();
@@ -65,17 +64,16 @@ export default function LoginPage() {
   };
 
   const onVerifyCode = async () => {
-    if (!otp || !confirmationResult) return;
+    if (!otp || !confirmationResult || !db) return;
     setLoading(true);
     try {
       const result = await confirmationResult.confirm(otp);
-      const user = result.user;
+      const loggedUser = result.user;
       
-      // Initialize user in Firestore if doesn't exist
-      const userDoc = await getDoc(doc(db, "users", user.uid));
+      const userDoc = await getDoc(doc(db, "users", loggedUser.uid));
       if (!userDoc.exists()) {
-        await setDoc(doc(db, "users", user.uid), {
-          phone: user.phoneNumber,
+        await setDoc(doc(db, "users", loggedUser.uid), {
+          phone: loggedUser.phoneNumber,
           createdAt: serverTimestamp()
         });
       }

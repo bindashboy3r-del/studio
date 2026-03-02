@@ -1,26 +1,23 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged, User } from "firebase/auth";
 import { 
   collection, 
   addDoc, 
   query, 
-  where, 
   orderBy, 
   onSnapshot, 
-  serverTimestamp,
-  Timestamp 
+  serverTimestamp
 } from "firebase/firestore";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, LogOut, ArrowLeft, Instagram, Youtube, ShoppingCart } from "lucide-react";
+import { Send, LogOut, ShoppingCart } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PLATFORMS, SERVICES, Platform, SMMService } from "@/app/lib/constants";
 import { intelligentOrderParsing } from "@/ai/flows/intelligent-order-parsing";
+import { useAuth, useFirestore, useUser } from "@/firebase";
 
 type ChatState = 
   | 'idle' 
@@ -38,7 +35,9 @@ interface OrderInProgress {
 }
 
 export default function ChatPage() {
-  const [user, setUser] = useState<User | null>(null);
+  const { user, isUserLoading } = useUser();
+  const auth = useAuth();
+  const db = useFirestore();
   const [messages, setMessages] = useState<any[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -49,15 +48,11 @@ export default function ChatPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      if (!u) router.push("/");
-      else setUser(u);
-    });
-    return () => unsubscribe();
-  }, [router]);
+    if (!isUserLoading && !user) router.push("/");
+  }, [user, isUserLoading, router]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !db) return;
 
     const q = query(
       collection(db, "messages", user.uid, "user_messages"),
@@ -75,7 +70,7 @@ export default function ChatPage() {
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, db]);
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
@@ -84,7 +79,7 @@ export default function ChatPage() {
   };
 
   const addMessage = async (sender: 'user' | 'bot', text: string) => {
-    if (!user) return;
+    if (!user || !db) return;
     await addDoc(collection(db, "messages", user.uid, "user_messages"), {
       sender,
       text,
@@ -112,12 +107,11 @@ export default function ChatPage() {
   }, [messages, user, chatState]);
 
   const handleSend = async () => {
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() || !db || !user) return;
     const text = inputValue.trim();
     setInputValue("");
     await addMessage('user', text);
 
-    // AI Check for full order in one go
     if (chatState === 'choosing_platform' || chatState === 'idle') {
       try {
         const parsed = await intelligentOrderParsing({ requestText: text });
@@ -138,11 +132,10 @@ export default function ChatPage() {
           }
         }
       } catch (e) {
-        // Fallback to regular flow if AI fails or input is just greeting
+        // Fallback
       }
     }
 
-    // Step-by-step logic
     switch (chatState) {
       case 'choosing_platform':
         if (text === "1" || text.toLowerCase().includes("instagram")) {
@@ -222,7 +215,6 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-screen dark chat-bg max-w-md mx-auto relative overflow-hidden">
-      {/* Header */}
       <header className="bg-card border-b p-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
@@ -237,13 +229,12 @@ export default function ChatPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="ghost" size="icon" onClick={() => auth.signOut()}>
+          <Button variant="ghost" size="icon" onClick={() => auth?.signOut()}>
             <LogOut size={18} />
           </Button>
         </div>
       </header>
 
-      {/* Messages Area */}
       <main className="flex-1 overflow-y-auto p-4 scrollbar-hide">
         {messages.map((m) => (
           <MessageBubble 
@@ -257,7 +248,6 @@ export default function ChatPage() {
         <div ref={scrollRef} />
       </main>
 
-      {/* Input Area */}
       <footer className="p-3 bg-background border-t">
         <div className="flex items-center gap-2 max-w-lg mx-auto bg-muted/30 rounded-full px-2 py-1 shadow-inner border">
           <Input 

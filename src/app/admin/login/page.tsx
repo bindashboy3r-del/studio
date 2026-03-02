@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { auth } from "@/lib/firebase";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { ShieldAlert } from "lucide-react";
+import { useAuth } from "@/firebase";
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
@@ -16,8 +16,10 @@ export default function AdminLoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+  const auth = useAuth();
 
   const handleLogin = async () => {
+    if (!auth) return;
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
