@@ -1,3 +1,4 @@
+
 export type Platform = 'instagram' | 'youtube';
 
 export interface SMMService {

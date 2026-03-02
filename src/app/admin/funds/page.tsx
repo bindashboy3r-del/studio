@@ -79,19 +79,19 @@ export default function FundRequestsPage() {
 
       reqs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
       
-      // Initialize credit amounts state
-      const initialAmounts: Record<string, string> = {};
+      const newCreditAmounts: Record<string, string> = { ...creditAmounts };
       const bonusPct = parseFloat(globalBonus) || 0;
 
       reqs.forEach(r => {
-        if (r.status === 'Pending') {
-          // If a global bonus exists, pre-calculate it for the input field
-          const calcAmount = r.amount + (r.amount * bonusPct / 100);
-          initialAmounts[r.id] = calcAmount.toString();
+        if (r.status === 'Pending' && !newCreditAmounts[r.id]) {
+          // Calculate: Principal + Bonus
+          const bonusAmount = (r.amount * bonusPct) / 100;
+          const totalWithBonus = r.amount + bonusAmount;
+          newCreditAmounts[r.id] = totalWithBonus.toFixed(0);
         }
       });
-      setCreditAmounts(prev => ({ ...initialAmounts, ...prev }));
       
+      setCreditAmounts(newCreditAmounts);
       setRequests(reqs);
       setLoading(false);
     }, (error) => {
@@ -113,6 +113,17 @@ export default function FundRequestsPage() {
         updatedAt: serverTimestamp(),
         updatedBy: admin?.email
       }, { merge: true });
+      
+      // Force recalculate all pending amounts based on new bonus
+      const bonusPct = parseFloat(globalBonus) || 0;
+      const updatedCredits = { ...creditAmounts };
+      requests.forEach(r => {
+        if (r.status === 'Pending') {
+          updatedCredits[r.id] = (r.amount + (r.amount * bonusPct / 100)).toFixed(0);
+        }
+      });
+      setCreditAmounts(updatedCredits);
+
       toast({ title: "Settings Saved", description: `Global bonus set to ${globalBonus}%` });
     } catch (e) {
       toast({ variant: "destructive", title: "Save Failed" });
@@ -130,14 +141,20 @@ export default function FundRequestsPage() {
 
     setProcessingId(request.id);
     
-    const finalAmount = action === 'Approved' ? parseFloat(creditAmounts[request.id] || request.amount) : 0;
+    // Crucial: Use the amount from the input field (which includes bonus)
+    const finalCredit = action === 'Approved' ? parseFloat(creditAmounts[request.id]) : 0;
     
+    // Safety check: if parsing fails, fallback to amount + global bonus
+    const bonusPct = parseFloat(globalBonus) || 0;
+    const fallbackAmount = request.amount + (request.amount * bonusPct / 100);
+    const validatedAmount = isNaN(finalCredit) ? fallbackAmount : finalCredit;
+
     const batch = writeBatch(db);
 
     const reqRef = doc(db, "fundRequests", request.id);
     batch.update(reqRef, { 
       status: action,
-      finalCreditAmount: finalAmount,
+      finalCreditAmount: action === 'Approved' ? validatedAmount : 0,
       processedBy: admin.uid,
       processedAt: serverTimestamp()
     });
@@ -145,7 +162,7 @@ export default function FundRequestsPage() {
     if (action === 'Approved') {
       const userRef = doc(db, "users", request.userId);
       batch.update(userRef, {
-        balance: increment(finalAmount)
+        balance: increment(validatedAmount)
       });
     }
 
@@ -153,7 +170,7 @@ export default function FundRequestsPage() {
     batch.set(notifRef, {
       title: action === 'Approved' ? '💰 Wallet Refilled!' : '❌ Fund Request Rejected',
       message: action === 'Approved' 
-        ? `₹${finalAmount.toFixed(0)} has been credited to your wallet. Balance updated!`
+        ? `₹${validatedAmount.toFixed(0)} has been credited to your wallet (Amount + Bonus).`
         : `Your fund request for ₹${request.amount} was rejected. Please contact support.`,
       read: false,
       createdAt: serverTimestamp()
@@ -163,14 +180,14 @@ export default function FundRequestsPage() {
       .then(() => {
         toast({ 
           title: `Request ${action}`, 
-          description: action === 'Approved' ? `₹${finalAmount.toFixed(0)} credited to user.` : `Request denied.` 
+          description: action === 'Approved' ? `₹${validatedAmount.toFixed(0)} credited to user.` : `Request denied.` 
         });
       })
       .catch((err) => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: `batch-operation (fundRequests/${request.id})`,
           operation: 'write',
-          requestResourceData: { action, finalAmount, userId: request.userId }
+          requestResourceData: { action, validatedAmount, userId: request.userId }
         }));
       })
       .finally(() => {
@@ -231,7 +248,7 @@ export default function FundRequestsPage() {
               <TableRow className="border-slate-100 hover:bg-transparent">
                 <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">User</TableHead>
                 <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Requested</TableHead>
-                <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Credit Amount (Editable)</TableHead>
+                <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Credit Amount (Total)</TableHead>
                 <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">UTR ID</TableHead>
                 <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Status</TableHead>
                 <TableHead className="text-right text-[10px] font-black uppercase tracking-widest py-6">Actions</TableHead>
@@ -249,7 +266,7 @@ export default function FundRequestsPage() {
                   <TableCell className="font-black text-slate-400 text-sm">₹{req.amount}</TableCell>
                   <TableCell>
                     {req.status === 'Pending' ? (
-                      <div className="flex items-center gap-2 max-w-[120px]">
+                      <div className="flex items-center gap-2 max-w-[140px]">
                         <div className="relative w-full">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-emerald-600">₹</span>
                           <Input 
