@@ -229,7 +229,7 @@ export default function OrdersHistoryPage() {
                     </span>
                     <span className="text-slate-200 dark:text-slate-700">•</span>
                     <span className="text-[11px] font-bold text-[#25D366] dark:text-emerald-400 uppercase">
-                      ₹{order.price?.toFixed(0)}
+                      ₹{order.price?.toFixed(2)}
                     </span>
                     <span className="text-slate-200 dark:text-slate-700">•</span>
                     <Badge variant="outline" className={`text-[9px] h-5 font-black px-2 border-none rounded-lg ${

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -423,7 +424,7 @@ export default function ChatPage() {
     setCurrentOrder(prev => ({ ...prev, bulkLinks: links }));
     const selectedService = currentOrder.items[0].service;
     setChatState('entering_quantity'); 
-    botReply(`📊 Quantity PER LINK for ${selectedService.name}? (Min ${selectedService.minQuantity})`);
+    botReply(`📊 Quantity PER LINK for ${selectedService.name}? (Min ${selectedService.minQuantity})`, ["1000", "2000", "5000", "10000"]);
   };
 
   const handleComboFromCard = async (items: { serviceId: string, quantity: number }[], link: string) => {
@@ -506,7 +507,7 @@ export default function ChatPage() {
           } else {
             setCurrentOrder(prev => ({ ...prev, items: [{ service: selected, quantity: 0, link: '' }] }));
             setChatState('entering_quantity');
-            botReply(`📊 Quantity for ${selected.name}? (Min ${selected.minQuantity})`);
+            botReply(`📊 Quantity for ${selected.name}? (Min ${selected.minQuantity})`, ["1000", "2000", "5000", "10000"]);
           }
         }
         break;
