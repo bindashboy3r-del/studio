@@ -94,6 +94,7 @@ export function MessageBubble({
   const [bulkLinks, setBulkLinks] = useState<string[]>([]);
   const [currentBulkLink, setCurrentBulkLink] = useState("");
 
+  // Default Combo Services: Likes, Views, Comments
   const [comboItems, setComboItems] = useState<{ serviceId: string, quantity: number }[]>([
     { serviceId: 'likes', quantity: 0 },
     { serviceId: 'views', quantity: 0 },
@@ -191,7 +192,7 @@ export function MessageBubble({
     return { raw, discounted: raw * 0.95 };
   }, [comboItems]);
 
-  const isComboValid = comboItems.length >= 2 && comboItems.every(i => i.quantity >= 100) && comboLink.trim() !== "";
+  const isComboValid = comboItems.length >= 2 && comboItems.some(i => i.quantity >= 100) && comboLink.trim() !== "";
 
   return (
     <div className={cn("flex w-full mb-4", isUser ? "justify-end" : "justify-start")}>
