@@ -1,13 +1,14 @@
+
 "use client";
 
-import { useMemo, useEffect } from "react";
-import { query, collection, doc, updateDoc, getDoc } from "firebase/firestore";
+import { useMemo, useEffect, useState } from "react";
+import { query, collection, doc, updateDoc, getDoc, writeBatch, increment, serverTimestamp } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { History, X, Clock, Copy, RefreshCw } from "lucide-react";
-import { format, isValid, isAfter } from "date-fns";
+import { History, X, Clock, Copy, RefreshCw, Wallet, AlertCircle } from "lucide-react";
+import { format, isValid, isAfter, subMinutes } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { getApiOrdersStatus } from "@/app/actions/smm-api";
 
@@ -16,6 +17,7 @@ export default function OrdersHistoryPage() {
   const db = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const ordersQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
@@ -53,30 +55,94 @@ export default function OrdersHistoryPage() {
     return processed.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }, [rawOrdersData]);
 
-  // Real-time Status Sync Logic
+  // Automatic Refund Logic (30 Minute Window)
   useEffect(() => {
-    if (!db || !user || !orders.length) return;
+    if (!db || !user || !orders.length || isSyncing) return;
+
+    const checkRefunds = async () => {
+      const thirtyMinsAgo = subMinutes(new Date(), 30);
+      
+      // Orders eligible for refund:
+      // 1. Status is 'Pending'
+      // 2. Created > 30 mins ago
+      // 3. Paid via Wallet
+      // 4. API failed (no apiOrderId OR apiError exists)
+      const eligibleForRefund = orders.filter(o => 
+        o.status === 'Pending' && 
+        o.paymentMethod === 'Wallet' &&
+        isAfter(thirtyMinsAgo, o.createdAt) &&
+        (!o.apiOrderId || o.apiError)
+      );
+
+      if (eligibleForRefund.length === 0) return;
+
+      setIsSyncing(true);
+      const batch = writeBatch(db);
+
+      for (const order of eligibleForRefund) {
+        const orderRef = doc(db, "users", user.uid, "orders", order.id);
+        const userRef = doc(db, "users", user.uid);
+        const notifRef = doc(collection(db, "users", user.uid, "notifications"));
+
+        // 1. Mark Order as Refunded
+        batch.update(orderRef, { 
+          status: 'Refunded', 
+          refundedAt: serverTimestamp(),
+          refundReason: order.apiError || 'API Timeout / Manual Failure'
+        });
+
+        // 2. Add Balance back
+        batch.update(userRef, {
+          balance: increment(order.price || 0)
+        });
+
+        // 3. Send Notification
+        batch.set(notifRef, {
+          title: '💸 Auto-Refund Processed',
+          message: `Your order #${order.orderId || order.id.slice(0,8)} failed to start. ₹${order.price?.toFixed(2)} has been refunded to your wallet.`,
+          read: false,
+          createdAt: serverTimestamp()
+        });
+      }
+
+      try {
+        await batch.commit();
+        toast({ 
+          title: "System Update", 
+          description: `${eligibleForRefund.length} failed orders have been automatically refunded.` 
+        });
+      } catch (e) {
+        console.error("Refund Batch Failed", e);
+      } finally {
+        setIsSyncing(false);
+      }
+    };
+
+    checkRefunds();
+  }, [db, user, orders, isSyncing]);
+
+  // Real-time API Status Sync Logic
+  useEffect(() => {
+    if (!db || !user || !orders.length || isSyncing) return;
 
     const syncApiOrders = async () => {
-      // Find orders that need status checking
       const needsSync = orders.filter(o => 
-        (o.status === 'Pending' || o.status === 'Processing') && 
+        (o.status === 'Pending' || o.status === 'Processing' || o.status === 'In progress') && 
         o.apiOrderId && 
         o.providerId
       );
 
       if (needsSync.length === 0) return;
 
-      // Group orders by provider
+      const apiSettingsSnap = await getDoc(doc(db, "globalSettings", "api"));
+      if (!apiSettingsSnap.exists()) return;
+      const apiSettings = apiSettingsSnap.data();
+
       const byProvider: Record<string, string[]> = {};
       needsSync.forEach(o => {
         if (!byProvider[o.providerId]) byProvider[o.providerId] = [];
         byProvider[o.providerId].push(o.apiOrderId);
       });
-
-      const apiSettingsSnap = await getDoc(doc(db, "globalSettings", "api"));
-      if (!apiSettingsSnap.exists()) return;
-      const apiSettings = apiSettingsSnap.data();
 
       for (const providerId in byProvider) {
         const provider = apiSettings.providers?.find((p: any) => p.id === providerId);
@@ -86,16 +152,15 @@ export default function OrdersHistoryPage() {
         const result = await getApiOrdersStatus(provider.url, provider.key, idsStr);
 
         if (result.success && result.statuses) {
-          // Update Firestore for each order
           for (const apiId in result.statuses) {
-            const apiStatus = result.statuses[apiId].status; // e.g., 'Completed', 'Processing'
+            const apiStatus = result.statuses[apiId].status;
             const matchingOrder = needsSync.find(o => o.apiOrderId === apiId);
             
             if (matchingOrder && apiStatus && apiStatus !== matchingOrder.status) {
               const orderRef = doc(db, "users", user.uid, "orders", matchingOrder.id);
               updateDoc(orderRef, { 
                 status: apiStatus,
-                apiStatusLastChecked: new Date().toISOString()
+                apiStatusLastChecked: serverTimestamp()
               });
             }
           }
@@ -103,9 +168,8 @@ export default function OrdersHistoryPage() {
       }
     };
 
-    // Run sync occasionally or once on load
     syncApiOrders();
-  }, [db, user, orders]);
+  }, [db, user, orders, isSyncing]);
 
   const copyOrderId = (id: string) => {
     navigator.clipboard.writeText(id);
@@ -171,13 +235,24 @@ export default function OrdersHistoryPage() {
                     <Badge variant="outline" className={`text-[9px] h-5 font-black px-2 border-none rounded-lg ${
                       order.effectiveStatus === 'Processing' || order.effectiveStatus === 'In progress' ? 'bg-blue-50 text-blue-600' :
                       order.effectiveStatus === 'Completed' ? 'bg-emerald-50 text-emerald-600' :
+                      order.effectiveStatus === 'Refunded' ? 'bg-amber-100 text-amber-700' :
                       order.effectiveStatus === 'Cancelled' || order.effectiveStatus === 'Canceled' || order.effectiveStatus === 'Refunded' ? 'bg-red-50 text-red-600' :
                       'bg-slate-100 text-slate-400'
                     }`}>
                       {(order.effectiveStatus === 'Processing' || order.effectiveStatus === 'In progress') && <Clock size={10} className="mr-1 inline animate-spin" />}
+                      {order.effectiveStatus === 'Refunded' && <Wallet size={10} className="mr-1 inline" />}
                       {order.effectiveStatus}
                     </Badge>
                   </div>
+
+                  {order.effectiveStatus === 'Refunded' && (
+                    <div className="mt-2 bg-amber-50 dark:bg-amber-900/10 p-2 rounded-xl border border-amber-100 dark:border-amber-800/30 flex items-start gap-2">
+                      <AlertCircle size={12} className="text-amber-600 mt-0.5" />
+                      <p className="text-[9px] font-bold text-amber-700 dark:text-amber-500 uppercase leading-tight">
+                        Reason: {order.refundReason || 'Order failed to place on server.'}
+                      </p>
+                    </div>
+                  )}
 
                   <div className="mt-1 self-end text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
                     {isValid(order.createdAt) ? format(order.createdAt, 'd MMM').toUpperCase() : ''}

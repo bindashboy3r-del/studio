@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -7,8 +8,6 @@ import {
   onSnapshot, 
   updateDoc, 
   doc,
-  addDoc,
-  collection,
   serverTimestamp,
   getDoc
 } from "firebase/firestore";
@@ -32,7 +31,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, isValid, addMinutes, isAfter } from "date-fns";
-import { ChevronLeft, RefreshCw, ExternalLink, Copy, Clock, Globe } from "lucide-react";
+import { ChevronLeft, RefreshCw, ExternalLink, Copy, Clock, Globe, Wallet, AlertCircle } from "lucide-react";
 import { useFirestore, useUser } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
@@ -109,7 +108,7 @@ export default function TrackerPage() {
     setIsSyncing(true);
     
     const needsSync = orders.filter(o => 
-      (o.status === 'Pending' || o.status === 'Processing') && 
+      (o.status === 'Pending' || o.status === 'Processing' || o.status === 'In progress') && 
       o.apiOrderId && 
       o.providerId
     );
@@ -143,7 +142,7 @@ export default function TrackerPage() {
             if (matchingOrder && apiStatus && apiStatus !== matchingOrder.status) {
               await updateDoc(doc(db, matchingOrder.path), { 
                 status: apiStatus,
-                apiStatusLastChecked: new Date().toISOString()
+                apiStatusLastChecked: serverTimestamp()
               });
             }
           }
@@ -180,7 +179,7 @@ export default function TrackerPage() {
     toast({ title: "Copied", description: `${label} copied to clipboard.` });
   };
 
-  const pendingOrders = orders.filter(o => o.effectiveStatus === 'Pending' || o.effectiveStatus === 'Processing' || o.effectiveStatus === 'In progress');
+  const activeOrders = orders.filter(o => o.effectiveStatus === 'Pending' || o.effectiveStatus === 'Processing' || o.effectiveStatus === 'In progress');
   const historyOrders = orders.filter(o => o.effectiveStatus === 'Completed' || o.effectiveStatus === 'Cancelled' || o.effectiveStatus === 'Canceled' || o.effectiveStatus === 'Refunded');
 
   const OrderTable = ({ data }: { data: any[] }) => (
@@ -207,6 +206,7 @@ export default function TrackerPage() {
                 <div className="flex flex-col">
                   <span className="font-black uppercase text-[10px] text-blue-600">{order.platform || 'Platform'}</span>
                   <span className="text-sm font-bold text-slate-800">{order.service || 'N/A'} ({order.quantity || 0})</span>
+                  <span className="text-[9px] font-black text-emerald-600">₹{order.price?.toFixed(2)}</span>
                 </div>
               </TableCell>
               <TableCell>
@@ -228,6 +228,11 @@ export default function TrackerPage() {
                     <Badge variant="secondary" className="text-[9px] w-fit font-black bg-slate-100">API: {order.apiOrderId}</Badge>
                     <span className="text-[8px] font-bold text-slate-400 uppercase">{order.providerId || 'Unknown Provider'}</span>
                   </div>
+                ) : order.apiError ? (
+                  <div className="flex items-center gap-1 text-red-500">
+                    <AlertCircle size={12} />
+                    <span className="text-[9px] font-black uppercase">API Error</span>
+                  </div>
                 ) : (
                   <span className="text-[9px] font-bold text-slate-300 italic">Manual Order</span>
                 )}
@@ -237,9 +242,11 @@ export default function TrackerPage() {
                   order.effectiveStatus === 'Pending' ? 'bg-yellow-500/10 text-yellow-600 border-none' : 
                   (order.effectiveStatus === 'Processing' || order.effectiveStatus === 'In progress') ? 'bg-blue-500/10 text-blue-600 border-none' :
                   (order.effectiveStatus === 'Cancelled' || order.effectiveStatus === 'Canceled') ? 'bg-red-500/10 text-red-600 border-none' :
+                  order.effectiveStatus === 'Refunded' ? 'bg-amber-100 text-amber-700 border-none' :
                   'bg-emerald-500/10 text-emerald-600 border-none'
                 }>
                   {(order.effectiveStatus === 'Processing' || order.effectiveStatus === 'In progress') && <Clock size={10} className="mr-1 inline animate-spin" />}
+                  {order.effectiveStatus === 'Refunded' && <Wallet size={10} className="mr-1 inline" />}
                   {order.effectiveStatus}
                 </Badge>
               </TableCell>
@@ -299,7 +306,7 @@ export default function TrackerPage() {
             <div className="px-8 pt-6 pb-2 border-b border-slate-50 flex items-center justify-between">
               <TabsList className="bg-slate-100 rounded-2xl p-1 h-12">
                 <TabsTrigger value="pending" className="rounded-xl px-6 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-[#312ECB] data-[state=active]:text-white">
-                  Active ({pendingOrders.length})
+                  Active ({activeOrders.length})
                 </TabsTrigger>
                 <TabsTrigger value="history" className="rounded-xl px-6 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-[#312ECB] data-[state=active]:text-white">
                   History ({historyOrders.length})
@@ -308,7 +315,7 @@ export default function TrackerPage() {
             </div>
 
             <TabsContent value="pending" className="mt-0">
-              <OrderTable data={pendingOrders} />
+              <OrderTable data={activeOrders} />
             </TabsContent>
             
             <TabsContent value="history" className="mt-0">
