@@ -15,7 +15,8 @@ import {
   FileText, 
   User as UserIcon,
   CheckCircle2,
-  MessageCircle
+  MessageCircle,
+  X
 } from "lucide-react";
 import {
   Accordion,
@@ -23,6 +24,13 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
@@ -148,7 +156,8 @@ export default function ProfilePage() {
           <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] px-2">
             <HelpCircle size={14} /> Support & Terms
           </div>
-          <Card className="border-none shadow-[0_10px_40px_rgba(0,0,0,0.03)] rounded-[2.5rem] p-6 overflow-hidden">
+          <Card className="border-none shadow-[0_10px_40px_rgba(0,0,0,0.03)] rounded-[2.5rem] p-6 space-y-3">
+            {/* Support Button (as Accordion for context or just Button) */}
             <Accordion type="single" collapsible className="w-full">
               <AccordionItem value="support" className="border-none">
                 <AccordionTrigger className="text-[12px] font-black uppercase tracking-widest text-[#111B21] hover:no-underline px-4 bg-slate-50 rounded-2xl mb-2">
@@ -172,19 +181,59 @@ export default function ProfilePage() {
                   </Button>
                 </AccordionContent>
               </AccordionItem>
+            </Accordion>
 
-              <AccordionItem value="terms" className="border-none">
-                <AccordionTrigger className="text-[12px] font-black uppercase tracking-widest text-[#111B21] hover:no-underline px-4 bg-slate-50 rounded-2xl">
+            {/* Terms & Conditions Button that opens Dialog */}
+            <Dialog>
+              <DialogTrigger asChild>
+                <button className="w-full flex items-center justify-between text-[12px] font-black uppercase tracking-widest text-[#111B21] px-4 py-4 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-colors">
                   <div className="flex items-center gap-3">
                     <FileText size={16} className="text-[#312ECB]" />
-                    Terms of Service
+                    Terms & Conditions
                   </div>
-                </AccordionTrigger>
-                <AccordionContent className="px-6 py-4 text-xs font-semibold text-slate-500 leading-relaxed">
-                  By using SocialBoost, you agree that we are not responsible for any account blocks or restrictions. Our services are for growth acceleration. Payments are final once the order processing begins. Refunds are only issued if the service fails to deliver within the promised timeframe.
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
+                  <ChevronLeft size={16} className="rotate-180 text-slate-300" />
+                </button>
+              </DialogTrigger>
+              <DialogContent className="max-w-[90%] sm:max-w-[400px] rounded-[3rem] p-8 border-none bg-[#F3F4F9] shadow-2xl">
+                <DialogHeader className="text-center mb-8">
+                  <DialogTitle className="text-2xl font-black uppercase tracking-tight text-[#111B21]">
+                    TERMS & CONDITIONS
+                  </DialogTitle>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    SOCIALBOOST OFFICIAL GUIDELINES
+                  </p>
+                </DialogHeader>
+
+                <div className="space-y-8">
+                  <div className="space-y-2">
+                    <h3 className="text-[11px] font-black text-[#312ECB] uppercase tracking-widest">
+                      1. SERVICE USAGE
+                    </h3>
+                    <p className="text-[13px] font-semibold text-slate-600 leading-relaxed">
+                      SocialBoost is an automation tool for social media services. We are not affiliated with Instagram.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-[11px] font-black text-[#312ECB] uppercase tracking-widest">
+                      2. ACCOUNT SAFETY
+                    </h3>
+                    <p className="text-[13px] font-semibold text-slate-600 leading-relaxed">
+                      We do not ask for your Instagram password. Ensure your account is PUBLIC before ordering.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-[11px] font-black text-[#312ECB] uppercase tracking-widest">
+                      3. REFUND POLICY
+                    </h3>
+                    <p className="text-[13px] font-semibold text-slate-600 leading-relaxed">
+                      Once payment is confirmed, no refunds will be processed as order is final.
+                    </p>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </Card>
         </section>
 
@@ -196,7 +245,7 @@ export default function ProfilePage() {
             className="w-full h-14 border-red-100 text-red-600 hover:bg-red-50 hover:text-red-700 font-black text-[11px] uppercase tracking-widest rounded-2xl border-2 transition-all"
           >
             <LogOut size={16} className="mr-2" /> 
-            Sign Out From SocialBoost
+            Logout Account
           </Button>
         </div>
 
