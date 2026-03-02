@@ -9,14 +9,8 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, collectionGroup, query, where, getDocs, limit } from 'firebase/firestore';
+import { getFirestore, collection, collectionGroup, query, where, getDocs, limit } from 'firebase/firestore';
 import { firebaseConfig } from '@/firebase/config';
-
-// Initialize Firebase for server-side tool usage
-if (!getApps().length) {
-  initializeApp(firebaseConfig);
-}
-const db = getFirestore();
 
 /**
  * Tool to retrieve order details from the database.
@@ -24,9 +18,10 @@ const db = getFirestore();
 const getOrderDetails = ai.defineTool(
   {
     name: 'getOrderDetails',
-    description: 'Retrieves details for a specific SocialBoost order using its Order ID (e.g., SB-123456). Use this whenever a user provides an Order ID to check their status.',
+    description: 'Retrieves details for a specific SocialBoost order using its Order ID (e.g., SB-123456).',
     inputSchema: z.object({
       orderId: z.string().describe('The Order ID to look up (starts with SB-).'),
+      userId: z.string().describe('The ID of the currently logged-in user to help find their specific order.'),
     }),
     outputSchema: z.object({
       found: z.boolean().describe('Whether the order was found.'),
@@ -39,25 +34,43 @@ const getOrderDetails = ai.defineTool(
   },
   async (input) => {
     try {
+      // Initialize Firebase inside the tool to ensure it's ready on the server
+      if (!getApps().length) {
+        initializeApp(firebaseConfig);
+      }
+      const db = getFirestore();
+
       // Clean the Order ID
       const cleanId = input.orderId.trim().toUpperCase();
       
-      const q = query(
-        collectionGroup(db, 'orders'),
-        where('orderId', '==', cleanId),
-        limit(1)
-      );
+      // Step 1: Try searching the user's specific collection (fastest, no index required)
+      const userOrdersRef = collection(db, 'users', input.userId, 'orders');
+      const qUser = query(userOrdersRef, where('orderId', '==', cleanId), limit(1));
+      const snapshotUser = await getDocs(qUser);
       
-      const snapshot = await getDocs(q);
+      let orderDoc = !snapshotUser.empty ? snapshotUser.docs[0] : null;
+
+      // Step 2: Fallback to collection group search if not found in current user's (e.g. if they logged in with a different email)
+      if (!orderDoc) {
+        const qGroup = query(
+          collectionGroup(db, 'orders'),
+          where('orderId', '==', cleanId),
+          limit(1)
+        );
+        const snapshotGroup = await getDocs(qGroup);
+        if (!snapshotGroup.empty) {
+          orderDoc = snapshotGroup.docs[0];
+        }
+      }
       
-      if (snapshot.empty) {
+      if (!orderDoc) {
         return { 
           found: false, 
-          message: `Aapka order ${cleanId} abhi nahi mil pa raha hai, database mein kuch error aa raha hai. Kripya thodi der baad phir se koshish karein ya @bindash_boy3 ko Instagram par contact karein.` 
+          message: `Aapka order ${cleanId} abhi nahi mil pa raha hai, database mein kuch error aa raha hai. Kripya thodi der baad phir se koshish karein ya @bindash_boy3 ko Instagram par contact karein. 😔` 
         };
       }
       
-      const data = snapshot.docs[0].data();
+      const data = orderDoc.data();
       return {
         found: true,
         status: data.status || 'Pending',
@@ -66,7 +79,11 @@ const getOrderDetails = ai.defineTool(
         price: data.price,
       };
     } catch (e: any) {
-      return { found: false, message: "Database search failed. Kripya thodi der baad phir se koshish karein ya @bindash_boy3 ko Instagram par contact karein." };
+      console.error("Support bot tool error:", e);
+      return { 
+        found: false, 
+        message: "Database search failed. Kripya thodi der baad phir se koshish karein ya @bindash_boy3 ko Instagram par contact karein. 😔" 
+      };
     }
   }
 );
@@ -94,9 +111,9 @@ const supportBotPrompt = ai.definePrompt({
 Your goal is to help users with their SMM orders and wallet balances.
 
 GUIDELINES:
-1. If a user provides an Order ID (e.g., SB-123456), ALWAYS use the getOrderDetails tool to check the live status. 
+1. If a user provides an Order ID (e.g., SB-123456), ALWAYS use the getOrderDetails tool. Pass both the Order ID and the current User ID to the tool.
 2. If the tool finds the order, explain the current status (Pending, Processing, Completed, or Rejected) clearly to the user.
-3. If an order is NOT found or if there is any error, say: "Aapka order [ORDER_ID] abhi nahi mil pa raha hai, database mein kuch error aa raha hai. Kripya thodi der baad phir se koshish karein ya @bindash_boy3 ko Instagram par contact karein."
+3. If the tool returns found: false or if there is any error, use the exact Hinglish message provided by the tool to inform the user.
 4. If they ask how to add money or for a QR code, provide the UPI ID "smmxpressbot@slc" and suggest they click the "Add Funds" button in the header.
 5. If they ask for help or the bot is confused, suggest contacting the owner @bindash_boy3 on Instagram.
 6. Keep responses concise and friendly. Use Hinglish (Hindi written in English script) as the user prefers. Use emojis! 🚀
