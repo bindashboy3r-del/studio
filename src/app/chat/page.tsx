@@ -249,8 +249,9 @@ export default function ChatPage() {
     }
   }, [user, isMessagesLoading]);
 
-  const calculateTotalPrice = () => {
-    let total = currentOrder.items.reduce((total, item) => {
+  const calculateTotalPrice = (itemsOverride?: OrderItem[]) => {
+    const items = itemsOverride || currentOrder.items;
+    let total = items.reduce((total, item) => {
       const multiplier = (currentOrder.type === 'bulk' && currentOrder.bulkLinks) ? currentOrder.bulkLinks.length : 1;
       return total + (item.quantity / 1000) * item.service.pricePer1000 * multiplier;
     }, 0);
@@ -431,7 +432,7 @@ export default function ChatPage() {
     const updatedOrder = { ...currentOrder, type: 'combo' as const, items: formattedItems };
     setCurrentOrder(updatedOrder);
     
-    const total = formattedItems.reduce((sum, item) => sum + (item.quantity / 1000) * item.service.pricePer1000, 0) * 0.95;
+    const total = calculateTotalPrice(formattedItems);
     
     setChatState('choosing_payment_method');
     botReply(
@@ -514,9 +515,18 @@ export default function ChatPage() {
             items: prev.items.map(item => ({ ...item, quantity: qty }))
           }));
           setChatState('choosing_payment_method');
-          const total = calculateTotalPrice();
+          
+          // Use validated qty directly to avoid stale state in calculation
+          let total = (qty / 1000) * currentService.pricePer1000;
+          if (currentOrder.type === 'bulk' && currentOrder.bulkLinks) {
+            total *= currentOrder.bulkLinks.length;
+          }
+          if (currentOrder.type === 'combo') {
+            total *= 0.95;
+          }
+
           botReply(
-            `✅ Aapne ${PLATFORMS[currentOrder.platform]} ${currentService.name} select kiya hai.\n\n` +
+            `✅ Aapne Instagram ${currentService.name} select kiya hai.\n\n` +
             `📊 Quantity: ${qty}\n` +
             `💰 Total Price: ₹${total.toFixed(2)}\n\n` +
             `💳 Aapka Wallet: ₹${walletBalance.toFixed(2)}`, 
