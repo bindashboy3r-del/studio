@@ -257,7 +257,6 @@ export default function ChatPage() {
       return total + (item.quantity / 1000) * item.service.pricePer1000 * multiplier;
     }, 0);
 
-    // Apply 5% discount for combo orders
     if (currentOrder.type === 'combo') {
       total = total * 0.95;
     }
@@ -272,7 +271,6 @@ export default function ChatPage() {
     const batch = writeBatch(db);
     const orderResults: any[] = [];
 
-    // Handle single/combo or bulk links
     const targets = (currentOrder.type === 'bulk' && currentOrder.bulkLinks) ? currentOrder.bulkLinks : [currentOrder.items[0].link];
 
     for (const link of targets) {
@@ -407,8 +405,31 @@ export default function ChatPage() {
     if (links.length === 0) return;
     await addMessage('user', `Added ${links.length} links for bulk order.`);
     setCurrentOrder({ ...currentOrder, bulkLinks: links });
-    setChatState('entering_quantity'); // Direct to quantity per link
+    setChatState('entering_quantity'); 
     botReply(`📊 Quantity PER LINK for ${currentOrder.items[0].service.name}?`);
+  };
+
+  const handleComboFromCard = async (items: { serviceId: string, quantity: number }[], link: string) => {
+    if (items.length === 0 || !link) return;
+    
+    const formattedItems = items.map(item => ({
+      service: SERVICES.instagram.find(s => s.id === item.serviceId)!,
+      quantity: item.quantity,
+      link: link
+    }));
+
+    await addMessage('user', `Placed combo order with ${items.length} services.`);
+    const updatedOrder = { ...currentOrder, type: 'combo' as const, items: formattedItems };
+    setCurrentOrder(updatedOrder);
+    
+    // Calculate total for confirmation
+    const total = formattedItems.reduce((sum, item) => sum + (item.quantity / 1000) * item.service.pricePer1000, 0) * 0.95;
+    
+    setChatState('choosing_payment_method');
+    botReply(
+      `🎁 Combo Discount: 5% OFF!\n✅ Final Total: ₹${total.toFixed(2)}\n💳 Wallet: ₹${walletBalance.toFixed(0)}`, 
+      ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]
+    );
   };
 
   const handleSend = async (manualText?: string) => {
@@ -447,7 +468,9 @@ export default function ChatPage() {
         } else if (cleanText.includes("combo")) {
           setCurrentOrder({ type: 'combo', platform: 'instagram', items: [] });
           setChatState('choosing_combo_services');
-          botReply("🎁 Combo Offer: Get 5% OFF on total! Select services (Send 'DONE' when finished):", SERVICES.instagram.map(s => s.name));
+          botReply("🎁 Configure your Combo Order (Get 5% OFF!):", [], {
+            isComboCard: true
+          });
         } else if (cleanText.includes("bulk")) {
           setCurrentOrder({ type: 'bulk', platform: 'instagram', items: [] });
           setChatState('choosing_service');
@@ -472,27 +495,6 @@ export default function ChatPage() {
         }
         break;
 
-      case 'choosing_combo_services':
-        if (cleanText === 'done') {
-          if (currentOrder.items.length < 2) {
-            botReply("Please select at least 2 services for a Combo!");
-          } else {
-            setChatState('confirming_price'); // Step to get link for combo
-            botReply("🔗 Send the target Instagram link for this combo:");
-          }
-        } else {
-          const s = SERVICES.instagram.find(sv => cleanText.includes(sv.name.toLowerCase()));
-          if (s) {
-            if (currentOrder.items.find(item => item.service.id === s.id)) {
-              botReply(`${s.name} already added. Select another or send 'DONE'.`);
-            } else {
-              setCurrentOrder({ ...currentOrder, items: [...currentOrder.items, { service: s, quantity: 0, link: '' }] });
-              botReply(`✅ Added ${s.name}. Select more or send 'DONE' to set quantities.`);
-            }
-          }
-        }
-        break;
-
       case 'entering_quantity':
         const qty = parseInt(text);
         if (isNaN(qty) || qty < 100) {
@@ -506,57 +508,17 @@ export default function ChatPage() {
         break;
 
       case 'confirming_price':
-        if (currentOrder.type === 'combo') {
-          const updated = currentOrder.items.map(i => ({ ...i, link: text }));
-          setCurrentOrder({ ...currentOrder, items: updated });
-          setChatState('entering_combo_quantities');
-          botReply(`📊 Enter quantity for ${updated[0].service.name}:`);
-        } else {
-          const updated = currentOrder.items.map(i => ({ ...i, link: text }));
-          const finalOrder = { ...currentOrder, items: updated };
-          setCurrentOrder(finalOrder);
-          setChatState('choosing_payment_method');
-          
-          const total = finalOrder.items.reduce((sum, item) => {
-            const multi = finalOrder.bulkLinks?.length || 1;
-            return sum + (item.quantity / 1000) * item.service.pricePer1000 * multi;
-          }, 0);
-
-          botReply(`💰 Total: ₹${total.toFixed(2)}\n💳 Wallet: ₹${walletBalance.toFixed(0)}`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]);
-        }
-        break;
-
-      case 'entering_combo_quantities':
-        const cQty = parseInt(text);
-        if (isNaN(cQty) || cQty < 100) {
-          botReply("Invalid quantity. Please enter 100 or more.");
-          return;
-        }
-
-        const currentItems = [...currentOrder.items];
-        const nextIdx = currentItems.findIndex(i => i.quantity === 0);
+        const updated = currentOrder.items.map(i => ({ ...i, link: text }));
+        const finalOrder = { ...currentOrder, items: updated };
+        setCurrentOrder(finalOrder);
+        setChatState('choosing_payment_method');
         
-        if (nextIdx !== -1) {
-          currentItems[nextIdx].quantity = cQty;
-          const stillToFillIdx = currentItems.findIndex(i => i.quantity === 0);
-          
-          if (stillToFillIdx !== -1) {
-            setCurrentOrder({ ...currentOrder, items: currentItems });
-            botReply(`📊 Enter quantity for ${currentItems[stillToFillIdx].service.name}:`);
-          } else {
-            const finalOrder = { ...currentOrder, items: currentItems };
-            setCurrentOrder(finalOrder);
-            setChatState('choosing_payment_method');
-            
-            const rawTotal = currentItems.reduce((t, i) => t + (i.quantity/1000 * i.service.pricePer1000), 0);
-            const discountedTotal = rawTotal * 0.95;
+        const total = finalOrder.items.reduce((sum, item) => {
+          const multi = finalOrder.bulkLinks?.length || 1;
+          return sum + (item.quantity / 1000) * item.service.pricePer1000 * multi;
+        }, 0);
 
-            botReply(
-              `💰 Original: ₹${rawTotal.toFixed(2)}\n🎁 Combo Discount: 5% OFF!\n✅ Final Total: ₹${discountedTotal.toFixed(2)}\n💳 Wallet: ₹${walletBalance.toFixed(0)}`, 
-              ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]
-            );
-          }
-        }
+        botReply(`💰 Total: ₹${total.toFixed(2)}\n💳 Wallet: ₹${walletBalance.toFixed(0)}`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]);
         break;
 
       case 'choosing_payment_method':
@@ -711,6 +673,8 @@ export default function ChatPage() {
             successDetails={m.successDetails}
             isBulkLinkCard={m.isBulkLinkCard}
             onBulkLinksSubmit={(links) => handleBulkLinksFromCard(links)}
+            isComboCard={m.isComboCard}
+            onComboSubmit={(items, link) => handleComboFromCard(items, link)}
             onOptionClick={(option) => handleSend(option)}
             timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} 
           />

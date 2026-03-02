@@ -16,14 +16,23 @@ import {
   Plus,
   Trash2,
   Layers,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Percent,
+  ChevronDown
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { SERVICES } from "@/app/lib/constants";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface SuccessDetails {
   orderId: string;
@@ -51,6 +60,8 @@ interface MessageBubbleProps {
   onFundSubmit?: (amount: number, utr: string) => void;
   isBulkLinkCard?: boolean;
   onBulkLinksSubmit?: (links: string[]) => void;
+  isComboCard?: boolean;
+  onComboSubmit?: (items: { serviceId: string, quantity: number }[], link: string) => void;
 }
 
 export function MessageBubble({ 
@@ -68,7 +79,9 @@ export function MessageBubble({
   fundPrice,
   onFundSubmit,
   isBulkLinkCard,
-  onBulkLinksSubmit
+  onBulkLinksSubmit,
+  isComboCard,
+  onComboSubmit
 }: MessageBubbleProps) {
   const isUser = sender === 'user';
   const { toast } = useToast();
@@ -78,9 +91,15 @@ export function MessageBubble({
   const [utr, setUtr] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
   
-  // Bulk link specific state
   const [bulkLinks, setBulkLinks] = useState<string[]>([]);
   const [currentBulkLink, setCurrentBulkLink] = useState("");
+
+  const [comboItems, setComboItems] = useState<{ serviceId: string, quantity: number }[]>([
+    { serviceId: 'likes', quantity: 0 },
+    { serviceId: 'views', quantity: 0 },
+    { serviceId: 'comments', quantity: 0 }
+  ]);
+  const [comboLink, setComboLink] = useState("");
 
   const price = paymentPrice || fundPrice || 0;
   const upiId = "smmxpressbot@slc";
@@ -143,6 +162,36 @@ export function MessageBubble({
   const removeBulkLink = (index: number) => {
     setBulkLinks(bulkLinks.filter((_, i) => i !== index));
   };
+
+  // Combo Card Logic
+  const availableServices = useMemo(() => {
+    const selectedIds = comboItems.map(i => i.serviceId);
+    return SERVICES.instagram.filter(s => !selectedIds.includes(s.id));
+  }, [comboItems]);
+
+  const addComboService = (serviceId: string) => {
+    setComboItems([...comboItems, { serviceId, quantity: 0 }]);
+  };
+
+  const removeComboService = (index: number) => {
+    setComboItems(comboItems.filter((_, i) => i !== index));
+  };
+
+  const updateComboQuantity = (index: number, qty: number) => {
+    const updated = [...comboItems];
+    updated[index].quantity = qty;
+    setComboItems(updated);
+  };
+
+  const comboTotal = useMemo(() => {
+    const raw = comboItems.reduce((sum, item) => {
+      const s = SERVICES.instagram.find(sv => sv.id === item.serviceId);
+      return sum + (item.quantity / 1000) * (s?.pricePer1000 || 0);
+    }, 0);
+    return { raw, discounted: raw * 0.95 };
+  }, [comboItems]);
+
+  const isComboValid = comboItems.length >= 2 && comboItems.every(i => i.quantity >= 100) && comboLink.trim() !== "";
 
   return (
     <div className={cn("flex w-full mb-4", isUser ? "justify-end" : "justify-start")}>
@@ -337,13 +386,106 @@ export function MessageBubble({
               </Button>
             </div>
           </div>
+        ) : isComboCard ? (
+          <div className="space-y-6 min-w-[280px]">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-[12px] font-black text-[#111B21] dark:text-white uppercase tracking-tight">
+                <Rocket size={16} className="text-[#312ECB]" /> Configure Combo
+              </div>
+              <Badge className="bg-emerald-500/10 text-emerald-600 border-none font-black text-[9px] uppercase tracking-widest">
+                <Percent size={10} className="mr-1" /> 5% Discount Active
+              </Badge>
+            </div>
+
+            <div className="space-y-4">
+              <ScrollArea className="max-h-[250px] pr-2">
+                <div className="space-y-3">
+                  {comboItems.map((item, idx) => {
+                    const s = SERVICES.instagram.find(sv => sv.id === item.serviceId);
+                    return (
+                      <div key={idx} className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 animate-in slide-in-from-bottom-2 duration-300">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-[11px] font-black uppercase tracking-wider text-[#312ECB] dark:text-blue-400">{s?.name}</span>
+                          <button onClick={() => removeComboService(idx)} className="text-red-400 hover:text-red-600 p-1">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                        <div className="relative">
+                          <Input 
+                            type="number"
+                            placeholder="Qty (Min 100)"
+                            value={item.quantity || ""}
+                            onChange={(e) => updateComboQuantity(idx, parseInt(e.target.value) || 0)}
+                            className="h-10 bg-white dark:bg-slate-800 border-none rounded-xl px-4 text-xs font-bold shadow-inner"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+
+              {availableServices.length > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="w-full h-12 border-dashed border-2 border-slate-200 dark:border-slate-800 text-slate-400 hover:text-[#312ECB] rounded-2xl text-[10px] font-black uppercase tracking-widest gap-2">
+                      <Plus size={14} /> Add Service
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="center" className="w-[200px] bg-white dark:bg-slate-900 rounded-2xl border-gray-100 dark:border-slate-800 shadow-xl">
+                    {availableServices.map(s => (
+                      <DropdownMenuItem 
+                        key={s.id} 
+                        onClick={() => addComboService(s.id)}
+                        className="text-[10px] font-black uppercase tracking-widest py-3 hover:bg-slate-50 dark:hover:bg-slate-800"
+                      >
+                        {s.name}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+
+              <div className="space-y-1 pt-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Target Link</label>
+                <div className="relative">
+                  <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
+                  <Input 
+                    placeholder="Instagram link for combo"
+                    value={comboLink}
+                    onChange={(e) => setComboLink(e.target.value)}
+                    className="h-12 bg-slate-50 dark:bg-slate-900 border-none rounded-2xl pl-10 pr-5 text-sm font-bold shadow-inner"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-2">
+                <div className="flex justify-between text-[11px] font-bold text-slate-400 line-through">
+                  <span>Subtotal:</span>
+                  <span>₹{comboTotal.raw.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-[13px] font-black text-emerald-600">
+                  <span>Combo Total (5% OFF):</span>
+                  <span>₹{comboTotal.discounted.toFixed(2)}</span>
+                </div>
+              </div>
+
+              <Button 
+                onClick={() => onComboSubmit?.(comboItems, comboLink)}
+                disabled={!isComboValid}
+                className="w-full h-14 bg-[#312ECB] hover:bg-[#2825A6] text-white rounded-2xl font-black uppercase text-[12px] tracking-widest gap-2 shadow-xl transition-all active:scale-95"
+              >
+                Proceed to Payment
+              </Button>
+            </div>
+          </div>
         ) : (
           <p className="text-[14px] leading-relaxed font-bold text-black dark:text-white whitespace-pre-wrap">
             {text}
           </p>
         )}
 
-        {options && options.length > 0 && !isPaymentCard && !isSuccessCard && !isFundPaymentCard && !isBulkLinkCard && (
+        {options && options.length > 0 && !isPaymentCard && !isSuccessCard && !isFundPaymentCard && !isBulkLinkCard && !isComboCard && (
           <div className="mt-4 space-y-2">
             {options.map((option, idx) => (
               <button
