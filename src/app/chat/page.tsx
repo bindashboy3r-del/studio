@@ -31,7 +31,8 @@ import {
   Bot,
   User as UserIcon,
   CheckCircle2,
-  X
+  X,
+  Megaphone
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PLATFORMS, SERVICES, Platform, SMMService } from "@/app/lib/constants";
@@ -80,6 +81,7 @@ export default function ChatPage() {
   const [chatState, setChatState] = useState<ChatState>('idle');
   const [currentOrder, setCurrentOrder] = useState<OrderInProgress>({});
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [activeBroadcast, setActiveBroadcast] = useState<any>(null);
   
   const [sessionStartTime] = useState(() => Date.now());
   const hasInitialGreeted = useRef(false);
@@ -99,6 +101,20 @@ export default function ChatPage() {
     localStorage.setItem('theme', newTheme);
     document.documentElement.classList.toggle('dark', newTheme === 'dark');
   };
+
+  // Global Broadcast Listener
+  useEffect(() => {
+    if (!db) return;
+    const broadcastRef = doc(db, "globalAnnouncements", "current");
+    const unsubscribe = onSnapshot(broadcastRef, (snapshot) => {
+      if (snapshot.exists() && snapshot.data().active) {
+        setActiveBroadcast(snapshot.data());
+      } else {
+        setActiveBroadcast(null);
+      }
+    });
+    return () => unsubscribe();
+  }, [db]);
 
   // Real-time Notifications Listener
   const notificationsQuery = useMemoFirebase(() => {
@@ -386,6 +402,22 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-screen max-w-lg mx-auto overflow-hidden relative shadow-2xl bg-white dark:bg-slate-950 font-body">
+      {/* Broadcast Banner */}
+      {activeBroadcast && (
+        <div className="bg-[#312ECB] text-white px-6 py-3 flex items-start gap-4 animate-in slide-in-from-top duration-500 z-[60] shadow-xl">
+          <div className="mt-1 bg-white/20 p-2 rounded-xl">
+            <Megaphone size={16} />
+          </div>
+          <div className="flex-1">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-1">Official Announcement</p>
+            <p className="text-[12px] font-bold leading-relaxed whitespace-pre-wrap">{activeBroadcast.text}</p>
+          </div>
+          <button onClick={() => setActiveBroadcast(null)} className="mt-1 opacity-40 hover:opacity-100">
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       <div className="bg-white dark:bg-slate-900 px-4 py-3 flex items-center justify-between border-b border-gray-100 dark:border-slate-800 z-40">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-[#312ECB] flex items-center justify-center text-white shadow-md">
@@ -399,7 +431,6 @@ export default function ChatPage() {
             {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
           </Button>
           
-          {/* Notifications Bell */}
           <DropdownMenu onOpenChange={(open) => open && markAllAsRead()}>
             <DropdownMenuTrigger asChild>
               <button className="relative w-8 h-8 rounded-full text-slate-400 hover:text-[#312ECB] flex items-center justify-center transition-colors">
