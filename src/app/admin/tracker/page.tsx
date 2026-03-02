@@ -31,8 +31,8 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format, isValid } from "date-fns";
-import { ChevronLeft, RefreshCw, ExternalLink, Copy, Filter } from "lucide-react";
+import { format, isValid, addMinutes, isAfter } from "date-fns";
+import { ChevronLeft, RefreshCw, ExternalLink, Copy, Filter, Clock } from "lucide-react";
 import { useFirestore, useUser } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
@@ -55,8 +55,6 @@ export default function TrackerPage() {
   useEffect(() => {
     if (!user || !db || user.email !== "chetanmadhav4@gmail.com") return;
 
-    // We remove the server-side orderBy to avoid the COLLECTION_GROUP index error.
-    // We will sort the data in Javascript instead.
     const q = collectionGroup(db, "orders");
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -73,21 +71,28 @@ export default function TrackerPage() {
           }
         }
 
+        // Calculate Effective Status
+        let effectiveStatus = data.status || 'Pending';
+        if (data.status === 'Processing' && data.autoCompleteAt) {
+          const completeTime = data.autoCompleteAt.toDate ? data.autoCompleteAt.toDate() : new Date(data.autoCompleteAt);
+          if (isAfter(new Date(), completeTime)) {
+            effectiveStatus = 'Completed';
+          }
+        }
+
         return {
           id: doc.id,
           path: doc.ref.path,
           ...data,
-          createdAt
+          createdAt,
+          effectiveStatus
         };
       });
 
-      // Sort in memory: Recent orders first
       ords.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-
       setOrders(ords);
       setLoading(false);
     }, (err) => {
-      console.error("Tracker Error:", err);
       const contextualError = new FirestorePermissionError({
         path: 'orders (collectionGroup)',
         operation: 'list'
@@ -103,19 +108,30 @@ export default function TrackerPage() {
     if (!db) return;
     const orderRef = doc(db, order.path);
     
-    updateDoc(orderRef, { status: newStatus })
+    const updateData: any = { status: newStatus };
+    
+    // Auto-complete logic: 45 minutes from now
+    if (newStatus === 'Processing') {
+      const completionTime = addMinutes(new Date(), 45);
+      updateData.autoCompleteAt = completionTime;
+    } else {
+      updateData.autoCompleteAt = null;
+    }
+    
+    updateDoc(orderRef, updateData)
       .then(async () => {
-        toast({ title: "Status Updated", description: `Order ${order.id.slice(0, 8)} set to ${newStatus}` });
+        toast({ 
+          title: "Status Updated", 
+          description: newStatus === 'Processing' 
+            ? "Order is now Processing. Will auto-complete in 45 mins." 
+            : "Order has been rejected."
+        });
         
-        // Create notification for user
         if (order.userId) {
-          const notifTitle = newStatus === 'Completed' ? '✅ Order Approved' : 
-                            newStatus === 'Cancelled' ? '❌ Order Rejected' : 
-                            '🔄 Status Update';
-          
-          const notifMsg = newStatus === 'Completed' ? 
-            `Your order for ${order.service} is approved and processing!` :
-            `Sorry, your order for ${order.service} was rejected. Check details for info.`;
+          const notifTitle = newStatus === 'Processing' ? '🔄 Order Processing' : '❌ Order Rejected';
+          const notifMsg = newStatus === 'Processing' ? 
+            `Your order for ${order.service} is being processed and will finish in 45 minutes!` :
+            `Sorry, your order for ${order.service} was rejected.`;
 
           addDoc(collection(db, "users", order.userId, "notifications"), {
             title: notifTitle,
@@ -131,7 +147,7 @@ export default function TrackerPage() {
         const contextualError = new FirestorePermissionError({
           path: order.path,
           operation: 'update',
-          requestResourceData: { status: newStatus }
+          requestResourceData: updateData
         });
         errorEmitter.emit('permission-error', contextualError);
       });
@@ -143,8 +159,8 @@ export default function TrackerPage() {
     toast({ title: "Copied", description: `${label} copied to clipboard.` });
   };
 
-  const pendingOrders = orders.filter(o => o.status === 'Pending' || o.status === 'Processing');
-  const historyOrders = orders.filter(o => o.status === 'Completed' || o.status === 'Cancelled');
+  const pendingOrders = orders.filter(o => o.effectiveStatus === 'Pending' || o.effectiveStatus === 'Processing');
+  const historyOrders = orders.filter(o => o.effectiveStatus === 'Completed' || o.effectiveStatus === 'Cancelled');
 
   const OrderTable = ({ data }: { data: any[] }) => (
     <div className="overflow-x-auto">
@@ -196,26 +212,29 @@ export default function TrackerPage() {
               </TableCell>
               <TableCell>
                 <Badge className={
-                  order.status === 'Pending' ? 'bg-yellow-500/10 text-yellow-600 border-none' : 
-                  order.status === 'Processing' ? 'bg-blue-500/10 text-blue-600 border-none' :
-                  order.status === 'Cancelled' ? 'bg-red-500/10 text-red-600 border-none' :
+                  order.effectiveStatus === 'Pending' ? 'bg-yellow-500/10 text-yellow-600 border-none' : 
+                  order.effectiveStatus === 'Processing' ? 'bg-blue-500/10 text-blue-600 border-none' :
+                  order.effectiveStatus === 'Cancelled' ? 'bg-red-500/10 text-red-600 border-none' :
                   'bg-emerald-500/10 text-emerald-600 border-none'
                 }>
-                  {order.status || 'Pending'}
+                  {order.effectiveStatus === 'Processing' && <Clock size={10} className="mr-1 inline" />}
+                  {order.effectiveStatus}
                 </Badge>
               </TableCell>
               <TableCell className="text-right">
-                <Select defaultValue={order.status || 'Pending'} onValueChange={(val) => updateStatus(order, val)}>
-                  <SelectTrigger className="w-[120px] h-10 bg-white border-slate-200 rounded-xl text-[10px] font-black uppercase">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Pending" className="text-[10px] font-black uppercase">Pending</SelectItem>
-                    <SelectItem value="Processing" className="text-[10px] font-black uppercase">Processing</SelectItem>
-                    <SelectItem value="Completed" className="text-[10px] font-black uppercase text-emerald-600">Completed</SelectItem>
-                    <SelectItem value="Cancelled" className="text-[10px] font-black uppercase text-red-600">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
+                {order.effectiveStatus === 'Pending' ? (
+                  <Select onValueChange={(val) => updateStatus(order, val)}>
+                    <SelectTrigger className="w-[120px] h-10 bg-white border-slate-200 rounded-xl text-[10px] font-black uppercase">
+                      <SelectValue placeholder="Action" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Processing" className="text-[10px] font-black uppercase text-blue-600">Processing</SelectItem>
+                      <SelectItem value="Cancelled" className="text-[10px] font-black uppercase text-red-600">Reject</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Locked</span>
+                )}
               </TableCell>
             </TableRow>
           ))}
@@ -260,7 +279,7 @@ export default function TrackerPage() {
             <div className="px-8 pt-6 pb-2 border-b border-slate-50 flex items-center justify-between">
               <TabsList className="bg-slate-100 rounded-2xl p-1 h-12">
                 <TabsTrigger value="pending" className="rounded-xl px-6 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-[#312ECB] data-[state=active]:text-white">
-                  Pending ({pendingOrders.length})
+                  Active ({pendingOrders.length})
                 </TabsTrigger>
                 <TabsTrigger value="history" className="rounded-xl px-6 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-[#312ECB] data-[state=active]:text-white">
                   History ({historyOrders.length})
@@ -268,8 +287,8 @@ export default function TrackerPage() {
               </TabsList>
               
               <div className="flex items-center gap-3">
-                <Filter size={16} className="text-slate-300" />
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Auto-updating live</span>
+                <Clock size={16} className="text-blue-500 animate-pulse" />
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">45m Auto-Completion Active</span>
               </div>
             </div>
 

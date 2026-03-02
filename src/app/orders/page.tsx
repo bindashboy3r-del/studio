@@ -6,16 +6,15 @@ import { query, collection } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { Button } from "@/components/ui/button";
-import { History, X } from "lucide-react";
-import { format, isValid } from "date-fns";
+import { Badge } from "@/components/ui/badge";
+import { History, X, Clock } from "lucide-react";
+import { format, isValid, isAfter } from "date-fns";
 
 export default function OrdersHistoryPage() {
   const { user } = useUser();
   const db = useFirestore();
   const router = useRouter();
 
-  // We remove the server-side orderBy to avoid the composite index requirement.
-  // We will sort the results in memory.
   const ordersQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
     return collection(db, "users", user.uid, "orders");
@@ -36,10 +35,19 @@ export default function OrdersHistoryPage() {
           if (isValid(parsed)) createdAt = parsed;
         }
       }
-      return { ...order, createdAt };
+
+      // Calculate Effective Status for User History
+      let effectiveStatus = order.status || 'Pending';
+      if (order.status === 'Processing' && order.autoCompleteAt) {
+        const completeTime = order.autoCompleteAt.toDate ? order.autoCompleteAt.toDate() : new Date(order.autoCompleteAt);
+        if (isAfter(new Date(), completeTime)) {
+          effectiveStatus = 'Completed';
+        }
+      }
+
+      return { ...order, createdAt, effectiveStatus };
     });
 
-    // Sort in memory: Recent orders first
     return processed.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }, [rawOrdersData]);
 
@@ -93,8 +101,14 @@ export default function OrdersHistoryPage() {
                     ₹{order.price?.toFixed(0)}
                   </span>
                   <span className="text-slate-200 dark:text-slate-700">•</span>
-                  <Badge variant="outline" className="text-[8px] h-4 font-black px-1.5 border-slate-200 dark:border-slate-700 text-slate-400">
-                    {order.status || 'Pending'}
+                  <Badge variant="outline" className={`text-[8px] h-4 font-black px-1.5 border-none ${
+                    order.effectiveStatus === 'Processing' ? 'bg-blue-50 text-blue-600' :
+                    order.effectiveStatus === 'Completed' ? 'bg-emerald-50 text-emerald-600' :
+                    order.effectiveStatus === 'Cancelled' ? 'bg-red-50 text-red-600' :
+                    'bg-slate-100 text-slate-400'
+                  }`}>
+                    {order.effectiveStatus === 'Processing' && <Clock size={8} className="mr-1 inline animate-spin" />}
+                    {order.effectiveStatus}
                   </Badge>
                 </div>
 
