@@ -53,8 +53,8 @@ export function MessageBubble({
   // Construct UPI link for QR generation
   const upiLink = `upi://pay?pa=${upiId}&pn=SocialBoost&am=${price.toFixed(2)}&cu=INR`;
   
-  // Using QuickChart for high reliability and CORS support
-  const qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(upiLink)}&size=300&margin=1&centerImageUrl=https://picsum.photos/seed/rocket/64/64`;
+  // Using QRServer for high reliability and simple parameters
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(upiLink)}`;
 
   const handleDownloadQR = async () => {
     setIsDownloading(true);
