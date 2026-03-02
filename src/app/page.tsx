@@ -7,17 +7,17 @@ import {
   createUserWithEmailAndPassword,
   updateProfile
 } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useRouter } from "next/navigation";
-import { Rocket, Mail, Lock, User } from "lucide-react";
+import { Zap, Instagram } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth, useFirestore } from "@/firebase";
+import { cn } from "@/lib/utils";
 
 export default function AuthPage() {
+  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -74,119 +74,110 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background whatsapp-bg p-4">
-      <Card className="w-full max-w-md border-primary/20 bg-white shadow-2xl">
-        <CardHeader className="text-center space-y-4">
-          <div className="mx-auto w-16 h-16 rounded-full bg-[#054640] flex items-center justify-center text-white border border-primary/30 shadow-lg">
-            <Rocket size={32} />
-          </div>
-          <div className="space-y-1">
-            <CardTitle className="text-3xl font-extrabold tracking-tight text-[#054640]">SocialBoost</CardTitle>
-            <CardDescription className="text-black font-semibold">Scale your social media growth instantly.</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-8 bg-slate-100">
-              <TabsTrigger value="login" className="data-[state=active]:bg-[#054640] data-[state=active]:text-white font-bold">Login</TabsTrigger>
-              <TabsTrigger value="signup" className="data-[state=active]:bg-[#054640] data-[state=active]:text-white font-bold">Register</TabsTrigger>
-            </TabsList>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#E9EBF0] p-6 font-body">
+      <div className="w-full max-w-[440px] bg-white rounded-[3.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] p-10 pb-12 flex flex-col items-center">
+        
+        {/* Logo Icon */}
+        <div className="w-16 h-16 bg-[#312ECB] rounded-2xl flex items-center justify-center shadow-[0_8px_16px_rgba(49,46,203,0.3)] mb-8">
+          <Zap className="text-white fill-current" size={32} />
+        </div>
 
-            <TabsContent value="login">
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-black flex items-center gap-2">
-                    <Mail size={14} className="text-[#054640]" /> EMAIL ADDRESS
-                  </label>
-                  <Input 
-                    type="email" 
-                    placeholder="name@example.com" 
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="bg-white border-slate-300 text-black font-medium"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-black flex items-center gap-2">
-                    <Lock size={14} className="text-[#054640]" /> PASSWORD
-                  </label>
-                  <Input 
-                    type="password" 
-                    placeholder="••••••••" 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="bg-white border-slate-300 text-black font-medium"
-                    required
-                  />
-                </div>
-                <Button 
-                  type="submit"
-                  disabled={loading} 
-                  className="w-full h-11 bg-[#054640] hover:bg-[#04332f] text-white font-bold transition-all active:scale-95 shadow-md"
-                >
-                  {loading ? "AUTHENTICATING..." : "LOGIN TO SOCIALBOOST"}
-                </Button>
-              </form>
-            </TabsContent>
+        {/* Heading */}
+        <h1 className="text-[28px] font-black tracking-tight text-[#111B21] uppercase text-center mb-2">
+          SOCIALBOOST ACCESS
+        </h1>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-10">
+          {isLogin ? "SIGN IN TO MANAGE YOUR ORDERS" : "CREATE AN ACCOUNT TO GET STARTED"}
+        </p>
 
-            <TabsContent value="signup">
-              <form onSubmit={handleSignup} className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-black flex items-center gap-2">
-                    <User size={14} className="text-[#054640]" /> FULL NAME
-                  </label>
-                  <Input 
-                    type="text" 
-                    placeholder="John Doe" 
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    className="bg-white border-slate-300 text-black font-medium"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-black flex items-center gap-2">
-                    <Mail size={14} className="text-[#054640]" /> EMAIL ADDRESS
-                  </label>
-                  <Input 
-                    type="email" 
-                    placeholder="name@example.com" 
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="bg-white border-slate-300 text-black font-medium"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-black flex items-center gap-2">
-                    <Lock size={14} className="text-[#054640]" /> PASSWORD
-                  </label>
-                  <Input 
-                    type="password" 
-                    placeholder="Create a strong password" 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="bg-white border-slate-300 text-black font-medium"
-                    required
-                  />
-                </div>
-                <Button 
-                  type="submit"
-                  disabled={loading} 
-                  className="w-full h-11 bg-[#054640] hover:bg-[#04332f] text-white font-bold transition-all active:scale-95 shadow-md"
-                >
-                  {loading ? "CREATING ACCOUNT..." : "CREATE FREE ACCOUNT"}
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
-          
-          <div className="mt-8 text-center text-[10px] text-black uppercase tracking-[0.2em] font-extrabold">
-            Professional • Secure • Global
+        {/* Form */}
+        <form onSubmit={isLogin ? handleLogin : handleSignup} className="w-full space-y-6">
+          {!isLogin && (
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-[#111B21] uppercase tracking-wider ml-1">
+                FULL NAME
+              </label>
+              <Input 
+                type="text" 
+                placeholder="Enter your name..." 
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                className="h-12 bg-slate-50 border-none rounded-2xl px-5 text-sm font-semibold placeholder:text-slate-300 shadow-none focus-visible:ring-1 focus-visible:ring-[#312ECB]/20"
+                required
+              />
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-[#111B21] uppercase tracking-wider ml-1">
+              USERNAME OR EMAIL
+            </label>
+            <Input 
+              type="email" 
+              placeholder="Enter details..." 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="h-12 bg-slate-50 border-none rounded-2xl px-5 text-sm font-semibold placeholder:text-slate-300 shadow-none focus-visible:ring-1 focus-visible:ring-[#312ECB]/20"
+              required
+            />
           </div>
-        </CardContent>
-      </Card>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-[#111B21] uppercase tracking-wider ml-1">
+              PASSWORD
+            </label>
+            <Input 
+              type="password" 
+              placeholder="••••••••" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="h-12 bg-slate-50 border-none rounded-2xl px-5 text-sm font-semibold placeholder:text-slate-300 shadow-none focus-visible:ring-1 focus-visible:ring-[#312ECB]/20"
+              required
+            />
+          </div>
+
+          <Button 
+            type="submit"
+            disabled={loading}
+            className="w-full h-14 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[13px] uppercase tracking-widest rounded-2xl shadow-[0_12px_24px_rgba(49,46,203,0.25)] transition-all active:scale-95 mt-4"
+          >
+            {loading ? "PROCESSING..." : isLogin ? "ACCESS DASHBOARD" : "CREATE ACCOUNT"}
+          </Button>
+        </form>
+
+        {/* Toggle */}
+        <div className="mt-8 text-center">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+            {isLogin ? "DON'T HAVE AN ACCOUNT?" : "ALREADY HAVE AN ACCOUNT?"}
+          </p>
+          <button 
+            onClick={() => setIsLogin(!isLogin)}
+            className="text-[12px] font-black text-[#312ECB] uppercase tracking-wider hover:underline"
+          >
+            {isLogin ? "CREATE FREE ACCOUNT" : "SIGN IN TO DASHBOARD"}
+          </button>
+        </div>
+      </div>
+
+      {/* Footer Credits */}
+      <div className="mt-12 flex flex-col items-center space-y-3">
+        <p className="text-[9px] font-black text-[#111B21] uppercase tracking-[0.25em]">
+          SOCIALBOOST CREATE BY CHETAN NAGANI
+        </p>
+        <a 
+          href="https://instagram.com/bindash_boy3" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="flex flex-col items-center group"
+        >
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[#312ECB] group-hover:scale-110 transition-transform">
+            <Instagram size={20} />
+          </div>
+          <span className="text-[11px] font-black text-[#312ECB] uppercase tracking-widest">
+            @BINDASH_BOY3
+          </span>
+        </a>
+      </div>
     </div>
   );
 }
