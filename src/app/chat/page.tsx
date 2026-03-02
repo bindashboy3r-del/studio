@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -451,7 +450,7 @@ export default function ChatPage() {
           setChatState('choosing_payment_method');
           botReply(
             `✅ Order: ${qty} ${PLATFORMS[currentOrder.platform!]} ${currentOrder.service!.name}\n💰 Price: ₹${price.toFixed(0)}\n💳 Your Balance: ₹${walletBalance.toFixed(0)}\n\nChoose payment method:`,
-            ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR", "🏠 MAIN MENU"]
+            ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]
           );
         }
         break;
@@ -459,7 +458,7 @@ export default function ChatPage() {
         const price = (currentOrder.quantity! / 1000) * currentOrder.service!.pricePer1000;
         if (cleanText.includes("wallet")) {
           if (walletBalance < price) {
-            botReply(`❌ Insufficient balance! (Needs ₹${price.toFixed(0)}, have ₹${walletBalance.toFixed(0)}).\n\nNiche di gayi list mein se select karein:`, ["📲 PAY VIA UPI QR", "💰 ADD FUNDS", "🏠 MAIN MENU"]);
+            botReply(`❌ Insufficient balance! (Needs ₹${price.toFixed(0)}, have ₹${walletBalance.toFixed(0)}).\n\nNiche di gayi list mein se select karein:`, ["📲 PAY VIA UPI QR", "💰 ADD FUNDS"]);
           } else {
             setCurrentOrder({ ...currentOrder, paymentMethod: 'wallet' });
             setChatState('confirming_price');
