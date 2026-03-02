@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -55,7 +56,6 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { placeApiOrder } from "@/app/actions/smm-api";
-import { SupportBot } from "@/components/SupportBot";
 
 type ChatState = 
   | 'idle' 
@@ -748,7 +748,6 @@ export default function ChatPage() {
           </Button>
         </div>
       </footer>
-      <SupportBot />
     </div>
   );
 }
