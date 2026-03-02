@@ -5,120 +5,65 @@ service cloud.firestore {
     /**
      * CORE PHILOSOPHY
      * This ruleset implements a strict Path-Based Ownership model supplemented by a 
-     * Global Role-Based Access Control (RBAC) system for administrators. 
-     * 
-     * DATA STRUCTURE
-     * - /users/{userId}: The root document for a user's profile.
-     * - /users/{userId}/orders/{orderId}: User-specific subcollection for service orders.
-     * - /users/{userId}/chatMessages/{chatMessageId}: User-specific subcollection for bot interactions.
-     * - /services/{serviceId}: Top-level collection for SMM service definitions.
-     * - /roles_admin/{userId}: Security-critical collection where document existence defines admin status.
-     * 
-     * KEY SECURITY DECISIONS
-     * 1. Authorization Independence: Every document in a user subcollection contains a denormalized 
-     *    'userId' field. This allows rules to verify ownership and path-integrity without external reads.
-     * 2. Immutable Ownership: For orders and chat messages, the 'userId' field is strictly validated 
-     *    on creation and locked during updates to prevent data hijacking.
-     * 3. Admin Override: A dedicated global helper 'isAdmin()' checks a top-level collection 
-     *    to grant elevated privileges across all data paths.
-     * 4. Structural Segregation: Administrative roles are separated from user profiles to 
-     *    prevent privilege escalation via profile updates.
+     * Global Administrative Access model based on email identification for simplicity
+     * in this specific admin deployment.
      */
 
     // --- Helper Functions ---
 
-    /** @description Checks if the request comes from a signed-in user. */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /** @description Checks if the authenticated user matches the provided userId. */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    /** @description Checks if the user has administrative privileges via the roles_admin collection. */
+    /** 
+     * @description Identifies if the user is the specific admin provided.
+     * Use roles_admin collection for more scalable RBAC in production.
+     */
     function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      return isSignedIn() && request.auth.token.email == "chetanmadhav4@gmail.com";
     }
 
-    /** @description Combines ownership and existence checks for updates/deletes. */
     function isExistingOwner(userId) {
       return resource != null && isOwner(userId);
     }
 
-    /** @description Helper to check if a user is an admin for existing documents. */
-    function isExistingAdmin() {
-      return resource != null && isAdmin();
-    }
-
     // --- Collection Rules ---
 
-    /**
-     * @description Rules for the User profile document.
-     * @path /users/{userId}
-     * @allow Authenticated user (get, list, create, update) where userId matches auth.uid.
-     * @deny Any user attempting to modify another user's profile.
-     * @principle Path-based ownership for root user data.
-     */
     match /users/{userId} {
       allow get, list: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId) || isExistingAdmin();
-      allow delete: if isExistingAdmin();
+      allow update: if isExistingOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
     }
 
-    /**
-     * @description Rules for the SMM Service definitions.
-     * @path /services/{serviceId}
-     * @allow Any signed-in user (get, list). Admins (create, update, delete).
-     * @deny Non-admin users attempting to modify service data or prices.
-     * @principle Public read (for auth users) with restricted administrative writes.
-     */
     match /services/{serviceId} {
       allow get, list: if isSignedIn();
-      allow create: if isAdmin();
-      allow update, delete: if isExistingAdmin();
+      allow create, update, delete: if isAdmin();
     }
 
-    /**
-     * @description Rules for User Orders. Ensures users can place orders but not modify them.
-     * @path /users/{userId}/orders/{orderId}
-     * @allow User (create, get, list) for their own path. Admin (full access).
-     * @deny User (update, delete) once order is placed.
-     * @principle Relational integrity and path-consistency validation.
-     */
     match /users/{userId}/orders/{orderId} {
       allow get, list: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId) && request.resource.data.userId == userId;
-      allow update: if isExistingAdmin() && request.resource.data.userId == resource.data.userId;
-      allow delete: if isExistingAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
-    /**
-     * @description Rules for Chat Messages. Secure private communication between user and bot.
-     * @path /users/{userId}/chatMessages/{chatMessageId}
-     * @allow User (full access) to their own chat history. Admin (read-only).
-     * @deny Access to any chat history not belonging to the auth user.
-     * @principle Path-based ownership with path-to-data consistency.
-     */
     match /users/{userId}/chatMessages/{chatMessageId} {
       allow get, list: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId) && request.resource.data.userId == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-      allow delete: if isExistingOwner(userId) || isExistingAdmin();
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId) || isAdmin();
     }
 
-    /**
-     * @description Rules for identifying Administrators.
-     * @path /roles_admin/{userId}
-     * @allow Admins (read). System/Root (write).
-     * @deny Any user attempting to self-promote to admin.
-     * @principle Existence-based RBAC for global permissions.
+    /** 
+     * Support for collectionGroup queries (e.g., fetching all orders in Admin Dashboard)
      */
-    match /roles_admin/{userId} {
-      allow get, list: if isAdmin();
-      allow create, update, delete: if false; // Managed via Admin SDK/Console only.
+    match /{path=**}/orders/{orderId} {
+      allow read: if isAdmin();
     }
   }
 }

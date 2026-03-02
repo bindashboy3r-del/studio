@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -29,21 +28,23 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { format } from "date-fns";
-import { Download, RefreshCw, LayoutDashboard, LogOut } from "lucide-react";
+import { Download, RefreshCw, LayoutDashboard, LogOut, ExternalLink, Copy, CheckCircle } from "lucide-react";
 import { useAuth, useFirestore, useUser } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AdminDashboard() {
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
   const db = useFirestore();
+  const { toast } = useToast();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    if (!isUserLoading && (!user || !user.email)) {
+    if (!isUserLoading && (!user || user.email !== "chetanmadhav4@gmail.com")) {
       router.push("/admin/login");
     }
   }, [user, isUserLoading, router]);
@@ -51,14 +52,13 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (!user || !db) return;
 
-    // Path matches firestore.rules: users/{userId}/orders/{orderId}
-    // We use collectionGroup to fetch all orders across all users
+    // Use collectionGroup to fetch all orders across all users
     const q = query(collectionGroup(db, "orders"), orderBy("createdAt", "desc"));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const ords = snapshot.docs.map(doc => ({
         id: doc.id,
-        path: doc.ref.path, // Store the full path for updates
+        path: doc.ref.path,
         ...doc.data(),
         createdAt: doc.data().createdAt?.toDate() || new Date()
       }));
@@ -78,9 +78,11 @@ export default function AdminDashboard() {
 
   const updateStatus = async (orderPath: string, status: string) => {
     if (!db) return;
-    // We must use the full path to update documents in subcollections
     const orderRef = doc(db, orderPath);
     updateDoc(orderRef, { status })
+      .then(() => {
+        toast({ title: "Updated", description: `Order status set to ${status}` });
+      })
       .catch((error) => {
         const contextualError = new FirestorePermissionError({
           path: orderPath,
@@ -91,11 +93,16 @@ export default function AdminDashboard() {
       });
   };
 
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: "Copied", description: `${label} copied to clipboard.` });
+  };
+
   const exportOrders = () => {
     const csv = [
-      ["Order ID", "User ID", "Platform", "Service", "Link", "Quantity", "Price", "Status", "Date"].join(","),
+      ["Order ID", "User ID", "Platform", "Service", "Link", "Quantity", "Price", "UTR ID", "Status", "Date"].join(","),
       ...orders.map(o => [
-        o.id, o.userId, o.platform, o.service, o.link, o.quantity, o.price, o.status, o.createdAt.toISOString()
+        o.id, o.userId, o.platform, o.service, o.link, o.quantity, o.price, o.utrId, o.status, o.createdAt.toISOString()
       ].join(","))
     ].join("\n");
     
@@ -104,7 +111,7 @@ export default function AdminDashboard() {
     const a = document.createElement('a');
     a.setAttribute('hidden', '');
     a.setAttribute('href', url);
-    a.setAttribute('download', `orders_${new Date().toISOString()}.csv`);
+    a.setAttribute('download', `socialboost_orders_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`);
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -112,94 +119,138 @@ export default function AdminDashboard() {
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
-      <RefreshCw className="animate-spin" />
+      <RefreshCw className="animate-spin text-red-500" />
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
-      <div className="max-w-7xl mx-auto space-y-8">
-        <header className="flex items-center justify-between bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-lg">
-          <div className="flex items-center gap-3">
-            <LayoutDashboard className="text-primary w-8 h-8" />
-            <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-          </div>
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-6 font-body">
+      <div className="max-w-[1400px] mx-auto space-y-8">
+        <header className="flex flex-col md:flex-row items-center justify-between gap-6 bg-slate-900 p-6 rounded-[2rem] border border-slate-800 shadow-2xl">
           <div className="flex items-center gap-4">
-            <Button variant="outline" size="sm" onClick={exportOrders} className="gap-2 border-slate-700 bg-slate-800 hover:bg-slate-700">
+            <div className="w-12 h-12 bg-red-600 rounded-2xl flex items-center justify-center shadow-lg shadow-red-600/20">
+              <LayoutDashboard className="text-white" size={24} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black uppercase tracking-tight">Admin Control</h1>
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Global Order Management</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button variant="outline" size="sm" onClick={exportOrders} className="rounded-xl border-slate-700 bg-slate-800 hover:bg-slate-700 text-[11px] font-black uppercase tracking-widest px-6 h-11 gap-2">
               <Download size={16} /> Export CSV
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => auth?.signOut()} className="text-red-400 hover:text-red-300 hover:bg-red-950/30">
+            <Button variant="ghost" size="sm" onClick={() => auth?.signOut()} className="rounded-xl text-red-400 hover:text-red-300 hover:bg-red-950/30 text-[11px] font-black uppercase tracking-widest px-6 h-11 gap-2">
               <LogOut size={16} /> Sign Out
             </Button>
           </div>
         </header>
 
-        <main className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden shadow-xl">
-          <Table>
-            <TableHeader className="bg-slate-950">
-              <TableRow className="border-slate-800">
-                <TableHead>Date</TableHead>
-                <TableHead>Service</TableHead>
-                <TableHead>Link</TableHead>
-                <TableHead>Qty</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {orders.map((order) => (
-                <TableRow key={order.id} className="border-slate-800 hover:bg-slate-800/50 transition-colors">
-                  <TableCell className="text-xs text-slate-400">
-                    {format(order.createdAt, 'MMM dd, HH:mm')}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span className="font-bold uppercase text-[10px] text-primary">{order.platform}</span>
-                      <span className="text-sm">{order.service}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="max-w-[200px] truncate">
-                    <a href={order.link} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline text-xs">
-                      {order.link}
-                    </a>
-                  </TableCell>
-                  <TableCell>{order.quantity}</TableCell>
-                  <TableCell>${order.price ? order.price.toFixed(2) : '0.00'}</TableCell>
-                  <TableCell>
-                    <Badge variant={order.status === 'Completed' ? 'default' : 'secondary'} className={
-                      order.status === 'Pending' ? 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30' : 
-                      order.status === 'Processing' ? 'bg-blue-500/20 text-blue-500 border-blue-500/30' :
-                      order.status === 'Cancelled' ? 'bg-red-500/20 text-red-500 border-red-500/30' :
-                      'bg-green-500/20 text-green-500 border-green-500/30'
-                    }>
-                      {order.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Select defaultValue={order.status} onValueChange={(val) => updateStatus(order.path, val)}>
-                      <SelectTrigger className="w-[130px] h-8 bg-slate-950 border-slate-700 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-slate-900 border-slate-700">
-                        <SelectItem value="Pending">Pending</SelectItem>
-                        <SelectItem value="Processing">Processing</SelectItem>
-                        <SelectItem value="Completed">Completed</SelectItem>
-                        <SelectItem value="Cancelled">Cancelled</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
+        <main className="bg-slate-900 rounded-[2.5rem] border border-slate-800 overflow-hidden shadow-2xl">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-slate-950">
+                <TableRow className="border-slate-800 hover:bg-transparent">
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Date</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Service Info</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Order Details</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Target Link</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Payment UTR</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Status</TableHead>
+                  <TableHead className="text-right text-[10px] font-black uppercase tracking-widest py-6">Action</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          {orders.length === 0 && (
-            <div className="p-12 text-center text-slate-500 font-medium">
-              No orders found yet.
-            </div>
-          )}
+              </TableHeader>
+              <TableBody>
+                {orders.map((order) => (
+                  <TableRow key={order.id} className="border-slate-800 hover:bg-slate-800/50 transition-colors">
+                    <TableCell className="text-[11px] font-bold text-slate-500 uppercase">
+                      {format(order.createdAt, 'MMM dd')}<br/>
+                      {format(order.createdAt, 'HH:mm')}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-black uppercase text-[10px] text-red-500">{order.platform}</span>
+                        <span className="text-sm font-bold">{order.service}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="text-[11px] font-bold text-slate-400">Qty: {order.quantity}</span>
+                        <span className="text-sm font-black text-green-500">₹{order.price?.toFixed(0)}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span className="max-w-[150px] truncate text-[11px] font-bold text-blue-400">
+                          {order.link}
+                        </span>
+                        <button 
+                          onClick={() => copyToClipboard(order.link, "Link")}
+                          className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                        >
+                          <Copy size={12} />
+                        </button>
+                        <a href={order.link} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-colors">
+                          <ExternalLink size={12} />
+                        </a>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <code className="bg-slate-800 px-3 py-1 rounded-lg text-[11px] font-black tracking-tighter text-yellow-500">
+                          {order.utrId || 'N/A'}
+                        </code>
+                        {order.utrId && (
+                          <button 
+                            onClick={() => copyToClipboard(order.utrId, "UTR ID")}
+                            className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                          >
+                            <Copy size={12} />
+                          </button>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={
+                        order.status === 'Pending' ? 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30 font-black text-[10px] uppercase rounded-lg px-3 py-1' : 
+                        order.status === 'Processing' ? 'bg-blue-500/20 text-blue-500 border-blue-500/30 font-black text-[10px] uppercase rounded-lg px-3 py-1' :
+                        order.status === 'Cancelled' ? 'bg-red-500/20 text-red-500 border-red-500/30 font-black text-[10px] uppercase rounded-lg px-3 py-1' :
+                        'bg-green-500/20 text-green-500 border-green-500/30 font-black text-[10px] uppercase rounded-lg px-3 py-1'
+                      }>
+                        {order.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Select defaultValue={order.status} onValueChange={(val) => updateStatus(order.path, val)}>
+                        <SelectTrigger className="w-[140px] h-10 bg-slate-950 border-slate-700 rounded-xl text-[11px] font-black uppercase tracking-widest">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-900 border-slate-700">
+                          <SelectItem value="Pending" className="text-[11px] font-black uppercase">Pending</SelectItem>
+                          <SelectItem value="Processing" className="text-[11px] font-black uppercase">Processing</SelectItem>
+                          <SelectItem value="Completed" className="text-[11px] font-black uppercase text-green-500">Completed</SelectItem>
+                          <SelectItem value="Cancelled" className="text-[11px] font-black uppercase text-red-500">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {orders.length === 0 && (
+              <div className="p-20 text-center flex flex-col items-center gap-4">
+                <RefreshCw size={48} className="text-slate-700 mb-2" />
+                <p className="text-[11px] font-black text-slate-500 uppercase tracking-[0.3em]">No orders discovered in the database</p>
+              </div>
+            )}
+          </div>
         </main>
       </div>
+      <footer className="mt-12 text-center">
+        <p className="text-[9px] font-black text-slate-700 uppercase tracking-[0.8em]">
+          SOCIALBOOST CORE DASHBOARD v2.5
+        </p>
+      </footer>
     </div>
   );
 }
