@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo } from "react";
@@ -7,13 +6,15 @@ import { useRouter } from "next/navigation";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { History, X, Clock } from "lucide-react";
+import { History, X, Clock, Copy } from "lucide-react";
 import { format, isValid, isAfter } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 export default function OrdersHistoryPage() {
   const { user } = useUser();
   const db = useFirestore();
   const router = useRouter();
+  const { toast } = useToast();
 
   const ordersQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
@@ -52,6 +53,11 @@ export default function OrdersHistoryPage() {
     return processed.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }, [rawOrdersData]);
 
+  const copyOrderId = (id: string) => {
+    navigator.clipboard.writeText(id);
+    toast({ title: "Copied!", description: "Order ID copied to clipboard." });
+  };
+
   return (
     <div className="min-h-screen bg-slate-200/50 dark:bg-slate-950 flex items-center justify-center p-4 md:p-8 font-body">
       <div className="w-full max-w-lg bg-[#F0F2F5] dark:bg-slate-900 rounded-[3rem] shadow-[0_30px_60px_rgba(0,0,0,0.12)] overflow-hidden flex flex-col h-[85vh] animate-in zoom-in-95 duration-500">
@@ -80,44 +86,51 @@ export default function OrdersHistoryPage() {
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fetching Logs...</p>
             </div>
           ) : orders && orders.length > 0 ? (
-            orders.map((order: any) => (
-              <div 
-                key={order.id} 
-                className="bg-white dark:bg-slate-800 p-6 rounded-[1.8rem] shadow-sm border border-gray-50 dark:border-slate-700/50 flex flex-col gap-2 relative transition-all hover:shadow-md"
-              >
-                <div className="absolute top-6 right-6 bg-[#312ECB]/5 dark:bg-blue-400/10 px-3 py-1 rounded-full text-[9px] font-black text-[#312ECB] dark:text-blue-400 uppercase tracking-tighter">
-                  #{order.orderId || order.id.slice(0, 8).toUpperCase()}
-                </div>
+            orders.map((order: any) => {
+              const displayId = order.orderId || order.id.slice(0, 8).toUpperCase();
+              return (
+                <div 
+                  key={order.id} 
+                  className="bg-white dark:bg-slate-800 p-6 rounded-[1.8rem] shadow-sm border border-gray-50 dark:border-slate-700/50 flex flex-col gap-2 relative transition-all hover:shadow-md"
+                >
+                  <button 
+                    onClick={() => copyOrderId(displayId)}
+                    className="absolute top-6 right-6 bg-[#312ECB]/5 dark:bg-blue-400/10 px-3 py-1 rounded-full text-[9px] font-black text-[#312ECB] dark:text-blue-400 uppercase tracking-tighter flex items-center gap-1.5 hover:bg-[#312ECB]/10 transition-colors"
+                  >
+                    #{displayId}
+                    <Copy size={10} />
+                  </button>
 
-                <h3 className="text-[14px] font-black uppercase text-[#312ECB] dark:text-blue-400 tracking-wide pr-24">
-                  {order.platform} {order.service}
-                </h3>
+                  <h3 className="text-[14px] font-black uppercase text-[#312ECB] dark:text-blue-400 tracking-wide pr-24">
+                    {order.platform} {order.service}
+                  </h3>
 
-                <div className="flex items-center gap-3">
-                  <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase">
-                    QTY: {order.quantity}
-                  </span>
-                  <span className="text-slate-200 dark:text-slate-700">•</span>
-                  <span className="text-[11px] font-bold text-[#25D366] dark:text-emerald-400 uppercase">
-                    ₹{order.price?.toFixed(0)}
-                  </span>
-                  <span className="text-slate-200 dark:text-slate-700">•</span>
-                  <Badge variant="outline" className={`text-[9px] h-5 font-black px-2 border-none rounded-lg ${
-                    order.effectiveStatus === 'Processing' ? 'bg-blue-50 text-blue-600' :
-                    order.effectiveStatus === 'Completed' ? 'bg-emerald-50 text-emerald-600' :
-                    order.effectiveStatus === 'Cancelled' ? 'bg-red-50 text-red-600' :
-                    'bg-slate-100 text-slate-400'
-                  }`}>
-                    {order.effectiveStatus === 'Processing' && <Clock size={10} className="mr-1 inline animate-spin" />}
-                    {order.effectiveStatus}
-                  </Badge>
-                </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase">
+                      QTY: {order.quantity}
+                    </span>
+                    <span className="text-slate-200 dark:text-slate-700">•</span>
+                    <span className="text-[11px] font-bold text-[#25D366] dark:text-emerald-400 uppercase">
+                      ₹{order.price?.toFixed(0)}
+                    </span>
+                    <span className="text-slate-200 dark:text-slate-700">•</span>
+                    <Badge variant="outline" className={`text-[9px] h-5 font-black px-2 border-none rounded-lg ${
+                      order.effectiveStatus === 'Processing' ? 'bg-blue-50 text-blue-600' :
+                      order.effectiveStatus === 'Completed' ? 'bg-emerald-50 text-emerald-600' :
+                      order.effectiveStatus === 'Cancelled' ? 'bg-red-50 text-red-600' :
+                      'bg-slate-100 text-slate-400'
+                    }`}>
+                      {order.effectiveStatus === 'Processing' && <Clock size={10} className="mr-1 inline animate-spin" />}
+                      {order.effectiveStatus}
+                    </Badge>
+                  </div>
 
-                <div className="mt-1 self-end text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                  {isValid(order.createdAt) ? format(order.createdAt, 'd MMM').toUpperCase() : ''}
+                  <div className="mt-1 self-end text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                    {isValid(order.createdAt) ? format(order.createdAt, 'd MMM').toUpperCase() : ''}
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           ) : (
             <div className="text-center py-20 space-y-4">
               <div className="w-20 h-20 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto shadow-inner">
