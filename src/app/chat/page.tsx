@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -45,6 +44,7 @@ type ChatState =
   | 'choosing_platform' 
   | 'choosing_service' 
   | 'entering_quantity' 
+  | 'confirming_price'
   | 'entering_link' 
   | 'confirming';
 
@@ -164,11 +164,13 @@ export default function ChatPage() {
     if (!manualText) setInputValue("");
     await addMessage('user', text);
 
-    if (chatState === 'initial' && text.toLowerCase() === 'hi') {
+    const cleanText = text.toLowerCase();
+
+    if (chatState === 'initial' && cleanText === 'hi') {
       setChatState('choosing_platform');
       botReply(
         "👋 Welcome to SocialBoost Bot!\n\nNiche di gayi list mein se koi bhi service select karein:",
-        ["1. Instagram Services", "2. YouTube Services"]
+        ["1. INSTAGRAM SERVICES", "2. YOUTUBE SERVICES"]
       );
       return;
     } else if (chatState === 'initial') {
@@ -176,44 +178,24 @@ export default function ChatPage() {
       return;
     }
 
-    if (chatState === 'choosing_platform' || chatState === 'idle') {
-      try {
-        if (text.length > 5 && !manualText) {
-          const parsed = await intelligentOrderParsing({ requestText: text });
-          if (parsed && parsed.platform && parsed.service && parsed.quantity && parsed.link) {
-            const platformServices = SERVICES[parsed.platform as Platform];
-            const service = platformServices.find(s => s.id === parsed.service);
-            if (service) {
-              const price = (parsed.quantity / 1000) * service.pricePer1000;
-              setCurrentOrder({
-                platform: parsed.platform as Platform,
-                service: service,
-                link: parsed.link,
-                quantity: parsed.quantity
-              });
-              setChatState('confirming');
-              botReply(
-                `I've prepared your order! 🛒\n\nPlatform: ${PLATFORMS[parsed.platform as Platform]}\nService: ${service.name}\nLink: ${parsed.link}\nQuantity: ${parsed.quantity}\nTotal Price: $${price.toFixed(2)}\n\nReply "Confirm" to proceed or "Cancel" to abort.`,
-                ["Confirm", "Cancel"]
-              );
-              return;
-            }
-          }
-        }
-      } catch (e) { }
+    // Handle "Main Menu" at any point
+    if (cleanText.includes("main menu")) {
+      setChatState('initial');
+      botReply("Send 'Hi' to start create order");
+      return;
     }
 
     switch (chatState) {
       case 'choosing_platform':
-        if (text.includes("1") || text.toLowerCase().includes("instagram")) {
+        if (cleanText.includes("1") || cleanText.includes("instagram")) {
           setCurrentOrder({ platform: 'instagram' });
           setChatState('choosing_service');
-          const options = SERVICES.instagram.map((s, i) => `${i + 1}. Instagram ${s.name}`);
+          const options = SERVICES.instagram.map((s, i) => `${i + 1}. INSTAGRAM ${s.name.toUpperCase()}`);
           botReply("Perfect. Niche di gayi Instagram service select karein:", options);
-        } else if (text.includes("2") || text.toLowerCase().includes("youtube")) {
+        } else if (cleanText.includes("2") || cleanText.includes("youtube")) {
           setCurrentOrder({ platform: 'youtube' });
           setChatState('choosing_service');
-          const options = SERVICES.youtube.map((s, i) => `${i + 1}. YouTube ${s.name}`);
+          const options = SERVICES.youtube.map((s, i) => `${i + 1}. YOUTUBE ${s.name.toUpperCase()}`);
           botReply("Perfect. Niche di gayi YouTube service select karein:", options);
         } else {
           botReply("Please select from the options provided.");
@@ -244,8 +226,21 @@ export default function ChatPage() {
         } else {
           const price = (qty / 1000) * currentOrder.service!.pricePer1000;
           setCurrentOrder({ ...currentOrder, quantity: qty });
+          setChatState('confirming_price');
+          botReply(
+            `✅ Aapne ${qty} ${PLATFORMS[currentOrder.platform!]} ${currentOrder.service!.name} select kiye hain.\n💰 Total price: ₹${price.toFixed(0)}\n\nKya aap aage badhna chahte hain?`,
+            ["✅ YES, PROCEED", "🏠 MAIN MENU"]
+          );
+        }
+        break;
+
+      case 'confirming_price':
+        if (cleanText.includes("yes") || cleanText.includes("proceed")) {
           setChatState('entering_link');
-          botReply(`Price is $${price.toFixed(2)} ✅\n\nAb niche apne ${currentOrder.platform === 'instagram' ? 'Profile handle (@username) or Post URL' : 'Channel or Video URL'} ka link paste karein:`);
+          botReply(`Ab niche apne ${currentOrder.platform === 'instagram' ? 'Profile handle (@username) or Post URL' : 'Channel or Video URL'} ka link paste karein:`);
+        } else {
+          setChatState('initial');
+          botReply("Order cancelled. Send 'Hi' to start create order");
         }
         break;
 
@@ -254,13 +249,13 @@ export default function ChatPage() {
         setCurrentOrder({ ...currentOrder, link: text });
         setChatState('confirming');
         botReply(
-          `Order Details 📝\n\nPlatform: ${PLATFORMS[currentOrder.platform!]}\nService: ${currentOrder.service!.name}\nLink: ${text}\nQuantity: ${currentOrder.quantity}\nTotal Price: $${finalPrice.toFixed(2)}\n\nType "Confirm" to place order or "Cancel" to start over.`,
+          `Order Details 📝\n\nPlatform: ${PLATFORMS[currentOrder.platform!]}\nService: ${currentOrder.service!.name}\nLink: ${text}\nQuantity: ${currentOrder.quantity}\nTotal Price: ₹${finalPrice.toFixed(0)}\n\nType "Confirm" to place order or "Cancel" to start over.`,
           ["Confirm", "Cancel"]
         );
         break;
 
       case 'confirming':
-        if (text.toLowerCase() === 'confirm') {
+        if (cleanText === 'confirm') {
           const orderData = {
             userId: user.uid,
             platform: PLATFORMS[currentOrder.platform!],
