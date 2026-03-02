@@ -13,7 +13,7 @@ import { MessageBubble } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, LogOut, ShoppingCart } from "lucide-react";
+import { Send, LogOut, Rocket } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PLATFORMS, SERVICES, Platform, SMMService } from "@/app/lib/constants";
 import { intelligentOrderParsing } from "@/ai/flows/intelligent-order-parsing";
@@ -97,7 +97,7 @@ export default function ChatPage() {
 
   const startOrderFlow = async () => {
     setChatState('choosing_platform');
-    botReply("Welcome to ChatServe! 🚀\nHow can I help you today?\n\n1️⃣ Instagram Services\n2️⃣ YouTube Services");
+    botReply(`Welcome to SocialBoost! 🚀\nI'm your assistant. What can I help you with today?\n\n1️⃣ Instagram Services\n2️⃣ YouTube Services`);
   };
 
   useEffect(() => {
@@ -127,12 +127,12 @@ export default function ChatPage() {
               quantity: parsed.quantity
             });
             setChatState('confirming');
-            botReply(`I've detected an order! 🛒\n\nPlatform: ${PLATFORMS[parsed.platform as Platform]}\nService: ${service.name}\nLink: ${parsed.link}\nQuantity: ${parsed.quantity}\nTotal Price: $${price.toFixed(2)}\n\nReply "Confirm" to proceed or "Cancel" to abort.`);
+            botReply(`I've prepared your order! 🛒\n\nPlatform: ${PLATFORMS[parsed.platform as Platform]}\nService: ${service.name}\nLink: ${parsed.link}\nQuantity: ${parsed.quantity}\nTotal Price: $${price.toFixed(2)}\n\nReply "Confirm" to proceed or "Cancel" to abort.`);
             return;
           }
         }
       } catch (e) {
-        // Fallback
+        // Fallback to guided flow
       }
     }
 
@@ -142,14 +142,14 @@ export default function ChatPage() {
           setCurrentOrder({ platform: 'instagram' });
           setChatState('choosing_service');
           const svcList = SERVICES.instagram.map((s, i) => `${i + 1}️⃣ ${s.name}`).join('\n');
-          botReply(`Great! Select a service for Instagram:\n\n${svcList}`);
+          botReply(`Perfect. Select an Instagram service:\n\n${svcList}`);
         } else if (text === "2" || text.toLowerCase().includes("youtube")) {
           setCurrentOrder({ platform: 'youtube' });
           setChatState('choosing_service');
           const svcList = SERVICES.youtube.map((s, i) => `${i + 1}️⃣ ${s.name}`).join('\n');
-          botReply(`Great! Select a service for YouTube:\n\n${svcList}`);
+          botReply(`Perfect. Select a YouTube service:\n\n${svcList}`);
         } else {
-          botReply("Please choose 1 for Instagram or 2 for YouTube.");
+          botReply("Please enter 1 for Instagram or 2 for YouTube.");
         }
         break;
 
@@ -162,25 +162,25 @@ export default function ChatPage() {
           setChatState('entering_link');
           botReply(`Please provide the ${platform === 'instagram' ? 'Profile handle (@username) or Post URL' : 'Channel or Video URL'}:`);
         } else {
-          botReply("Invalid selection. Please choose from the list above.");
+          botReply("Invalid selection. Please choose from the list.");
         }
         break;
 
       case 'entering_link':
         setCurrentOrder({ ...currentOrder, link: text });
         setChatState('entering_quantity');
-        botReply("How many would you like to order? (e.g., 1000)");
+        botReply("How many would you like? (Minimum 100)");
         break;
 
       case 'entering_quantity':
         const qty = parseInt(text);
-        if (isNaN(qty) || qty <= 0) {
-          botReply("Please enter a valid positive number for quantity.");
+        if (isNaN(qty) || qty < 100) {
+          botReply("Please enter a valid number (minimum 100).");
         } else {
           const price = (qty / 1000) * currentOrder.service!.pricePer1000;
           setCurrentOrder({ ...currentOrder, quantity: qty });
           setChatState('confirming');
-          botReply(`Order Summary 📝\n\nPlatform: ${PLATFORMS[currentOrder.platform!]}\nService: ${currentOrder.service!.name}\nLink: ${currentOrder.link}\nQuantity: ${qty}\nTotal Price: $${price.toFixed(2)}\n\nType "Confirm" to place order or "Cancel" to start over.`);
+          botReply(`Order Details 📝\n\nPlatform: ${PLATFORMS[currentOrder.platform!]}\nService: ${currentOrder.service!.name}\nLink: ${currentOrder.link}\nQuantity: ${qty}\nTotal Price: $${price.toFixed(2)}\n\nType "Confirm" to place order or "Cancel" to start over.`);
         }
         break;
 
@@ -197,17 +197,17 @@ export default function ChatPage() {
             createdAt: serverTimestamp()
           });
           setChatState('idle');
-          botReply("Order placed successfully! 🎉\nYour request is being processed. It will show as 'Pending' in your history.");
+          botReply("Order placed successfully! 🎉\nWe are processing it now. Check back soon for updates.");
           setTimeout(() => startOrderFlow(), 3000);
         } else {
           setChatState('idle');
-          botReply("Order cancelled. Let's start over.");
+          botReply("No problem. Let's start fresh.");
           setTimeout(() => startOrderFlow(), 2000);
         }
         break;
 
       default:
-        botReply("I didn't quite catch that. Let's start over.");
+        botReply("I didn't understand that. Let's restart the process.");
         startOrderFlow();
         break;
     }
@@ -218,13 +218,13 @@ export default function ChatPage() {
       <header className="bg-card border-b p-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
-            <ShoppingCart size={20} />
+            <Rocket size={20} />
           </div>
           <div>
-            <h1 className="font-bold text-sm">ChatServe Bot</h1>
+            <h1 className="font-bold text-sm">SocialBoost Bot</h1>
             <p className="text-[10px] text-primary flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-              Online
+              Active
             </p>
           </div>
         </div>
@@ -254,7 +254,7 @@ export default function ChatPage() {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
-            placeholder="Type a message..."
+            placeholder="How can we boost you?"
             className="border-none bg-transparent focus-visible:ring-0 shadow-none text-sm h-10"
           />
           <Button 

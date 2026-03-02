@@ -4,15 +4,19 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "User",
       "type": "object",
-      "description": "Represents a user account in the ChatServe Bot application, authenticated via phone number.",
+      "description": "Represents a user account in SocialBoost, authenticated via Email/Password.",
       "properties": {
         "id": {
           "type": "string",
           "description": "Unique identifier for the User entity."
         },
-        "phoneNumber": {
+        "email": {
           "type": "string",
-          "description": "The user's unique phone number, used for authentication (e.g., +15551234567)."
+          "description": "The user's unique email address used for login."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "The user's full name or preferred display name."
         },
         "createdAt": {
           "type": "string",
@@ -22,7 +26,7 @@
       },
       "required": [
         "id",
-        "phoneNumber",
+        "email",
         "createdAt"
       ]
     },
@@ -30,7 +34,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Service",
       "type": "object",
-      "description": "Defines an SMM service offered by the ChatServe Bot, including its platform, name, description, and pricing details.",
+      "description": "Defines an SMM service offered by SocialBoost.",
       "properties": {
         "id": {
           "type": "string",
@@ -38,34 +42,25 @@
         },
         "platform": {
           "type": "string",
-          "description": "The social media platform the service targets (e.g., 'Instagram', 'YouTube')."
+          "description": "The social media platform (Instagram, YouTube)."
         },
         "name": {
           "type": "string",
-          "description": "The specific name of the service (e.g., 'Followers', 'Likes', 'Views')."
+          "description": "Service name (Followers, Likes, etc.)."
         },
         "description": {
           "type": "string",
-          "description": "A brief description explaining what the service offers."
+          "description": "Detailed description of service."
         },
         "unitPrice": {
           "type": "number",
-          "description": "The price for a single unit of the service (e.g., per follower, per like)."
-        },
-        "minimumQuantity": {
-          "type": "number",
-          "description": "The minimum number of units a user can order for this service."
-        },
-        "maximumQuantity": {
-          "type": "number",
-          "description": "The maximum number of units a user can order for this service."
+          "description": "Price per 1000 units."
         }
       },
       "required": [
         "id",
         "platform",
         "name",
-        "description",
         "unitPrice"
       ]
     },
@@ -73,45 +68,38 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Order",
       "type": "object",
-      "description": "Represents a user's placement of an SMM service order through the ChatServe Bot.",
+      "description": "An SMM service order placed by a user.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the Order entity."
+          "description": "Unique identifier for the Order."
         },
         "userId": {
           "type": "string",
-          "description": "Reference to the User who placed this order. (Relationship: User 1:N Order)"
+          "description": "ID of the user who placed the order."
         },
         "serviceId": {
           "type": "string",
-          "description": "Reference to the Service that was ordered. (Relationship: Service 1:N Order)"
+          "description": "ID of the service ordered."
         },
         "link": {
           "type": "string",
-          "description": "The URL of the social media content or profile where the service is to be delivered.",
-          "format": "uri"
+          "description": "Destination URL for the service."
         },
         "quantity": {
           "type": "number",
-          "description": "The requested quantity of the service (e.g., number of followers, likes)."
+          "description": "Number of units ordered."
         },
         "totalPrice": {
           "type": "number",
-          "description": "The total calculated price for this order."
+          "description": "Calculated total price."
         },
         "status": {
           "type": "string",
-          "description": "The current processing status of the order (e.g., 'Pending', 'Processing', 'Completed', 'Cancelled')."
+          "description": "Pending, Processing, Completed, Cancelled."
         },
         "createdAt": {
           "type": "string",
-          "description": "Timestamp indicating when the order was initially placed.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp indicating when the order's status or details were last updated.",
           "format": "date-time"
         }
       },
@@ -121,52 +109,14 @@
         "serviceId",
         "link",
         "quantity",
-        "totalPrice",
         "status",
         "createdAt"
-      ]
-    },
-    "ChatMessage": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "ChatMessage",
-      "type": "object",
-      "description": "Represents a single message sent either by the user or the bot within a specific chat conversation.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the ChatMessage entity."
-        },
-        "userId": {
-          "type": "string",
-          "description": "Reference to the User associated with this chat conversation. (Relationship: User 1:N ChatMessage)"
-        },
-        "sender": {
-          "type": "string",
-          "description": "The originator of the message: 'user' for a message sent by the user, 'bot' for a message sent by the bot."
-        },
-        "text": {
-          "type": "string",
-          "description": "The actual content of the chat message."
-        },
-        "timestamp": {
-          "type": "string",
-          "description": "Timestamp indicating when the message was sent.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "userId",
-        "sender",
-        "text",
-        "timestamp"
       ]
     }
   },
   "auth": {
     "providers": [
-      "password",
-      "anonymous"
+      "password"
     ]
   },
   "firestore": {
@@ -178,88 +128,19 @@
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "Stores user profile data, including their phone number and creation timestamp. This is the root for all user-specific data. Owned by the user specified in `userId`.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique Firebase Authentication UID of the user."
-            }
-          ]
+          "description": "User profile data."
         }
       },
       {
-        "path": "/services/{serviceId}",
-        "definition": {
-          "entityName": "Service",
-          "schema": {
-            "$ref": "#/backend/entities/Service"
-          },
-          "description": "Stores definitions of all available SMM services (e.g., Instagram Followers, YouTube Likes). These documents are globally readable by all authenticated users. Admin-only write access.",
-          "params": [
-            {
-              "name": "serviceId",
-              "description": "The unique identifier for a specific SMM service."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/users/{userId}/orders/{orderId}",
+        "path": "/orders/{orderId}",
         "definition": {
           "entityName": "Order",
           "schema": {
             "$ref": "#/backend/entities/Order"
           },
-          "description": "Stores individual SMM orders placed by a specific user. This subcollection ensures user-specific ownership. Includes denormalized 'userId' field matching the path for authorization independence and simplified security rules. Users can only create new orders, not modify existing ones. Admins have full access.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique Firebase Authentication UID of the user who placed the order."
-            },
-            {
-              "name": "orderId",
-              "description": "The unique identifier for the specific order."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/users/{userId}/chatMessages/{chatMessageId}",
-        "definition": {
-          "entityName": "ChatMessage",
-          "schema": {
-            "$ref": "#/backend/entities/ChatMessage"
-          },
-          "description": "Stores chat messages between a user and the bot. This subcollection ensures privacy and direct ownership by the user. Includes denormalized 'userId' field matching the path for authorization independence and simplified security rules.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique Firebase Authentication UID of the user participating in the chat."
-            },
-            {
-              "name": "chatMessageId",
-              "description": "The unique identifier for a specific chat message."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/roles_admin/{userId}",
-        "definition": {
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "A top-level collection used for Database Access Control (DBAC) to identify administrators. The mere existence of a document at this path signifies that the corresponding `userId` has administrative privileges. Document content can be minimal or empty.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique Firebase Authentication UID of a user designated as an administrator."
-            }
-          ]
+          "description": "Global order tracking."
         }
       }
-    ],
-    "reasoning": "The Firestore structure is designed to be secure, scalable, and easily debuggable, strictly adhering to the provided core design principles and mandates. \n\n**Authorization Independence (Strategy A) & QAPs:**\n\n1.  **Users (`/users/{userId}`):** User profile data is stored under their unique UID, enforcing Path-Based Ownership. Access rules are simple: `request.auth.uid == userId` allows a user to manage their own profile. Admin access is granted via a separate `roles_admin` collection, avoiding hierarchical dependencies. List operations are generally restricted or admin-only, as direct queries by UID are common for individual user data.\n2.  **Services (`/services/{serviceId}`):** All SMM services are stored in a top-level collection. This collection has a homogeneous security posture: it's globally readable by all authenticated users. The `platform` and `name` are fields within each `Service` document, allowing for straightforward `list` operations (QAPs) by querying `where('platform', '==', 'Instagram')` without complex rules or `get()` calls. This structure avoids nesting services under platforms as distinct collections, which would deviate from the `Service` entity's schema definition.\n3.  **User Orders (`/users/{userId}/orders/{orderId}`):** Orders are placed as subcollections under the respective user's document. This directly implements Path-Based Ownership (Strategy C.2) and Authorization Independence (Strategy A). The `Order` document includes `userId` which is denormalized and matches the `{userId}` wildcard in the path. This allows for extremely simple, atomic security rules like `allow read, write: if request.auth.uid == userId;` for users (with write-only for creation) and `allow read, write: if isAdmin();` for admins. List operations (QAPs) are naturally supported: a user can `list` their own orders by querying `/users/{request.auth.uid}/orders`, as the rules ensure `request.auth.uid` matches the path.\n4.  **Chat Messages (`/users/{userId}/chatMessages/{chatMessageId}`):** Similar to orders, chat messages are stored as subcollections under the user's document, ensuring private, user-specific conversations. The `ChatMessage` document includes `userId`, denormalized to match the path. This structure provides Authorization Independence (Strategy A) and allows for simple, atomic security rules (`request.auth.uid == userId`). QAPs are achieved as users can only `list` messages within their own `/users/{request.auth.uid}/chatMessages` path.\n5.  **Admin Roles (`/roles_admin/{userId}`):** This top-level collection utilizes the \"Existence over Content\" pattern for global roles (Strategy C.4). An admin's UID is simply a document ID in this collection. Security rules can check `exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid))` to grant admin privileges. This is authorization-independent and ensures QAPs for checking admin status without needing to traverse complex hierarchies.\n\n**Structural Segregation (Strategy B):** Each collection and subcollection (`users`, `services`, `users/{userId}/orders`, `users/{userId}/chatMessages`, `roles_admin`) maintains a homogeneous security posture, making rules straightforward and minimizing complexity. For instance, `services` are uniformly public-read, while `users/{userId}/orders` are uniformly owned by the respective user (or accessible by admin).\n\n**Data Clarity and Predictability (Strategy D):** All paths use descriptive wildcards (e.g., `{userId}`, `{serviceId}`, `{orderId}`, `{chatMessageId}`) and consistent naming conventions. The `status` field in `Order` explicitly models state as a Finite State Machine.\n\nOverall, this structure prioritizes security and debuggability by leveraging path-based authorization, denormalization of ownership, and structural segregation, making security rules concise and easy to verify."
+    ]
   }
 }

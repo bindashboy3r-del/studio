@@ -4,8 +4,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 export const metadata: Metadata = {
-  title: 'ChatServe Bot - Your SMM Partner',
-  description: 'Order SMM services for Instagram and YouTube through our intelligent WhatsApp-style bot.',
+  title: 'SocialBoost - Professional SMM Services',
+  description: 'Boost your social presence with SocialBoost. High-quality SMM services for Instagram and YouTube.',
 };
 
 export default function RootLayout({
