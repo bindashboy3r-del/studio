@@ -30,23 +30,33 @@ export function MessageBubble({
   const [link, setLink] = useState("");
   const [utr, setUtr] = useState("");
   
-  const upiLink = `upi://pay?pa=smmxpressbot@slc&pn=SocialBoost&am=${paymentPrice}&cu=INR`;
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiLink)}`;
+  const price = paymentPrice || 0;
+  const upiLink = `upi://pay?pa=smmxpressbot@slc&pn=SocialBoost&am=${price}&cu=INR`;
+  // Using Google Charts API for more reliable QR generation
+  const qrUrl = `https://chart.googleapis.com/chart?chs=300x300&cht=qr&chl=${encodeURIComponent(upiLink)}&choe=UTF-8`;
 
   const handleDownloadQR = async () => {
     try {
-      const response = await fetch(qrUrl);
+      // Fetching the image with cors to allow blob conversion
+      const response = await fetch(qrUrl, { mode: 'cors' });
+      if (!response.ok) throw new Error('Failed to fetch image');
+      
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
+      
       const a = document.createElement('a');
+      a.style.display = 'none';
       a.href = url;
-      a.download = `SocialBoost_Payment_QR_${paymentPrice}.png`;
+      a.download = `SocialBoost_QR_₹${price}.png`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      
+      // Cleanup
       window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
     } catch (error) {
-      // Fallback: open in new tab if direct download fails
+      console.error('Download failed, falling back to new tab:', error);
+      // Fallback: Open in new tab if direct download fails (CORS or browser restriction)
       window.open(qrUrl, '_blank');
     }
   };
@@ -70,7 +80,7 @@ export function MessageBubble({
                 <QrCode size={16} className="text-[#312ECB]" /> Secure Payment
               </div>
               <p className="text-[13px] font-bold text-slate-700 dark:text-slate-300">
-                Kripya niche diye gaye QR code ko scan karke ya download karke <span className="text-[#312ECB] font-black">₹{paymentPrice?.toFixed(0)}</span> ka payment karein.
+                Kripya niche diye gaye QR code ko scan karke ya download karke <span className="text-[#312ECB] font-black">₹{price.toFixed(0)}</span> ka payment karein.
               </p>
               <div className="bg-slate-50 dark:bg-slate-900 p-2 rounded-lg">
                 <p className="text-[11px] font-black text-slate-500 uppercase">UPI ID: <span className="text-[#312ECB] dark:text-blue-400">smmxpressbot@slc</span></p>
@@ -78,8 +88,14 @@ export function MessageBubble({
             </div>
 
             <div className="flex flex-col items-center gap-4 py-2">
-              <div className="bg-white p-2 rounded-2xl shadow-inner border border-slate-100">
-                <img src={qrUrl} alt="Payment QR" className="w-48 h-48" />
+              <div className="bg-white p-2 rounded-2xl shadow-inner border border-slate-100 flex items-center justify-center min-h-[200px] min-w-[200px]">
+                <img 
+                  src={qrUrl} 
+                  alt="Payment QR" 
+                  className="w-48 h-48 block" 
+                  crossOrigin="anonymous"
+                  loading="eager"
+                />
               </div>
               
               <Button 
