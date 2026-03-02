@@ -14,7 +14,8 @@ import {
   HelpCircle, 
   FileText, 
   User as UserIcon,
-  CheckCircle2
+  CheckCircle2,
+  MessageCircle
 } from "lucide-react";
 import {
   Accordion,
@@ -156,8 +157,19 @@ export default function ProfilePage() {
                     Support Center
                   </div>
                 </AccordionTrigger>
-                <AccordionContent className="px-6 py-4 text-xs font-semibold text-slate-500 leading-relaxed">
-                  Need help with your orders? Contact our specialized growth team at <strong>support@socialboost.com</strong> or reach out via our Instagram @bindash_boy3. We are available 24/7.
+                <AccordionContent className="px-6 py-4 flex flex-col gap-4">
+                  <p className="text-xs font-semibold text-slate-500 leading-relaxed">
+                    Need help with your orders? Our growth team is available 24/7 to assist you. Click the button below to message us directly on WhatsApp.
+                  </p>
+                  <Button 
+                    asChild
+                    className="w-full h-12 bg-[#25D366] hover:bg-[#20bd5b] text-white font-black text-[11px] uppercase tracking-widest rounded-2xl shadow-[0_8px_16px_rgba(37,211,102,0.2)]"
+                  >
+                    <a href="https://wa.me/919116399517" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2">
+                      <MessageCircle size={18} />
+                      Chat on WhatsApp
+                    </a>
+                  </Button>
                 </AccordionContent>
               </AccordionItem>
 
