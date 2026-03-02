@@ -28,8 +28,8 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { format } from "date-fns";
-import { ChevronLeft, RefreshCw, ExternalLink, Copy, Download } from "lucide-react";
+import { format, isValid } from "date-fns";
+import { ChevronLeft, RefreshCw, ExternalLink, Copy, Download, AlertTriangle } from "lucide-react";
 import { useFirestore, useUser } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
@@ -41,6 +41,7 @@ export default function TrackerPage() {
   const { toast } = useToast();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -50,25 +51,46 @@ export default function TrackerPage() {
   }, [user, isUserLoading, router]);
 
   useEffect(() => {
-    if (!user || !db) return;
+    if (!user || !db || user.email !== "chetanmadhav4@gmail.com") return;
 
     const q = query(collectionGroup(db, "orders"), orderBy("createdAt", "desc"));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const ords = snapshot.docs.map(doc => ({
-        id: doc.id,
-        path: doc.ref.path,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date()
-      }));
+      const ords = snapshot.docs.map(doc => {
+        const data = doc.data();
+        let createdAt = new Date();
+        
+        // Robust date parsing for Firestore Timestamps or ISO Strings
+        if (data.createdAt) {
+          if (typeof data.createdAt.toDate === 'function') {
+            createdAt = data.createdAt.toDate();
+          } else {
+            const parsed = new Date(data.createdAt);
+            if (isValid(parsed)) createdAt = parsed;
+          }
+        }
+
+        return {
+          id: doc.id,
+          path: doc.ref.path,
+          ...data,
+          createdAt
+        };
+      });
       setOrders(ords);
       setLoading(false);
-    }, (error) => {
-      const contextualError = new FirestorePermissionError({
-        path: 'orders (collectionGroup)',
-        operation: 'list'
-      });
-      errorEmitter.emit('permission-error', contextualError);
+      setError(null);
+    }, (err) => {
+      console.error("Tracker Error:", err);
+      if (err.message?.includes("index")) {
+        setError("Missing Index: Please visit the Firebase Console link in your error log to enable collectionGroup indexing.");
+      } else {
+        const contextualError = new FirestorePermissionError({
+          path: 'orders (collectionGroup)',
+          operation: 'list'
+        });
+        errorEmitter.emit('permission-error', contextualError);
+      }
       setLoading(false);
     });
     
@@ -82,7 +104,7 @@ export default function TrackerPage() {
       .then(() => {
         toast({ title: "Updated", description: `Order status set to ${status}` });
       })
-      .catch((error) => {
+      .catch((err) => {
         const contextualError = new FirestorePermissionError({
           path: orderPath,
           operation: 'update',
@@ -93,6 +115,7 @@ export default function TrackerPage() {
   };
 
   const copyToClipboard = (text: string, label: string) => {
+    if (!text) return;
     navigator.clipboard.writeText(text);
     toast({ title: "Copied", description: `${label} copied to clipboard.` });
   };
@@ -101,7 +124,15 @@ export default function TrackerPage() {
     const csv = [
       ["Order ID", "Platform", "Service", "Link", "Quantity", "Price", "UTR ID", "Status", "Date"].join(","),
       ...orders.map(o => [
-        o.id, o.platform, o.service, o.link, o.quantity, o.price, o.utrId, o.status, o.createdAt.toISOString()
+        o.id, 
+        o.platform || 'N/A', 
+        o.service || 'N/A', 
+        `"${o.link || ''}"`, 
+        o.quantity || 0, 
+        o.price || 0, 
+        o.utrId || 'N/A', 
+        o.status || 'Pending', 
+        isValid(o.createdAt) ? o.createdAt.toISOString() : ''
       ].join(","))
     ].join("\n");
     
@@ -143,6 +174,13 @@ export default function TrackerPage() {
           </Button>
         </header>
 
+        {error && (
+          <div className="bg-red-50 border border-red-100 p-6 rounded-[2rem] flex items-center gap-4 text-red-600 font-bold text-sm">
+            <AlertTriangle size={20} />
+            {error}
+          </div>
+        )}
+
         <main className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden">
           <div className="overflow-x-auto">
             <Table>
@@ -160,22 +198,30 @@ export default function TrackerPage() {
                 {orders.map((order) => (
                   <TableRow key={order.id} className="border-slate-50 hover:bg-slate-50/50 transition-colors">
                     <TableCell className="text-[11px] font-bold text-slate-400 uppercase">
-                      {format(order.createdAt, 'MMM dd')}<br/>
-                      {format(order.createdAt, 'HH:mm')}
+                      {isValid(order.createdAt) ? (
+                        <>
+                          {format(order.createdAt, 'MMM dd')}<br/>
+                          {format(order.createdAt, 'HH:mm')}
+                        </>
+                      ) : 'Invalid Date'}
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col">
-                        <span className="font-black uppercase text-[10px] text-blue-600">{order.platform}</span>
-                        <span className="text-sm font-bold text-slate-800">{order.service} ({order.quantity})</span>
+                        <span className="font-black uppercase text-[10px] text-blue-600">{order.platform || 'Platform'}</span>
+                        <span className="text-sm font-bold text-slate-800">{order.service || 'N/A'} ({order.quantity || 0})</span>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <span className="max-w-[120px] truncate text-[11px] font-bold text-slate-500">
-                          {order.link}
+                          {order.link || 'No Link'}
                         </span>
-                        <button onClick={() => copyToClipboard(order.link, "Link")} className="text-slate-300 hover:text-blue-600"><Copy size={12} /></button>
-                        <a href={order.link} target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-blue-600"><ExternalLink size={12} /></a>
+                        {order.link && (
+                          <>
+                            <button onClick={() => copyToClipboard(order.link, "Link")} className="text-slate-300 hover:text-blue-600"><Copy size={12} /></button>
+                            <a href={order.link} target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-blue-600"><ExternalLink size={12} /></a>
+                          </>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -190,11 +236,11 @@ export default function TrackerPage() {
                         order.status === 'Cancelled' ? 'bg-red-500/10 text-red-600 border-none' :
                         'bg-emerald-500/10 text-emerald-600 border-none'
                       }>
-                        {order.status}
+                        {order.status || 'Pending'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Select defaultValue={order.status} onValueChange={(val) => updateStatus(order.path, val)}>
+                      <Select defaultValue={order.status || 'Pending'} onValueChange={(val) => updateStatus(order.path, val)}>
                         <SelectTrigger className="w-[120px] h-10 bg-white border-slate-200 rounded-xl text-[10px] font-black uppercase">
                           <SelectValue />
                         </SelectTrigger>
@@ -208,6 +254,13 @@ export default function TrackerPage() {
                     </TableCell>
                   </TableRow>
                 ))}
+                {orders.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-20 text-slate-400 font-bold uppercase text-xs tracking-widest">
+                      No orders found in the database.
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>

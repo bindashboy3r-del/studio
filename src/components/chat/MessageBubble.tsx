@@ -1,3 +1,4 @@
+
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { SendHorizonal, Rocket, Home, QrCode, Download, MessageCircle, Copy, CheckCircle, Loader2 } from "lucide-react";
@@ -53,32 +54,37 @@ export function MessageBubble({
   // Construct UPI link for QR generation
   const upiLink = `upi://pay?pa=${upiId}&pn=SocialBoost&am=${price.toFixed(2)}&cu=INR`;
   
-  // Using a stable QR generation service
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(upiLink)}`;
+  // Using QuickChart - a very stable and CORS-friendly generator
+  const qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(upiLink)}&size=400&margin=1&format=png`;
 
   const handleDownloadQR = async () => {
     setIsDownloading(true);
     try {
+      // Direct browser-safe download method
       const response = await fetch(qrUrl);
-      if (!response.ok) throw new Error('Network response was not ok');
+      if (!response.ok) throw new Error('Failed to fetch image');
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       
       const a = document.createElement('a');
       a.style.display = 'none';
       a.href = url;
-      a.download = `SocialBoost_Payment_QR_${Date.now()}.png`;
+      a.download = `SocialBoost_Payment_QR.png`;
       document.body.appendChild(a);
       a.click();
       
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       
-      toast({ title: "Success", description: "QR Code saved to your gallery." });
+      toast({ title: "Success", description: "QR Code download started." });
     } catch (error) {
       console.error('Download failed:', error);
+      // Absolute fallback: Open in new tab
       window.open(qrUrl, '_blank');
-      toast({ title: "Note", description: "Please long-press the QR code in the new tab to save it." });
+      toast({ 
+        title: "Download Help", 
+        description: "QR Code opened in a new tab. Long-press the image to save it to your gallery." 
+      });
     } finally {
       setIsDownloading(false);
     }
@@ -196,7 +202,7 @@ export function MessageBubble({
                 />
               </div>
 
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center px-4">
                 Agar download na ho to screenshot leke payment kre
               </p>
               
