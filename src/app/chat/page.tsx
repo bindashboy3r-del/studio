@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -34,7 +35,10 @@ import {
   Circle,
   Instagram,
   Wallet,
-  PlusCircle
+  PlusCircle,
+  Layers,
+  Copy,
+  Link as LinkIcon
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PLATFORMS, SERVICES, Platform, SMMService } from "@/app/lib/constants";
@@ -55,17 +59,25 @@ import { placeApiOrder } from "@/app/actions/smm-api";
 type ChatState = 
   | 'idle' 
   | 'initial'
+  | 'choosing_order_type'
   | 'choosing_service' 
+  | 'choosing_combo_services'
   | 'entering_quantity' 
+  | 'entering_bulk_links'
+  | 'entering_combo_quantities'
   | 'choosing_payment_method'
   | 'confirming_price';
 
+interface OrderItem {
+  service: SMMService;
+  quantity: number;
+  link: string;
+}
+
 interface OrderInProgress {
-  platform?: Platform;
-  service?: SMMService;
-  link?: string;
-  quantity?: number;
-  utrId?: string;
+  type: 'single' | 'combo' | 'bulk';
+  platform: Platform;
+  items: OrderItem[];
   paymentMethod?: 'wallet' | 'upi';
 }
 
@@ -79,7 +91,11 @@ export default function ChatPage() {
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [chatState, setChatState] = useState<ChatState>('idle');
-  const [currentOrder, setCurrentOrder] = useState<OrderInProgress>({});
+  const [currentOrder, setCurrentOrder] = useState<OrderInProgress>({
+    type: 'single',
+    platform: 'instagram',
+    items: []
+  });
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [activeBroadcast, setActiveBroadcast] = useState<any>(null);
   const [globalBonus, setGlobalBonus] = useState(0);
@@ -174,21 +190,6 @@ export default function ChatPage() {
     await batch.commit().catch(e => console.error("Failed to mark read", e));
   };
 
-  const clearAllNotifications = async () => {
-    if (!db || !user || !notificationsData || notificationsData.length === 0) return;
-    const batch = writeBatch(db);
-    notificationsData.forEach(n => {
-      const ref = doc(db, "users", user.uid, "notifications", n.id);
-      batch.delete(ref);
-    });
-    await batch.commit().then(() => {
-      toast({ title: "Notifications Cleared" });
-    }).catch(e => {
-      console.error("Failed to clear", e);
-      toast({ variant: "destructive", title: "Clear Failed" });
-    });
-  };
-
   const messagesQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
     return query(
@@ -229,14 +230,7 @@ export default function ChatPage() {
       ...extraData
     };
 
-    addDoc(collection(db, "users", user.uid, "chatMessages"), data)
-      .catch(async (error) => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: `users/${user.uid}/chatMessages`,
-          operation: 'create',
-          requestResourceData: data,
-        }));
-      });
+    addDoc(collection(db, "users", user.uid, "chatMessages"), data);
   };
 
   const botReply = async (text: string, options?: string[], extraData?: any) => {
@@ -255,119 +249,133 @@ export default function ChatPage() {
     }
   }, [user, isMessagesLoading]);
 
-  const handlePaymentSubmit = async (link: string, utr: string) => {
-    if (!link || !utr || !db || !user) return;
-    const finalPrice = (currentOrder.quantity! / 1000) * currentOrder.service!.pricePer1000;
-    const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}`;
+  const calculateTotalPrice = () => {
+    return currentOrder.items.reduce((total, item) => {
+      return total + (item.quantity / 1000) * item.service.pricePer1000;
+    }, 0);
+  };
+
+  const handleBundlePaymentSubmit = async (utr: string) => {
+    if (!db || !user || currentOrder.items.length === 0) return;
+    const totalPrice = calculateTotalPrice();
     
-    const orderData = {
-      userId: user.uid,
-      orderId: orderId,
-      platform: 'Instagram',
-      service: currentOrder.service?.name,
-      link: link,
-      quantity: currentOrder.quantity,
-      price: finalPrice,
-      utrId: utr,
-      status: 'Pending',
-      paymentMethod: 'UPI',
-      createdAt: serverTimestamp()
-    };
+    const batch = writeBatch(db);
+    const orderResults: any[] = [];
 
-    addDoc(collection(db, "users", user.uid, "orders"), orderData);
-
-    setChatState('idle');
-    botReply("Order submitted successfully!", [], {
-      isSuccessCard: true,
-      successDetails: {
+    for (const item of currentOrder.items) {
+      const orderId = `SB-B-${Math.floor(100000 + Math.random() * 900000)}`;
+      const orderRef = doc(collection(db, "users", user.uid, "orders"));
+      
+      const orderData = {
+        userId: user.uid,
         orderId,
         platform: 'Instagram',
-        service: currentOrder.service?.name,
-        quantity: currentOrder.quantity,
-        price: finalPrice,
-        link: link,
+        service: item.service.name,
+        link: item.link,
+        quantity: item.quantity,
+        price: (item.quantity / 1000) * item.service.pricePer1000,
+        utrId: utr,
+        status: 'Pending',
+        paymentMethod: 'UPI',
+        createdAt: serverTimestamp()
+      };
+      
+      batch.set(orderRef, orderData);
+      orderResults.push(orderData);
+    }
+
+    await batch.commit();
+    setChatState('idle');
+    botReply(`✅ ${currentOrder.items.length} orders submitted for verification!`, [], {
+      isSuccessCard: true,
+      successDetails: {
+        orderId: `BUNDLE-${currentOrder.items.length}`,
+        platform: 'Instagram',
+        service: 'Multiple Services',
+        quantity: currentOrder.items.reduce((a, b) => a + b.quantity, 0),
+        price: totalPrice,
+        link: currentOrder.items[0].link + (currentOrder.items.length > 1 ? ` (+${currentOrder.items.length - 1} more)` : ''),
         utrId: utr
       }
     });
   };
 
-  const handleWalletPaymentSubmit = async (link: string) => {
-    if (!link || !db || !user || !currentOrder.service) return;
-    const finalPrice = (currentOrder.quantity! / 1000) * currentOrder.service.pricePer1000;
+  const handleBundleWalletSubmit = async () => {
+    if (!db || !user || currentOrder.items.length === 0) return;
+    const totalPrice = calculateTotalPrice();
     
-    if (walletBalance < finalPrice) {
-      botReply("❌ Insufficient balance! Please add funds to your wallet.");
+    if (walletBalance < totalPrice) {
+      botReply("❌ Insufficient balance! Please add funds.");
       return;
     }
 
-    const orderId = `SB-W-${Math.floor(100000 + Math.random() * 900000)}`;
-    
-    // Check for API settings
     const apiSnap = await getDoc(doc(db, "globalSettings", "api"));
-    let apiOrderId = null;
-    let apiError = null;
-    let finalStatus = 'Pending';
-
-    if (apiSnap.exists()) {
-      const apiData = apiSnap.data();
-      const serviceId = apiData.serviceMappings?.[currentOrder.service.id];
-      
-      if (apiData.apiUrl && apiData.apiKey && serviceId) {
-        const apiResult = await placeApiOrder({
-          apiUrl: apiData.apiUrl,
-          apiKey: apiData.apiKey,
-          serviceId: serviceId,
-          link: link,
-          quantity: currentOrder.quantity!
-        });
-
-        if (apiResult.success) {
-          apiOrderId = apiResult.order;
-          finalStatus = 'Processing'; // Auto-process if API succeeded
-        } else {
-          apiError = apiResult.error;
-        }
-      }
-    }
+    const apiData = apiSnap.exists() ? apiSnap.data() : null;
 
     const batch = writeBatch(db);
-    const orderRef = doc(collection(db, "users", user.uid, "orders"));
     
-    batch.set(orderRef, {
-      userId: user.uid,
-      orderId: orderId,
-      platform: 'Instagram',
-      service: currentOrder.service.name,
-      link: link,
-      quantity: currentOrder.quantity,
-      price: finalPrice,
-      status: finalStatus,
-      paymentMethod: 'Wallet',
-      apiOrderId: apiOrderId,
-      apiError: apiError,
-      createdAt: serverTimestamp()
-    });
+    for (const item of currentOrder.items) {
+      const orderId = `SB-W-${Math.floor(100000 + Math.random() * 900000)}`;
+      const orderRef = doc(collection(db, "users", user.uid, "orders"));
+      
+      let finalStatus = 'Pending';
+      let apiOrderId = null;
+      let apiError = null;
+
+      if (apiData) {
+        const serviceId = apiData.serviceMappings?.[item.service.id];
+        if (apiData.apiUrl && apiData.apiKey && serviceId) {
+          const apiResult = await placeApiOrder({
+            apiUrl: apiData.apiUrl,
+            apiKey: apiData.apiKey,
+            serviceId: serviceId,
+            link: item.link,
+            quantity: item.quantity
+          });
+
+          if (apiResult.success) {
+            apiOrderId = apiResult.order;
+            finalStatus = 'Processing';
+          } else {
+            apiError = apiResult.error;
+          }
+        }
+      }
+
+      batch.set(orderRef, {
+        userId: user.uid,
+        orderId,
+        platform: 'Instagram',
+        service: item.service.name,
+        link: item.link,
+        quantity: item.quantity,
+        price: (item.quantity / 1000) * item.service.pricePer1000,
+        status: finalStatus,
+        paymentMethod: 'Wallet',
+        apiOrderId,
+        apiError,
+        createdAt: serverTimestamp()
+      });
+    }
 
     batch.update(doc(db, "users", user.uid), {
-      balance: increment(-finalPrice)
+      balance: increment(-totalPrice)
     });
 
     await batch.commit().then(() => {
       setChatState('idle');
-      botReply(`✅ Payment successful from Wallet!${apiOrderId ? '\n🚀 Order sent to API server.' : ''}`, [], {
+      botReply(`✅ ${currentOrder.items.length} orders processed from Wallet!`, [], {
         isSuccessCard: true,
         successDetails: {
-          orderId,
+          orderId: `WALLET-BUNDLE`,
           platform: 'Instagram',
-          service: currentOrder.service?.name,
-          quantity: currentOrder.quantity,
-          price: finalPrice,
-          link: link,
+          service: 'Multiple Services',
+          quantity: currentOrder.items.reduce((a, b) => a + b.quantity, 0),
+          price: totalPrice,
+          link: 'Processed via Wallet',
           utrId: 'WALLET-PAYMENT'
         }
       });
-    }).catch(err => {
-      toast({ variant: "destructive", title: "Wallet Error", description: "Failed to process wallet payment." });
     });
   };
 
@@ -379,12 +387,11 @@ export default function ChatPage() {
     const cleanText = text.toLowerCase();
 
     if (cleanText === 'hi' || cleanText.includes("main menu") || cleanText.includes("start")) {
-      setChatState('choosing_service');
-      setCurrentOrder({ platform: 'instagram' });
-      const options = SERVICES.instagram.map((s, i) => `${i + 1}. INSTAGRAM ${s.name.toUpperCase()}`);
+      setChatState('choosing_order_type');
+      setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
       botReply(
-        "👋 Welcome back to SocialBoost!\n\nSelect an Instagram service to start:",
-        options
+        "👋 Welcome! Choose your ordering method:",
+        ["1. SINGLE ORDER (One Link, One Service)", "2. COMBO ORDER (One Link, Multi-Service)", "3. BULK ORDER (Multi-Link, One Service)"]
       );
       return;
     }
@@ -394,69 +401,154 @@ export default function ChatPage() {
       return;
     }
 
-    if (cleanText.includes("order history") || cleanText.includes("history")) {
+    if (cleanText.includes("history")) {
       router.push("/orders");
       return;
     }
 
-    const allServices = SERVICES.instagram;
-    const matchedService = allServices.find(s => cleanText.includes(s.name.toLowerCase()));
-    if (matchedService && cleanText.includes("instagram")) {
-      setCurrentOrder({ platform: 'instagram', service: matchedService });
-      setChatState('entering_quantity');
-      botReply(`📊 You've selected Instagram ${matchedService.name}.\n\nHow many do you want? (Minimum 100)`);
-      return;
-    }
-
     switch (chatState) {
-      case 'choosing_service':
-        const sIndex = parseInt(text) - 1;
-        const sService = SERVICES.instagram[sIndex];
-        if (sService) {
-          setCurrentOrder({ platform: 'instagram', service: sService });
-          setChatState('entering_quantity');
-          botReply(`📊 You've selected Instagram ${sService.name}.\n\nHow many do you want? (Minimum 100)`);
+      case 'choosing_order_type':
+        if (cleanText.includes("single")) {
+          setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
+          setChatState('choosing_service');
+          botReply("Select Instagram service:", SERVICES.instagram.map(s => s.name));
+        } else if (cleanText.includes("combo")) {
+          setCurrentOrder({ type: 'combo', platform: 'instagram', items: [] });
+          setChatState('choosing_combo_services');
+          botReply("Select multiple services (Send 'DONE' when finished):", SERVICES.instagram.map(s => s.name));
+        } else if (cleanText.includes("bulk")) {
+          setCurrentOrder({ type: 'bulk', platform: 'instagram', items: [] });
+          setChatState('choosing_service');
+          botReply("Select Instagram service for bulk:", SERVICES.instagram.map(s => s.name));
         }
         break;
+
+      case 'choosing_service':
+        const selected = SERVICES.instagram.find(s => cleanText.includes(s.name.toLowerCase()));
+        if (selected) {
+          if (currentOrder.type === 'bulk') {
+            setCurrentOrder({ ...currentOrder, items: [{ service: selected, quantity: 0, link: '' }] });
+            setChatState('entering_bulk_links');
+            botReply("🔗 Send your Instagram links (one per line):");
+          } else {
+            setCurrentOrder({ ...currentOrder, items: [{ service: selected, quantity: 0, link: '' }] });
+            setChatState('entering_quantity');
+            botReply(`📊 Quantity for ${selected.name}? (Min 100)`);
+          }
+        }
+        break;
+
+      case 'choosing_combo_services':
+        if (cleanText === 'done') {
+          if (currentOrder.items.length === 0) {
+            botReply("Please select at least one service!");
+          } else {
+            setChatState('confirming_price'); // Reuse this for combo link
+            botReply("🔗 Send the Instagram link for this combo:");
+          }
+        } else {
+          const s = SERVICES.instagram.find(sv => cleanText.includes(sv.name.toLowerCase()));
+          if (s) {
+            if (currentOrder.items.find(item => item.service.id === s.id)) {
+              botReply(`${s.name} already added. Select another or send 'DONE'.`);
+            } else {
+              setCurrentOrder({ ...currentOrder, items: [...currentOrder.items, { service: s, quantity: 0, link: '' }] });
+              botReply(`✅ Added ${s.name}. Select more or send 'DONE'.`);
+            }
+          }
+        }
+        break;
+
       case 'entering_quantity':
         const qty = parseInt(text);
         if (isNaN(qty) || qty < 100) {
-          botReply("Please enter a valid number (minimum 100).");
+          botReply("Invalid quantity (Min 100).");
         } else {
-          const price = (qty / 1000) * currentOrder.service!.pricePer1000;
-          setCurrentOrder({ ...currentOrder, quantity: qty });
-          setChatState('choosing_payment_method');
-          botReply(
-            `✅ Order: ${qty} Instagram ${currentOrder.service!.name}\n💰 Price: ₹${price.toFixed(2)}\n💳 Wallet: ₹${walletBalance.toFixed(0)}\n\nChoose payment method:`,
-            ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]
-          );
+          const updatedItems = currentOrder.items.map(item => ({ ...item, quantity: qty }));
+          setCurrentOrder({ ...currentOrder, items: updatedItems });
+          setChatState('confirming_price');
+          botReply("🔗 Send the target Instagram link:");
         }
         break;
-      case 'choosing_payment_method':
-        const finalPrice = (currentOrder.quantity! / 1000) * currentOrder.service!.pricePer1000;
-        if (cleanText.includes("wallet")) {
-          if (walletBalance < finalPrice) {
-            botReply(`❌ Insufficient balance! (Needs ₹${finalPrice.toFixed(2)}, have ₹${walletBalance.toFixed(0)}).`, ["📲 PAY VIA UPI QR", "💰 ADD FUNDS"]);
+
+      case 'entering_bulk_links':
+        const links = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        if (links.length === 0) {
+          botReply("Please provide at least one link.");
+        } else {
+          setCurrentOrder({ ...currentOrder, bulkLinks: links } as any);
+          setChatState('entering_combo_quantities'); // Reuse for bulk qty
+          botReply(`📊 Quantity PER LINK for ${currentOrder.items[0].service.name}?`);
+        }
+        break;
+
+      case 'entering_combo_quantities':
+        const bQty = parseInt(text);
+        if (isNaN(bQty) || bQty < 100) {
+          botReply("Invalid quantity (Min 100).");
+        } else {
+          const links = (currentOrder as any).bulkLinks as string[];
+          const finalItems = links.map(l => ({
+            service: currentOrder.items[0].service,
+            quantity: bQty,
+            link: l
+          }));
+          setCurrentOrder({ ...currentOrder, items: finalItems });
+          setChatState('choosing_payment_method');
+          const total = finalItems.length * (bQty / 1000) * currentOrder.items[0].service.pricePer1000;
+          botReply(`💰 Total for ${links.length} links: ₹${total.toFixed(2)}\n💳 Wallet: ₹${walletBalance.toFixed(0)}`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]);
+        }
+        break;
+
+      case 'confirming_price':
+        if (currentOrder.type === 'combo') {
+          // Entering link for combo
+          const updated = currentOrder.items.map(i => ({ ...i, link: text }));
+          setCurrentOrder({ ...currentOrder, items: updated });
+          setChatState('entering_combo_quantities');
+          botReply(`📊 Enter quantity for ${currentOrder.items[0].service.name}:`);
+        } else {
+          // Entering link for single
+          const updated = currentOrder.items.map(i => ({ ...i, link: text }));
+          setCurrentOrder({ ...currentOrder, items: updated });
+          setChatState('choosing_payment_method');
+          const total = calculateTotalPrice();
+          botReply(`💰 Total: ₹${total.toFixed(2)}\n💳 Wallet: ₹${walletBalance.toFixed(0)}`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]);
+        }
+        break;
+
+      case 'entering_combo_quantities':
+        const cQty = parseInt(text);
+        const idx = currentOrder.items.findIndex(i => i.quantity === 0);
+        if (idx !== -1) {
+          const updated = [...currentOrder.items];
+          updated[idx].quantity = cQty;
+          setCurrentOrder({ ...currentOrder, items: updated });
+          const nextIdx = updated.findIndex(i => i.quantity === 0);
+          if (nextIdx !== -1) {
+            botReply(`📊 Enter quantity for ${updated[nextIdx].service.name}:`);
           } else {
-            setCurrentOrder({ ...currentOrder, paymentMethod: 'wallet' });
-            setChatState('confirming_price');
-            botReply(`💰 Paying ₹${finalPrice.toFixed(2)} from wallet.\n\nEnter the Target Link (Post/Profile URL):`);
+            setChatState('choosing_payment_method');
+            const total = updated.reduce((t, i) => t + (i.quantity/1000 * i.service.pricePer1000), 0);
+            botReply(`💰 Combo Total: ₹${total.toFixed(2)}\n💳 Wallet: ₹${walletBalance.toFixed(0)}`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]);
           }
+        }
+        break;
+
+      case 'choosing_payment_method':
+        if (cleanText.includes("wallet")) {
+          handleBundleWalletSubmit();
         } else if (cleanText.includes("upi")) {
-          setCurrentOrder({ ...currentOrder, paymentMethod: 'upi' });
-          botReply(`📸 Scan QR to pay ₹${finalPrice.toFixed(2)}:`, [], {
+          botReply(`📸 Scan QR to pay ₹${calculateTotalPrice().toFixed(2)}:`, [], {
             isPaymentCard: true,
-            paymentPrice: finalPrice
+            paymentPrice: calculateTotalPrice(),
+            onPaymentSubmit: (link: string, utr: string) => handleBundlePaymentSubmit(utr)
           });
         }
         break;
-      case 'confirming_price':
-        if (currentOrder.paymentMethod === 'wallet') {
-          handleWalletPaymentSubmit(text);
-        }
-        break;
+
       default:
-        botReply("Type 'Hi' for the menu or check your 'History'.");
+        botReply("Type 'Hi' for the menu.");
         break;
     }
   };
@@ -590,7 +682,7 @@ export default function ChatPage() {
             options={m.options}
             isPaymentCard={m.isPaymentCard}
             paymentPrice={m.paymentPrice}
-            onPaymentSubmit={handlePaymentSubmit}
+            onPaymentSubmit={m.onPaymentSubmit}
             isSuccessCard={m.isSuccessCard}
             successDetails={m.successDetails}
             onOptionClick={(option) => handleSend(option)}
