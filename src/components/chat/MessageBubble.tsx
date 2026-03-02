@@ -196,6 +196,10 @@ export function MessageBubble({
                   }}
                 />
               </div>
+
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">
+                Agar download na ho to screenshot leke payment kre
+              </p>
               
               <Button 
                 onClick={handleDownloadQR}
