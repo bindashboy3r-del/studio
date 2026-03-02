@@ -62,6 +62,8 @@ interface MessageBubbleProps {
   onBulkLinksSubmit?: (links: string[]) => void;
   isComboCard?: boolean;
   onComboSubmit?: (items: { serviceId: string, quantity: number }[], link: string) => void;
+  isWalletCard?: boolean;
+  onWalletSubmit?: (link: string) => void;
 }
 
 export function MessageBubble({ 
@@ -81,7 +83,9 @@ export function MessageBubble({
   isBulkLinkCard,
   onBulkLinksSubmit,
   isComboCard,
-  onComboSubmit
+  onComboSubmit,
+  isWalletCard,
+  onWalletSubmit
 }: MessageBubbleProps) {
   const isUser = sender === 'user';
   const { toast } = useToast();
@@ -482,13 +486,47 @@ export function MessageBubble({
               </Button>
             </div>
           </div>
+        ) : isWalletCard ? (
+          <div className="space-y-6 min-w-[280px]">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-[12px] font-black text-[#111B21] dark:text-white uppercase tracking-tight">
+                <Wallet size={16} className="text-[#25D366]" /> Wallet Payment
+              </div>
+              <p className="text-[13px] font-bold text-slate-700 dark:text-slate-300">
+                Confirm your payment of <span className="text-[#312ECB] font-black">₹{price.toFixed(2)}</span> from your wallet.
+              </p>
+            </div>
+
+            <div className="space-y-3 pt-2">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Target Link</label>
+                <div className="relative">
+                  <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
+                  <Input 
+                    placeholder="Enter Instagram Link"
+                    value={link}
+                    onChange={(e) => setLink(e.target.value)}
+                    className="h-12 bg-slate-50 dark:bg-slate-900 border-none rounded-2xl pl-10 pr-5 text-sm font-bold shadow-inner"
+                  />
+                </div>
+              </div>
+              
+              <Button 
+                onClick={() => onWalletSubmit?.(link)}
+                disabled={link.trim() === ""}
+                className="w-full h-14 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[12px] uppercase tracking-widest rounded-2xl shadow-xl gap-3 transition-all active:scale-95"
+              >
+                💸 Confirm & Pay ₹{price.toFixed(0)}
+              </Button>
+            </div>
+          </div>
         ) : (
           <p className="text-[14px] leading-relaxed font-bold text-black dark:text-white whitespace-pre-wrap">
             {text}
           </p>
         )}
 
-        {options && options.length > 0 && !isPaymentCard && !isSuccessCard && !isFundPaymentCard && !isBulkLinkCard && !isComboCard && (
+        {options && options.length > 0 && !isPaymentCard && !isSuccessCard && !isFundPaymentCard && !isBulkLinkCard && !isComboCard && !isWalletCard && (
           <div className="mt-4 space-y-2">
             {options.map((option, idx) => (
               <button

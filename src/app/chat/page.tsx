@@ -65,8 +65,7 @@ type ChatState =
   | 'entering_quantity' 
   | 'entering_bulk_links'
   | 'entering_combo_quantities'
-  | 'choosing_payment_method'
-  | 'confirming_price';
+  | 'choosing_payment_method';
 
 interface OrderItem {
   service: SMMService;
@@ -272,6 +271,11 @@ export default function ChatPage() {
 
     const targets = (currentOrder.type === 'bulk' && currentOrder.bulkLinks) ? currentOrder.bulkLinks : [linkOverride || currentOrder.items[0].link];
 
+    if (!targets[0] || targets[0].trim() === "") {
+        toast({ variant: "destructive", title: "Missing Link", description: "Please provide a valid Instagram link." });
+        return;
+    }
+
     for (const link of targets) {
       for (const item of currentOrder.items) {
         const orderId = `SB-B-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -315,7 +319,7 @@ export default function ChatPage() {
     });
   };
 
-  const handleBundleWalletSubmit = async () => {
+  const handleBundleWalletSubmit = async (linkOverride?: string) => {
     if (!db || !user || currentOrder.items.length === 0) return;
     const totalPrice = calculateTotalPrice();
     
@@ -328,8 +332,13 @@ export default function ChatPage() {
     const apiData = apiSnap.exists() ? apiSnap.data() : null;
 
     const batch = writeBatch(db);
-    const targets = (currentOrder.type === 'bulk' && currentOrder.bulkLinks) ? currentOrder.bulkLinks : [currentOrder.items[0].link];
+    const targets = (currentOrder.type === 'bulk' && currentOrder.bulkLinks) ? currentOrder.bulkLinks : [linkOverride || currentOrder.items[0].link];
     
+    if (!targets[0] || targets[0].trim() === "") {
+        toast({ variant: "destructive", title: "Missing Link", description: "Please provide a valid Instagram link." });
+        return;
+    }
+
     for (const link of targets) {
       for (const item of currentOrder.items) {
         const orderId = `SB-W-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -393,7 +402,7 @@ export default function ChatPage() {
           service: 'Multiple Services',
           quantity: currentOrder.items.reduce((a, b) => a + b.quantity, 0) * (currentOrder.bulkLinks?.length || 1),
           price: totalPrice,
-          link: 'Processed via Wallet',
+          link: targets[0],
           utrId: 'WALLET-PAYMENT'
         }
       });
@@ -504,25 +513,22 @@ export default function ChatPage() {
             ...prev,
             items: prev.items.map(item => ({ ...item, quantity: qty }))
           }));
-          setChatState('confirming_price');
-          botReply("🔗 Send the target Instagram link:");
+          setChatState('choosing_payment_method');
+          const total = calculateTotalPrice();
+          botReply(`💰 Total: ₹${total.toFixed(2)}\n💳 Wallet: ₹${walletBalance.toFixed(0)}`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]);
         }
-        break;
-
-      case 'confirming_price':
-        setCurrentOrder(prev => ({
-          ...prev,
-          items: prev.items.map(i => ({ ...i, link: text }))
-        }));
-        setChatState('choosing_payment_method');
-        
-        const total = calculateTotalPrice();
-        botReply(`💰 Total: ₹${total.toFixed(2)}\n💳 Wallet: ₹${walletBalance.toFixed(0)}`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]);
         break;
 
       case 'choosing_payment_method':
         if (cleanText.includes("wallet")) {
-          handleBundleWalletSubmit();
+          if (currentOrder.type === 'single') {
+            botReply("💳 Confirm Wallet Payment:", [], {
+              isWalletCard: true,
+              paymentPrice: calculateTotalPrice()
+            });
+          } else {
+            handleBundleWalletSubmit();
+          }
         } else if (cleanText.includes("upi")) {
           botReply(`📸 Scan QR to pay ₹${calculateTotalPrice().toFixed(2)}:`, [], {
             isPaymentCard: true,
@@ -673,6 +679,8 @@ export default function ChatPage() {
             onBulkLinksSubmit={(links) => handleBulkLinksFromCard(links)}
             isComboCard={m.isComboCard}
             onComboSubmit={(items, link) => handleComboFromCard(items, link)}
+            isWalletCard={m.isWalletCard}
+            onWalletSubmit={(link) => handleBundleWalletSubmit(link)}
             onOptionClick={(option) => handleSend(option)}
             timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} 
           />
