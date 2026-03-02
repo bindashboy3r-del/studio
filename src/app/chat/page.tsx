@@ -287,12 +287,12 @@ export default function ChatPage() {
       setCurrentOrder({});
       botReply(
         "👋 Welcome to SocialBoost Bot!\n\nNiche di gayi list mein se koi bhi platform select karein:",
-        ["1. INSTAGRAM SERVICES", "2. YOUTUBE SERVICES", "3. ORDER HISTORY"]
+        ["1. INSTAGRAM SERVICES", "2. YOUTUBE SERVICES"]
       );
       return;
     }
 
-    if (cleanText.includes("order history") || cleanText.includes("history") || cleanText === "3") {
+    if (cleanText.includes("order history") || cleanText.includes("history")) {
       router.push("/orders");
       return;
     }
