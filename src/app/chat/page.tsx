@@ -38,7 +38,8 @@ import {
   PlusCircle,
   Layers,
   Copy,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Percent
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PLATFORMS, SERVICES, Platform, SMMService } from "@/app/lib/constants";
@@ -79,6 +80,7 @@ interface OrderInProgress {
   platform: Platform;
   items: OrderItem[];
   paymentMethod?: 'wallet' | 'upi';
+  bulkLinks?: string[];
 }
 
 export default function ChatPage() {
@@ -250,9 +252,17 @@ export default function ChatPage() {
   }, [user, isMessagesLoading]);
 
   const calculateTotalPrice = () => {
-    return currentOrder.items.reduce((total, item) => {
-      return total + (item.quantity / 1000) * item.service.pricePer1000;
+    let total = currentOrder.items.reduce((total, item) => {
+      const multiplier = (currentOrder.type === 'bulk' && currentOrder.bulkLinks) ? currentOrder.bulkLinks.length : 1;
+      return total + (item.quantity / 1000) * item.service.pricePer1000 * multiplier;
     }, 0);
+
+    // Apply 5% discount for combo orders
+    if (currentOrder.type === 'combo') {
+      total = total * 0.95;
+    }
+
+    return total;
   };
 
   const handleBundlePaymentSubmit = async (utr: string) => {
@@ -262,39 +272,47 @@ export default function ChatPage() {
     const batch = writeBatch(db);
     const orderResults: any[] = [];
 
-    for (const item of currentOrder.items) {
-      const orderId = `SB-B-${Math.floor(100000 + Math.random() * 900000)}`;
-      const orderRef = doc(collection(db, "users", user.uid, "orders"));
-      
-      const orderData = {
-        userId: user.uid,
-        orderId,
-        platform: 'Instagram',
-        service: item.service.name,
-        link: item.link,
-        quantity: item.quantity,
-        price: (item.quantity / 1000) * item.service.pricePer1000,
-        utrId: utr,
-        status: 'Pending',
-        paymentMethod: 'UPI',
-        createdAt: serverTimestamp()
-      };
-      
-      batch.set(orderRef, orderData);
-      orderResults.push(orderData);
+    // Handle single/combo or bulk links
+    const targets = (currentOrder.type === 'bulk' && currentOrder.bulkLinks) ? currentOrder.bulkLinks : [currentOrder.items[0].link];
+
+    for (const link of targets) {
+      for (const item of currentOrder.items) {
+        const orderId = `SB-B-${Math.floor(100000 + Math.random() * 900000)}`;
+        const orderRef = doc(collection(db, "users", user.uid, "orders"));
+        
+        let itemPrice = (item.quantity / 1000) * item.service.pricePer1000;
+        if (currentOrder.type === 'combo') itemPrice *= 0.95;
+
+        const orderData = {
+          userId: user.uid,
+          orderId,
+          platform: 'Instagram',
+          service: item.service.name,
+          link: link,
+          quantity: item.quantity,
+          price: itemPrice,
+          utrId: utr,
+          status: 'Pending',
+          paymentMethod: 'UPI',
+          createdAt: serverTimestamp()
+        };
+        
+        batch.set(orderRef, orderData);
+        orderResults.push(orderData);
+      }
     }
 
     await batch.commit();
     setChatState('idle');
-    botReply(`✅ ${currentOrder.items.length} orders submitted for verification!`, [], {
+    botReply(`✅ ${orderResults.length} orders submitted for verification!`, [], {
       isSuccessCard: true,
       successDetails: {
-        orderId: `BUNDLE-${currentOrder.items.length}`,
+        orderId: `BUNDLE-${orderResults.length}`,
         platform: 'Instagram',
         service: 'Multiple Services',
-        quantity: currentOrder.items.reduce((a, b) => a + b.quantity, 0),
+        quantity: orderResults.reduce((a, b) => a + b.quantity, 0),
         price: totalPrice,
-        link: currentOrder.items[0].link + (currentOrder.items.length > 1 ? ` (+${currentOrder.items.length - 1} more)` : ''),
+        link: targets[0] + (targets.length > 1 ? ` (+${targets.length - 1} more)` : ''),
         utrId: utr
       }
     });
@@ -313,49 +331,55 @@ export default function ChatPage() {
     const apiData = apiSnap.exists() ? apiSnap.data() : null;
 
     const batch = writeBatch(db);
+    const targets = (currentOrder.type === 'bulk' && currentOrder.bulkLinks) ? currentOrder.bulkLinks : [currentOrder.items[0].link];
     
-    for (const item of currentOrder.items) {
-      const orderId = `SB-W-${Math.floor(100000 + Math.random() * 900000)}`;
-      const orderRef = doc(collection(db, "users", user.uid, "orders"));
-      
-      let finalStatus = 'Pending';
-      let apiOrderId = null;
-      let apiError = null;
+    for (const link of targets) {
+      for (const item of currentOrder.items) {
+        const orderId = `SB-W-${Math.floor(100000 + Math.random() * 900000)}`;
+        const orderRef = doc(collection(db, "users", user.uid, "orders"));
+        
+        let finalStatus = 'Pending';
+        let apiOrderId = null;
+        let apiError = null;
 
-      if (apiData) {
-        const serviceId = apiData.serviceMappings?.[item.service.id];
-        if (apiData.apiUrl && apiData.apiKey && serviceId) {
-          const apiResult = await placeApiOrder({
-            apiUrl: apiData.apiUrl,
-            apiKey: apiData.apiKey,
-            serviceId: serviceId,
-            link: item.link,
-            quantity: item.quantity
-          });
+        if (apiData) {
+          const serviceId = apiData.serviceMappings?.[item.service.id];
+          if (apiData.apiUrl && apiData.apiKey && serviceId) {
+            const apiResult = await placeApiOrder({
+              apiUrl: apiData.apiUrl,
+              apiKey: apiData.apiKey,
+              serviceId: serviceId,
+              link: link,
+              quantity: item.quantity
+            });
 
-          if (apiResult.success) {
-            apiOrderId = apiResult.order;
-            finalStatus = 'Processing';
-          } else {
-            apiError = apiResult.error;
+            if (apiResult.success) {
+              apiOrderId = apiResult.order;
+              finalStatus = 'Processing';
+            } else {
+              apiError = apiResult.error;
+            }
           }
         }
-      }
 
-      batch.set(orderRef, {
-        userId: user.uid,
-        orderId,
-        platform: 'Instagram',
-        service: item.service.name,
-        link: item.link,
-        quantity: item.quantity,
-        price: (item.quantity / 1000) * item.service.pricePer1000,
-        status: finalStatus,
-        paymentMethod: 'Wallet',
-        apiOrderId,
-        apiError,
-        createdAt: serverTimestamp()
-      });
+        let itemPrice = (item.quantity / 1000) * item.service.pricePer1000;
+        if (currentOrder.type === 'combo') itemPrice *= 0.95;
+
+        batch.set(orderRef, {
+          userId: user.uid,
+          orderId,
+          platform: 'Instagram',
+          service: item.service.name,
+          link: link,
+          quantity: item.quantity,
+          price: itemPrice,
+          status: finalStatus,
+          paymentMethod: 'Wallet',
+          apiOrderId,
+          apiError,
+          createdAt: serverTimestamp()
+        });
+      }
     }
 
     batch.update(doc(db, "users", user.uid), {
@@ -364,13 +388,13 @@ export default function ChatPage() {
 
     await batch.commit().then(() => {
       setChatState('idle');
-      botReply(`✅ ${currentOrder.items.length} orders processed from Wallet!`, [], {
+      botReply(`✅ Orders processed from Wallet!`, [], {
         isSuccessCard: true,
         successDetails: {
           orderId: `WALLET-BUNDLE`,
           platform: 'Instagram',
           service: 'Multiple Services',
-          quantity: currentOrder.items.reduce((a, b) => a + b.quantity, 0),
+          quantity: currentOrder.items.reduce((a, b) => a + b.quantity, 0) * (currentOrder.bulkLinks?.length || 1),
           price: totalPrice,
           link: 'Processed via Wallet',
           utrId: 'WALLET-PAYMENT'
@@ -382,8 +406,8 @@ export default function ChatPage() {
   const handleBulkLinksFromCard = async (links: string[]) => {
     if (links.length === 0) return;
     await addMessage('user', `Added ${links.length} links for bulk order.`);
-    setCurrentOrder({ ...currentOrder, bulkLinks: links } as any);
-    setChatState('entering_combo_quantities'); // Reuse for bulk qty
+    setCurrentOrder({ ...currentOrder, bulkLinks: links });
+    setChatState('entering_quantity'); // Direct to quantity per link
     botReply(`📊 Quantity PER LINK for ${currentOrder.items[0].service.name}?`);
   };
 
@@ -399,7 +423,7 @@ export default function ChatPage() {
       setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
       botReply(
         "👋 Welcome! Choose your ordering method:",
-        ["1. SINGLE ORDER (One Link, One Service)", "2. COMBO ORDER (One Link, Multi-Service)", "3. BULK ORDER (Multi-Link, One Service)"]
+        ["1. SINGLE ORDER", "2. COMBO ORDER (5% OFF! 🎁)", "3. BULK ORDER"]
       );
       return;
     }
@@ -423,7 +447,7 @@ export default function ChatPage() {
         } else if (cleanText.includes("combo")) {
           setCurrentOrder({ type: 'combo', platform: 'instagram', items: [] });
           setChatState('choosing_combo_services');
-          botReply("Select multiple services (Send 'DONE' when finished):", SERVICES.instagram.map(s => s.name));
+          botReply("🎁 Combo Offer: Get 5% OFF on total! Select services (Send 'DONE' when finished):", SERVICES.instagram.map(s => s.name));
         } else if (cleanText.includes("bulk")) {
           setCurrentOrder({ type: 'bulk', platform: 'instagram', items: [] });
           setChatState('choosing_service');
@@ -450,11 +474,11 @@ export default function ChatPage() {
 
       case 'choosing_combo_services':
         if (cleanText === 'done') {
-          if (currentOrder.items.length === 0) {
-            botReply("Please select at least one service!");
+          if (currentOrder.items.length < 2) {
+            botReply("Please select at least 2 services for a Combo!");
           } else {
-            setChatState('confirming_price'); // Reuse this for combo link
-            botReply("🔗 Send the Instagram link for this combo:");
+            setChatState('confirming_price'); // Step to get link for combo
+            botReply("🔗 Send the target Instagram link for this combo:");
           }
         } else {
           const s = SERVICES.instagram.find(sv => cleanText.includes(sv.name.toLowerCase()));
@@ -463,7 +487,7 @@ export default function ChatPage() {
               botReply(`${s.name} already added. Select another or send 'DONE'.`);
             } else {
               setCurrentOrder({ ...currentOrder, items: [...currentOrder.items, { service: s, quantity: 0, link: '' }] });
-              botReply(`✅ Added ${s.name}. Select more or send 'DONE'.`);
+              botReply(`✅ Added ${s.name}. Select more or send 'DONE' to set quantities.`);
             }
           }
         }
@@ -483,35 +507,54 @@ export default function ChatPage() {
 
       case 'confirming_price':
         if (currentOrder.type === 'combo') {
-          // Entering link for combo
           const updated = currentOrder.items.map(i => ({ ...i, link: text }));
           setCurrentOrder({ ...currentOrder, items: updated });
           setChatState('entering_combo_quantities');
-          botReply(`📊 Enter quantity for ${currentOrder.items[0].service.name}:`);
+          botReply(`📊 Enter quantity for ${updated[0].service.name}:`);
         } else {
-          // Entering link for single
           const updated = currentOrder.items.map(i => ({ ...i, link: text }));
-          setCurrentOrder({ ...currentOrder, items: updated });
+          const finalOrder = { ...currentOrder, items: updated };
+          setCurrentOrder(finalOrder);
           setChatState('choosing_payment_method');
-          const total = calculateTotalPrice();
+          
+          const total = finalOrder.items.reduce((sum, item) => {
+            const multi = finalOrder.bulkLinks?.length || 1;
+            return sum + (item.quantity / 1000) * item.service.pricePer1000 * multi;
+          }, 0);
+
           botReply(`💰 Total: ₹${total.toFixed(2)}\n💳 Wallet: ₹${walletBalance.toFixed(0)}`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]);
         }
         break;
 
       case 'entering_combo_quantities':
         const cQty = parseInt(text);
-        const idx = currentOrder.items.findIndex(i => i.quantity === 0);
-        if (idx !== -1) {
-          const updated = [...currentOrder.items];
-          updated[idx].quantity = cQty;
-          setCurrentOrder({ ...currentOrder, items: updated });
-          const nextIdx = updated.findIndex(i => i.quantity === 0);
-          if (nextIdx !== -1) {
-            botReply(`📊 Enter quantity for ${updated[nextIdx].service.name}:`);
+        if (isNaN(cQty) || cQty < 100) {
+          botReply("Invalid quantity. Please enter 100 or more.");
+          return;
+        }
+
+        const currentItems = [...currentOrder.items];
+        const nextIdx = currentItems.findIndex(i => i.quantity === 0);
+        
+        if (nextIdx !== -1) {
+          currentItems[nextIdx].quantity = cQty;
+          const stillToFillIdx = currentItems.findIndex(i => i.quantity === 0);
+          
+          if (stillToFillIdx !== -1) {
+            setCurrentOrder({ ...currentOrder, items: currentItems });
+            botReply(`📊 Enter quantity for ${currentItems[stillToFillIdx].service.name}:`);
           } else {
+            const finalOrder = { ...currentOrder, items: currentItems };
+            setCurrentOrder(finalOrder);
             setChatState('choosing_payment_method');
-            const total = updated.reduce((t, i) => t + (i.quantity/1000 * i.service.pricePer1000), 0);
-            botReply(`💰 Combo Total: ₹${total.toFixed(2)}\n💳 Wallet: ₹${walletBalance.toFixed(0)}`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]);
+            
+            const rawTotal = currentItems.reduce((t, i) => t + (i.quantity/1000 * i.service.pricePer1000), 0);
+            const discountedTotal = rawTotal * 0.95;
+
+            botReply(
+              `💰 Original: ₹${rawTotal.toFixed(2)}\n🎁 Combo Discount: 5% OFF!\n✅ Final Total: ₹${discountedTotal.toFixed(2)}\n💳 Wallet: ₹${walletBalance.toFixed(0)}`, 
+              ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]
+            );
           }
         }
         break;
