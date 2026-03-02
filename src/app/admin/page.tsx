@@ -1,46 +1,23 @@
+
 "use client";
 
-import { useState, useEffect } from "react";
-import { 
-  collectionGroup, 
-  query, 
-  orderBy, 
-  onSnapshot, 
-  updateDoc, 
-  doc 
-} from "firebase/firestore";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth, useUser } from "@/firebase";
 import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+  LayoutGrid, 
+  Megaphone, 
+  Users, 
+  ChevronRight, 
+  Moon, 
+  Bell, 
+  LogOut 
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { format } from "date-fns";
-import { Download, RefreshCw, LayoutDashboard, LogOut, ExternalLink, Copy, CheckCircle } from "lucide-react";
-import { useAuth, useFirestore, useUser } from "@/firebase";
-import { errorEmitter } from "@/firebase/error-emitter";
-import { FirestorePermissionError } from "@/firebase/errors";
-import { useToast } from "@/hooks/use-toast";
 
-export default function AdminDashboard() {
+export default function AdminHub() {
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
-  const db = useFirestore();
-  const { toast } = useToast();
-  const [orders, setOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -49,206 +26,109 @@ export default function AdminDashboard() {
     }
   }, [user, isUserLoading, router]);
 
-  useEffect(() => {
-    if (!user || !db) return;
+  if (isUserLoading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
-    // Use collectionGroup to fetch all orders across all users
-    const q = query(collectionGroup(db, "orders"), orderBy("createdAt", "desc"));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const ords = snapshot.docs.map(doc => ({
-        id: doc.id,
-        path: doc.ref.path,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date()
-      }));
-      setOrders(ords);
-      setLoading(false);
-    }, (error) => {
-      const contextualError = new FirestorePermissionError({
-        path: 'orders (collectionGroup)',
-        operation: 'list'
-      });
-      errorEmitter.emit('permission-error', contextualError);
-      setLoading(false);
-    });
-    
-    return () => unsubscribe();
-  }, [user, db]);
-
-  const updateStatus = async (orderPath: string, status: string) => {
-    if (!db) return;
-    const orderRef = doc(db, orderPath);
-    updateDoc(orderRef, { status })
-      .then(() => {
-        toast({ title: "Updated", description: `Order status set to ${status}` });
-      })
-      .catch((error) => {
-        const contextualError = new FirestorePermissionError({
-          path: orderPath,
-          operation: 'update',
-          requestResourceData: { status }
-        });
-        errorEmitter.emit('permission-error', contextualError);
-      });
-  };
-
-  const copyToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    toast({ title: "Copied", description: `${label} copied to clipboard.` });
-  };
-
-  const exportOrders = () => {
-    const csv = [
-      ["Order ID", "User ID", "Platform", "Service", "Link", "Quantity", "Price", "UTR ID", "Status", "Date"].join(","),
-      ...orders.map(o => [
-        o.id, o.userId, o.platform, o.service, o.link, o.quantity, o.price, o.utrId, o.status, o.createdAt.toISOString()
-      ].join(","))
-    ].join("\n");
-    
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.setAttribute('hidden', '');
-    a.setAttribute('href', url);
-    a.setAttribute('download', `socialboost_orders_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`);
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
-
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
-      <RefreshCw className="animate-spin text-red-500" />
-    </div>
-  );
+  const menuItems = [
+    {
+      title: "LIVE TRACKER",
+      subtitle: "APPROVE & REJECT ORDERS",
+      icon: <LayoutGrid size={28} />,
+      color: "bg-[#10B981]", // Emerald Green
+      path: "/admin/tracker"
+    },
+    {
+      title: "BROADCAST MSG",
+      subtitle: "REAL-TIME ANNOUNCEMENTS",
+      icon: <Megaphone size={28} />,
+      color: "bg-[#312ECB]", // Royal Blue
+      path: "/admin/broadcast"
+    },
+    {
+      title: "ALL USERS",
+      subtitle: "DATABASE & CONTACT LIST",
+      icon: <Users size={28} />,
+      color: "bg-[#1F2937]", // Dark Gray/Black
+      path: "/admin/users"
+    }
+  ];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-6 font-body">
-      <div className="max-w-[1400px] mx-auto space-y-8">
-        <header className="flex flex-col md:flex-row items-center justify-between gap-6 bg-slate-900 p-6 rounded-[2rem] border border-slate-800 shadow-2xl">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-red-600 rounded-2xl flex items-center justify-center shadow-lg shadow-red-600/20">
-              <LayoutDashboard className="text-white" size={24} />
-            </div>
-            <div>
-              <h1 className="text-2xl font-black uppercase tracking-tight">Admin Control</h1>
-              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Global Order Management</p>
-            </div>
+    <div className="min-h-screen bg-slate-50 font-body">
+      {/* Header matching screenshot */}
+      <header className="bg-white px-6 py-4 flex items-center justify-between border-b border-slate-100 sticky top-0 z-50">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-[#312ECB] rounded-xl flex items-center justify-center text-white shadow-lg">
+            <span className="font-black italic text-xl">S</span>
           </div>
-          <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={exportOrders} className="rounded-xl border-slate-700 bg-slate-800 hover:bg-slate-700 text-[11px] font-black uppercase tracking-widest px-6 h-11 gap-2">
-              <Download size={16} /> Export CSV
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => auth?.signOut()} className="rounded-xl text-red-400 hover:text-red-300 hover:bg-red-950/30 text-[11px] font-black uppercase tracking-widest px-6 h-11 gap-2">
-              <LogOut size={16} /> Sign Out
-            </Button>
+          <h1 className="text-xl font-black italic tracking-tighter text-[#312ECB]">INSTAFLOW</h1>
+        </div>
+        <div className="flex items-center gap-5">
+          <button className="text-slate-400 hover:text-[#312ECB] transition-colors">
+            <Moon size={20} />
+          </button>
+          <button className="text-slate-400 hover:text-[#312ECB] transition-colors relative">
+            <Bell size={20} />
+            <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
+          </button>
+          <div className="w-10 h-10 rounded-full bg-[#312ECB] flex items-center justify-center text-white font-black text-sm shadow-md">
+            C
           </div>
-        </header>
+        </div>
+      </header>
 
-        <main className="bg-slate-900 rounded-[2.5rem] border border-slate-800 overflow-hidden shadow-2xl">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-slate-950">
-                <TableRow className="border-slate-800 hover:bg-transparent">
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Date</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Service Info</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Order Details</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Target Link</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Payment UTR</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Status</TableHead>
-                  <TableHead className="text-right text-[10px] font-black uppercase tracking-widest py-6">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {orders.map((order) => (
-                  <TableRow key={order.id} className="border-slate-800 hover:bg-slate-800/50 transition-colors">
-                    <TableCell className="text-[11px] font-bold text-slate-500 uppercase">
-                      {format(order.createdAt, 'MMM dd')}<br/>
-                      {format(order.createdAt, 'HH:mm')}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-black uppercase text-[10px] text-red-500">{order.platform}</span>
-                        <span className="text-sm font-bold">{order.service}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="text-[11px] font-bold text-slate-400">Qty: {order.quantity}</span>
-                        <span className="text-sm font-black text-green-500">₹{order.price?.toFixed(0)}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className="max-w-[150px] truncate text-[11px] font-bold text-blue-400">
-                          {order.link}
-                        </span>
-                        <button 
-                          onClick={() => copyToClipboard(order.link, "Link")}
-                          className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-colors"
-                        >
-                          <Copy size={12} />
-                        </button>
-                        <a href={order.link} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-colors">
-                          <ExternalLink size={12} />
-                        </a>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <code className="bg-slate-800 px-3 py-1 rounded-lg text-[11px] font-black tracking-tighter text-yellow-500">
-                          {order.utrId || 'N/A'}
-                        </code>
-                        {order.utrId && (
-                          <button 
-                            onClick={() => copyToClipboard(order.utrId, "UTR ID")}
-                            className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-colors"
-                          >
-                            <Copy size={12} />
-                          </button>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={
-                        order.status === 'Pending' ? 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30 font-black text-[10px] uppercase rounded-lg px-3 py-1' : 
-                        order.status === 'Processing' ? 'bg-blue-500/20 text-blue-500 border-blue-500/30 font-black text-[10px] uppercase rounded-lg px-3 py-1' :
-                        order.status === 'Cancelled' ? 'bg-red-500/20 text-red-500 border-red-500/30 font-black text-[10px] uppercase rounded-lg px-3 py-1' :
-                        'bg-green-500/20 text-green-500 border-green-500/30 font-black text-[10px] uppercase rounded-lg px-3 py-1'
-                      }>
-                        {order.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Select defaultValue={order.status} onValueChange={(val) => updateStatus(order.path, val)}>
-                        <SelectTrigger className="w-[140px] h-10 bg-slate-950 border-slate-700 rounded-xl text-[11px] font-black uppercase tracking-widest">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-slate-900 border-slate-700">
-                          <SelectItem value="Pending" className="text-[11px] font-black uppercase">Pending</SelectItem>
-                          <SelectItem value="Processing" className="text-[11px] font-black uppercase">Processing</SelectItem>
-                          <SelectItem value="Completed" className="text-[11px] font-black uppercase text-green-500">Completed</SelectItem>
-                          <SelectItem value="Cancelled" className="text-[11px] font-black uppercase text-red-500">Cancelled</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            {orders.length === 0 && (
-              <div className="p-20 text-center flex flex-col items-center gap-4">
-                <RefreshCw size={48} className="text-slate-700 mb-2" />
-                <p className="text-[11px] font-black text-slate-500 uppercase tracking-[0.3em]">No orders discovered in the database</p>
+      <main className="max-w-md mx-auto p-6 space-y-8 pt-12">
+        <div className="space-y-1">
+          <h2 className="text-[28px] font-black text-[#111B21] tracking-tight">ADMIN PANEL</h2>
+          <p className="text-[11px] font-black text-[#312ECB] uppercase tracking-[0.3em]">Management Hub</p>
+        </div>
+
+        <div className="space-y-4">
+          {menuItems.map((item, idx) => (
+            <button
+              key={idx}
+              onClick={() => router.push(item.path)}
+              className={`${item.color} w-full rounded-[2rem] p-8 text-white flex items-center justify-between shadow-xl transition-all active:scale-[0.98] group relative overflow-hidden`}
+            >
+              <div className="flex items-center gap-6 z-10">
+                <div className="w-16 h-16 rounded-[1.2rem] bg-white/20 flex items-center justify-center border border-white/10">
+                  {item.icon}
+                </div>
+                <div className="text-left">
+                  <h3 className="text-xl font-black tracking-tight">{item.title}</h3>
+                  <p className="text-[10px] font-black text-white/60 uppercase tracking-widest mt-1">
+                    {item.subtitle}
+                  </p>
+                </div>
               </div>
-            )}
-          </div>
-        </main>
-      </div>
-      <footer className="mt-12 text-center">
-        <p className="text-[9px] font-black text-slate-700 uppercase tracking-[0.8em]">
-          SOCIALBOOST CORE DASHBOARD v2.5
+              <div className="z-10 bg-white/10 p-2 rounded-full group-hover:translate-x-1 transition-transform">
+                <ChevronRight size={24} />
+              </div>
+              {/* Subtle background decoration */}
+              <div className="absolute -right-4 -bottom-4 w-32 h-32 bg-white/5 rounded-full blur-2xl" />
+            </button>
+          ))}
+        </div>
+
+        <div className="pt-8">
+          <Button 
+            variant="ghost" 
+            onClick={() => auth?.signOut()}
+            className="w-full h-14 rounded-2xl text-slate-400 hover:text-red-500 hover:bg-red-50 font-black text-[11px] uppercase tracking-[0.3em] gap-3"
+          >
+            <LogOut size={18} /> Sign Out Session
+          </Button>
+        </div>
+      </main>
+
+      <footer className="mt-auto py-10 text-center">
+        <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.6em]">
+          SOCIALBOOST CORE v3.0
         </p>
       </footer>
     </div>
