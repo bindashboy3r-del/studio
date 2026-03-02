@@ -149,7 +149,7 @@ export function MessageBubble({
       `🆔 *Order ID:* #${successDetails.orderId}\n` +
       `📊 *Service:* ${successDetails.platform} ${successDetails.service}\n` +
       `🔢 *Quantity:* ${successDetails.quantity}\n` +
-      `💰 *Price:* ₹${successDetails.price.toFixed(0)}\n` +
+      `💰 *Price:* ₹${successDetails.price.toFixed(2)}\n` +
       `🔗 *Link:* ${successDetails.link}\n` +
       `💳 *Payment:* ${successDetails.utrId === 'WALLET-PAYMENT' ? 'WALLET' : 'UPI (' + successDetails.utrId + ')'}\n\n` +
       `Please process my order ASAP!`
@@ -223,7 +223,7 @@ export function MessageBubble({
                 <p className="flex justify-between"><span>Order ID:</span> <span className="text-[#312ECB] dark:text-blue-400">#{successDetails.orderId}</span></p>
                 <p className="flex justify-between"><span>Service:</span> <span>{successDetails.service}</span></p>
                 <p className="flex justify-between"><span>Quantity:</span> <span>{successDetails.quantity}</span></p>
-                <p className="flex justify-between"><span>Amount:</span> <span className="text-[#25D366]">₹{successDetails.price.toFixed(0)}</span></p>
+                <p className="flex justify-between"><span>Amount:</span> <span className="text-[#25D366]">₹{successDetails.price.toFixed(2)}</span></p>
                 <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Target Link:</p>
                   <p className="break-all text-[#312ECB] dark:text-blue-400 leading-snug">{successDetails.link}</p>
@@ -270,7 +270,7 @@ export function MessageBubble({
                 <QrCode size={16} className="text-[#312ECB]" /> {isFundPaymentCard ? 'Add Funds' : 'Secure Payment'}
               </div>
               <p className="text-[13px] font-bold text-slate-700 dark:text-slate-300">
-                Please scan QR or copy UPI ID to pay <span className="text-[#312ECB] font-black">₹{price.toFixed(0)}</span>.
+                Please scan QR or copy UPI ID to pay <span className="text-[#312ECB] font-black">₹{price.toFixed(2)}</span>.
               </p>
             </div>
 
@@ -314,7 +314,7 @@ export function MessageBubble({
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">12-Digit UTR ID</label>
                 <p className="text-[9px] font-bold text-red-500 uppercase tracking-tight ml-1 mb-1">
-                  ⚠️ Yaha sahi 12-digit UTR ID bharein. Galat ID se payment verify nahi hoga.
+                  ⚠️ Kripya sahi 12-digit UTR ID hi dalein. Galat ID se verify nahi hoga.
                 </p>
                 <Input 
                   placeholder="Enter 12-Digit Transaction ID"
@@ -519,7 +519,7 @@ export function MessageBubble({
                 disabled={link.trim() === ""}
                 className="w-full h-14 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[12px] uppercase tracking-widest rounded-2xl shadow-xl gap-3 transition-all active:scale-95"
               >
-                💸 Confirm & Pay ₹{price.toFixed(0)}
+                💸 Confirm & Pay ₹{price.toFixed(2)}
               </Button>
             </div>
           </div>

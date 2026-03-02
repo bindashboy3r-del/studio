@@ -435,7 +435,7 @@ export default function ChatPage() {
     
     setChatState('choosing_payment_method');
     botReply(
-      `🎁 Combo Discount: 5% OFF!\n✅ Final Total: ₹${total.toFixed(2)}\n💳 Wallet: ₹${walletBalance.toFixed(0)}`, 
+      `🎁 Combo Discount: 5% OFF!\n✅ Final Total: ₹${total.toFixed(2)}\n💳 Wallet: ₹${walletBalance.toFixed(2)}`, 
       ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]
     );
   };
@@ -515,7 +515,13 @@ export default function ChatPage() {
           }));
           setChatState('choosing_payment_method');
           const total = calculateTotalPrice();
-          botReply(`💰 Total: ₹${total.toFixed(2)}\n💳 Wallet: ₹${walletBalance.toFixed(0)}`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]);
+          botReply(
+            `✅ Aapne ${PLATFORMS[currentOrder.platform]} ${currentService.name} select kiya hai.\n\n` +
+            `📊 Quantity: ${qty}\n` +
+            `💰 Total Price: ₹${total.toFixed(2)}\n\n` +
+            `💳 Aapka Wallet: ₹${walletBalance.toFixed(2)}`, 
+            ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]
+          );
         }
         break;
 
@@ -607,7 +613,7 @@ export default function ChatPage() {
             className="flex items-center gap-2 bg-emerald-500/10 text-emerald-600 px-3 py-1.5 rounded-full border border-emerald-100 hover:bg-emerald-500/20 transition-colors"
           >
             <Wallet size={14} />
-            <span className="text-[11px] font-black tracking-tight">₹{walletBalance.toFixed(0)}</span>
+            <span className="text-[11px] font-black tracking-tight">₹{walletBalance.toFixed(2)}</span>
             <PlusCircle size={14} className="ml-1" />
           </button>
         </div>
