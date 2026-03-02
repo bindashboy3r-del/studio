@@ -12,13 +12,30 @@ import { MessageBubble } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, LogOut, MoreVertical, Search, Rocket } from "lucide-react";
+import { 
+  Send, 
+  LogOut, 
+  Bell, 
+  Moon, 
+  User, 
+  Rocket,
+  Settings,
+  ShieldCheck
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PLATFORMS, SERVICES, Platform, SMMService } from "@/app/lib/constants";
 import { intelligentOrderParsing } from "@/ai/flows/intelligent-order-parsing";
 import { useAuth, useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type ChatState = 
   | 'idle' 
@@ -47,13 +64,10 @@ export default function ChatPage() {
   const [chatState, setChatState] = useState<ChatState>('idle');
   const [currentOrder, setCurrentOrder] = useState<OrderInProgress>({});
   
-  // Track when this specific session started to "clear" old messages visually
   const [sessionStartTime] = useState(() => Date.now());
   const hasInitialGreeted = useRef(false);
-  
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Memoize the query for chat messages
   const messagesQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
     return query(
@@ -64,7 +78,6 @@ export default function ChatPage() {
 
   const { data: messagesData, isLoading: isMessagesLoading } = useCollection(messagesQuery);
   
-  // Filter messages to only show those from this session, creating the "clear" effect
   const messages = useMemo(() => {
     if (!messagesData) return [];
     return messagesData.filter((m: any) => {
@@ -117,7 +130,6 @@ export default function ChatPage() {
     }, 800);
   };
 
-  // Bot initialization logic - fires once per session mount
   useEffect(() => {
     if (user && !isMessagesLoading && !hasInitialGreeted.current) {
       hasInitialGreeted.current = true;
@@ -132,7 +144,6 @@ export default function ChatPage() {
     setInputValue("");
     await addMessage('user', text);
 
-    // Flow Logic
     if (chatState === 'initial' && text.toLowerCase() === 'hi') {
       setChatState('choosing_platform');
       botReply(`What can I help you with today?\n\n1️⃣ Instagram Services\n2️⃣ YouTube Services`);
@@ -142,7 +153,6 @@ export default function ChatPage() {
       return;
     }
 
-    // AI Parsing Shortcut
     if (chatState === 'choosing_platform' || chatState === 'idle') {
       try {
         if (text.length > 5) {
@@ -164,12 +174,9 @@ export default function ChatPage() {
             }
           }
         }
-      } catch (e) {
-        // Fallback to manual flow
-      }
+      } catch (e) { }
     }
 
-    // Manual Selection Flow
     switch (chatState) {
       case 'choosing_platform':
         if (text === "1" || text.toLowerCase().includes("instagram")) {
@@ -265,41 +272,65 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen whatsapp-bg max-w-lg mx-auto overflow-hidden relative shadow-2xl">
-      {/* WhatsApp Header */}
-      <header className="bg-[#054640] text-white p-3 px-4 flex items-center justify-between sticky top-0 z-20 shadow-md h-[60px]">
+    <div className="flex flex-col h-screen whatsapp-bg max-w-lg mx-auto overflow-hidden relative shadow-2xl bg-[#EFEAE2]">
+      {/* Top Banner / New Header */}
+      <header className="bg-[#054640] text-white p-4 flex items-center justify-between sticky top-0 z-30 shadow-lg h-[70px]">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center border border-white/10">
-            <Rocket size={20} className="text-white" />
+          <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
+            <Rocket size={22} className="text-[#25D366]" />
           </div>
           <div>
-            <h1 className="font-bold text-base leading-tight">SocialBoost</h1>
-            <p className="text-[12px] text-white/80 flex items-center font-medium">
+            <h1 className="font-black text-xl tracking-tight leading-none">SocialBoost</h1>
+            <div className="flex items-center mt-1">
               <span className="status-dot" />
-              Active Server
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <Search size={20} className="text-white/80 cursor-pointer" />
-          <div className="group relative">
-            <MoreVertical size={20} className="text-white/80 cursor-pointer" />
-            <div className="hidden group-hover:block absolute right-0 top-full mt-2 bg-white rounded-md shadow-xl border w-32 py-1 text-[#111B21] z-30">
-              <button 
-                onClick={() => auth?.signOut()}
-                className="w-full px-4 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2 font-semibold"
-              >
-                <LogOut size={14} /> Log out
-              </button>
+              <p className="text-[10px] text-white/70 uppercase font-black tracking-widest">Active Server</p>
             </div>
           </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Notification Button */}
+          <Button variant="ghost" size="icon" className="rounded-full w-9 h-9 bg-white/5 hover:bg-white/10 text-white border border-white/10">
+            <Bell size={18} />
+          </Button>
+
+          {/* Dark Mode Button */}
+          <Button variant="ghost" size="icon" className="rounded-full w-9 h-9 bg-white/5 hover:bg-white/10 text-white border border-white/10">
+            <Moon size={18} />
+          </Button>
+
+          {/* Profile Button with Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="rounded-full w-9 h-9 bg-white/5 hover:bg-white/10 text-white border border-white/10">
+                <User size={18} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 bg-white border-slate-200">
+              <DropdownMenuLabel className="font-black text-black">My Account</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="flex items-center gap-2 font-bold text-slate-700 cursor-pointer">
+                <Settings size={16} /> Settings
+              </DropdownMenuItem>
+              <DropdownMenuItem className="flex items-center gap-2 font-bold text-slate-700 cursor-pointer">
+                <ShieldCheck size={16} /> Privacy
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={() => auth?.signOut()}
+                className="flex items-center gap-2 font-black text-red-600 cursor-pointer"
+              >
+                <LogOut size={16} /> Log Out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 
       {/* Chat Area */}
-      <main className="flex-1 overflow-y-auto p-4 flex flex-col scroll-smooth">
-        <div className="mx-auto bg-[#D9FDD3]/80 px-4 py-1.5 rounded-lg text-[12px] text-black shadow-sm mb-6 uppercase tracking-wider font-bold">
-          Messages are secured
+      <main className="flex-1 overflow-y-auto p-4 pb-24 flex flex-col scroll-smooth">
+        <div className="mx-auto bg-[#D9FDD3]/90 px-5 py-2 rounded-xl text-[11px] text-black shadow-sm mb-8 uppercase tracking-widest font-black border border-black/5">
+          🔒 End-to-end encrypted
         </div>
         
         {messages.map((m: any) => (
@@ -315,23 +346,23 @@ export default function ChatPage() {
       </main>
 
       {/* WhatsApp Input Bar */}
-      <footer className="p-2 pb-4 px-3 bg-[#EFEAE2]">
-        <div className="flex items-center gap-2">
-          <div className="flex-1 bg-white rounded-full flex items-center px-4 py-1.5 shadow-sm border border-black/5">
+      <footer className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto p-3 bg-[#F0F2F5]/95 backdrop-blur-md border-t border-black/5 z-20">
+        <div className="flex items-center gap-3">
+          <div className="flex-1 bg-white rounded-2xl flex items-center px-4 py-2 shadow-sm border border-black/10">
             <Input 
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               placeholder="Type a message"
-              className="border-none bg-transparent focus-visible:ring-0 shadow-none text-[15px] h-9 p-0 text-black font-semibold placeholder:text-gray-500"
+              className="border-none bg-transparent focus-visible:ring-0 shadow-none text-[15px] h-10 p-0 text-black font-bold placeholder:text-gray-400"
             />
           </div>
           <Button 
             onClick={handleSend}
             size="icon" 
-            className="rounded-full h-11 w-11 bg-[#25D366] hover:bg-[#20bd5b] transition-all active:scale-90 shrink-0 shadow-md"
+            className="rounded-full h-12 w-12 bg-[#25D366] hover:bg-[#20bd5b] transition-all active:scale-90 shrink-0 shadow-xl border-2 border-white/20"
           >
-            <Send size={20} className="text-white ml-1" />
+            <Send size={24} className="text-white ml-1" />
           </Button>
         </div>
       </footer>
