@@ -28,13 +28,21 @@ export default function AuthPage() {
   const router = useRouter();
   const { toast } = useToast();
 
+  const ADMIN_EMAIL = "chetanmadhav4@gmail.com";
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password || !auth) return;
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.push("/chat");
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      
+      // Automatic redirect based on user role
+      if (result.user.email === ADMIN_EMAIL) {
+        router.push("/admin");
+      } else {
+        router.push("/chat");
+      }
     } catch (error: any) {
       toast({ 
         variant: "destructive", 
@@ -61,7 +69,12 @@ export default function AuthPage() {
         createdAt: new Date().toISOString()
       });
       
-      router.push("/chat");
+      // Redirect based on user role
+      if (result.user.email === ADMIN_EMAIL) {
+        router.push("/admin");
+      } else {
+        router.push("/chat");
+      }
     } catch (error: any) {
       toast({ 
         variant: "destructive", 
