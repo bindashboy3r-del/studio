@@ -60,7 +60,7 @@ export function SupportBot() {
 
       setMessages(prev => [...prev, { role: 'bot', text: response.reply }]);
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'bot', text: "Aapka request abhi process nahi ho pa raha hai. Kripya thodi der baad phir se koshish karein ya @social_boost.bot ko Instagram par contact karein. 🙏" }]);
+      setMessages(prev => [...prev, { role: 'bot', text: "Aapka order detail fetch karne mein dikkat aa rahi hai. Kripya thodi der baad koshish karein ya @social_boost.bot ko Instagram par contact karein. 😔" }]);
     } finally {
       setIsLoading(false);
     }
