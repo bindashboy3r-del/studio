@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { 
   collection, 
   addDoc, 
@@ -47,6 +47,9 @@ export default function ChatPage() {
   const [chatState, setChatState] = useState<ChatState>('idle');
   const [currentOrder, setCurrentOrder] = useState<OrderInProgress>({});
   
+  // Track when this specific session started to "clear" old messages visually
+  const [sessionStartTime] = useState(() => Date.now());
+  
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Memoize the query for chat messages
@@ -59,7 +62,17 @@ export default function ChatPage() {
   }, [db, user]);
 
   const { data: messagesData, isLoading: isMessagesLoading } = useCollection(messagesQuery);
-  const messages = messagesData || [];
+  
+  // Filter messages to only show those from this session, creating the "clear" effect
+  const messages = useMemo(() => {
+    if (!messagesData) return [];
+    return messagesData.filter((m: any) => {
+      // If no timestamp yet (optimistic update), assume it's current session
+      if (!m.timestamp) return true;
+      const msgTime = m.timestamp.toDate ? m.timestamp.toDate().getTime() : m.timestamp;
+      return msgTime >= sessionStartTime;
+    });
+  }, [messagesData, sessionStartTime]);
 
   useEffect(() => {
     if (!isUserLoading && !user) router.push("/");
@@ -98,19 +111,18 @@ export default function ChatPage() {
 
   const botReply = async (text: string) => {
     setIsTyping(true);
-    // Simulate thinking time
     setTimeout(async () => {
       await addMessage('bot', text);
       setIsTyping(false);
-    }, 1200);
+    }, 800);
   };
 
-  // Bot initialization logic
+  // Bot initialization logic - fires when session starts and no messages are visible
   useEffect(() => {
     if (user && !isMessagesLoading && messages.length === 0 && chatState === 'idle') {
       setChatState('initial');
-      // Only show the prompt to start the order
-      botReply("Send 'Hi' to start creating your order.");
+      // Only show the prompt to start the order as requested
+      botReply("Send 'Hi' to start create order");
     }
   }, [user, isMessagesLoading, messages.length, chatState]);
 
@@ -126,11 +138,11 @@ export default function ChatPage() {
       botReply(`What can I help you with today?\n\n1️⃣ Instagram Services\n2️⃣ YouTube Services`);
       return;
     } else if (chatState === 'initial') {
-      botReply("Send 'Hi' to start creating your order.");
+      botReply("Send 'Hi' to start create order");
       return;
     }
 
-    // AI Parsing Fallback / Shortcut
+    // AI Parsing Shortcut
     if (chatState === 'choosing_platform' || chatState === 'idle') {
       try {
         if (text.length > 5) {
@@ -153,7 +165,7 @@ export default function ChatPage() {
           }
         }
       } catch (e) {
-        // Fallback to manual flow if AI parsing fails or doesn't find a match
+        // Fallback to manual flow
       }
     }
 
@@ -237,16 +249,16 @@ export default function ChatPage() {
           botReply("Order placed successfully! 🎉\nWe are processing it now.");
           setTimeout(() => {
             setChatState('initial');
-            addMessage('bot', "Send 'Hi' to start creating another order.");
+            addMessage('bot', "Send 'Hi' to start create order");
           }, 3000);
         } else {
           setChatState('initial');
-          botReply("Order cancelled. Send 'Hi' if you'd like to try again.");
+          botReply("Order cancelled. Send 'Hi' to start create order");
         }
         break;
 
       default:
-        botReply("I didn't understand that. Send 'Hi' to start.");
+        botReply("I didn't understand that. Send 'Hi' to start create order");
         setChatState('initial');
         break;
     }
