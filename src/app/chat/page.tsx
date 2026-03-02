@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -6,7 +7,8 @@ import {
   addDoc, 
   query, 
   orderBy, 
-  serverTimestamp
+  serverTimestamp,
+  limit
 } from "firebase/firestore";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
@@ -20,7 +22,9 @@ import {
   User, 
   Rocket,
   Settings,
-  ShieldCheck
+  ShieldCheck,
+  History,
+  Bot
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PLATFORMS, SERVICES, Platform, SMMService } from "@/app/lib/constants";
@@ -36,6 +40,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
 
 type ChatState = 
   | 'idle' 
@@ -77,6 +91,17 @@ export default function ChatPage() {
   }, [db, user]);
 
   const { data: messagesData, isLoading: isMessagesLoading } = useCollection(messagesQuery);
+
+  const ordersQuery = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return query(
+      collection(db, "users", user.uid, "orders"),
+      orderBy("createdAt", "desc"),
+      limit(10)
+    );
+  }, [db, user]);
+
+  const { data: ordersData } = useCollection(ordersQuery);
   
   const messages = useMemo(() => {
     if (!messagesData) return [];
@@ -272,67 +297,97 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen whatsapp-bg max-w-lg mx-auto overflow-hidden relative shadow-2xl bg-[#EFEAE2]">
-      {/* Top Banner / New Header */}
-      <header className="bg-[#054640] text-white p-4 flex items-center justify-between sticky top-0 z-30 shadow-lg h-[70px]">
+    <div className="flex flex-col h-screen max-w-lg mx-auto overflow-hidden relative shadow-2xl bg-white">
+      {/* 1. TOP BAR (WHITE) */}
+      <div className="bg-white px-4 py-3 flex items-center justify-between border-b border-gray-100 z-40">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
-            <Rocket size={22} className="text-[#25D366]" />
+          <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white shadow-md">
+            <Rocket size={24} className="fill-current" />
           </div>
-          <div>
-            <h1 className="font-black text-xl tracking-tight leading-none">SocialBoost</h1>
-            <div className="flex items-center mt-1">
-              <span className="status-dot" />
-              <p className="text-[10px] text-white/70 uppercase font-black tracking-widest">Active Server</p>
-            </div>
-          </div>
+          <h1 className="text-xl font-black italic tracking-tighter text-blue-900">SOCIALBOOST</h1>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Notification Button */}
-          <Button variant="ghost" size="icon" className="rounded-full w-9 h-9 bg-white/5 hover:bg-white/10 text-white border border-white/10">
-            <Bell size={18} />
-          </Button>
-
-          {/* Dark Mode Button */}
-          <Button variant="ghost" size="icon" className="rounded-full w-9 h-9 bg-white/5 hover:bg-white/10 text-white border border-white/10">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-slate-400">
             <Moon size={18} />
           </Button>
-
-          {/* Profile Button with Dropdown */}
+          <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-slate-400">
+            <Bell size={18} />
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="rounded-full w-9 h-9 bg-white/5 hover:bg-white/10 text-white border border-white/10">
-                <User size={18} />
+              <Button variant="ghost" size="icon" className="w-10 h-10 rounded-full bg-blue-900 text-white font-bold text-xs">
+                {user?.displayName?.[0] || 'U'}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 bg-white border-slate-200">
-              <DropdownMenuLabel className="font-black text-black">My Account</DropdownMenuLabel>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Account</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="flex items-center gap-2 font-bold text-slate-700 cursor-pointer">
-                <Settings size={16} /> Settings
-              </DropdownMenuItem>
-              <DropdownMenuItem className="flex items-center gap-2 font-bold text-slate-700 cursor-pointer">
-                <ShieldCheck size={16} /> Privacy
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                onClick={() => auth?.signOut()}
-                className="flex items-center gap-2 font-black text-red-600 cursor-pointer"
-              >
-                <LogOut size={16} /> Log Out
+              <DropdownMenuItem onClick={() => auth?.signOut()} className="text-red-600 font-bold">
+                <LogOut size={16} className="mr-2" /> Log Out
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </header>
+      </div>
 
-      {/* Chat Area */}
-      <main className="flex-1 overflow-y-auto p-4 pb-24 flex flex-col scroll-smooth">
-        <div className="mx-auto bg-[#D9FDD3]/90 px-5 py-2 rounded-xl text-[11px] text-black shadow-sm mb-8 uppercase tracking-widest font-black border border-black/5">
-          🔒 End-to-end encrypted
-        </div>
+      {/* 2. SUB-HEADER BAR (WHITE) */}
+      <div className="bg-white px-5 py-2 flex items-center justify-between border-b border-gray-100 z-30">
+        <span className="text-[10px] font-black italic text-blue-900/40 tracking-widest uppercase">
+          Automated Assistant
+        </span>
         
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="sm" className="text-[10px] font-black text-blue-900 uppercase tracking-widest gap-2">
+              <History size={14} /> Recent Orders
+            </Button>
+          </SheetTrigger>
+          <SheetContent className="bg-white">
+            <SheetHeader>
+              <SheetTitle className="text-xl font-black text-blue-900">Your Recent Orders</SheetTitle>
+              <SheetDescription>Track your active growth services.</SheetDescription>
+            </SheetHeader>
+            <div className="mt-8 space-y-4">
+              {ordersData?.map((order: any) => (
+                <div key={order.id} className="p-4 border border-gray-100 rounded-xl bg-slate-50/50">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="font-black text-xs uppercase text-blue-900">{order.platform} - {order.service}</span>
+                    <Badge variant="outline" className="text-[10px] font-black uppercase">{order.status}</Badge>
+                  </div>
+                  <div className="text-[10px] text-slate-500 font-bold mb-1 truncate">{order.link}</div>
+                  <div className="flex justify-between items-center text-[10px] font-black text-slate-400">
+                    <span>QTY: {order.quantity}</span>
+                    <span>{order.createdAt?.toDate ? format(order.createdAt.toDate(), 'MMM dd, HH:mm') : ''}</span>
+                  </div>
+                </div>
+              ))}
+              {(!ordersData || ordersData.length === 0) && (
+                <div className="text-center py-12 text-slate-400 font-bold text-sm">
+                  No orders yet.
+                </div>
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
+
+      {/* 3. BOT BANNER (TEAL) */}
+      <div className="bg-[#054640] px-5 py-4 flex items-center gap-4 z-20">
+        <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
+          <Bot size={28} className="text-white/80" />
+        </div>
+        <div>
+          <h2 className="text-white font-black uppercase text-sm tracking-widest">SOCIALBOOST BOT</h2>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="w-2 h-2 rounded-full bg-[#25D366] animate-pulse" />
+            <span className="text-[10px] text-white/50 font-black uppercase tracking-widest">Active Server</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. CHAT AREA */}
+      <main className="flex-1 overflow-y-auto p-4 flex flex-col whatsapp-bg scroll-smooth">
         {messages.map((m: any) => (
           <MessageBubble 
             key={m.id} 
@@ -345,24 +400,24 @@ export default function ChatPage() {
         <div ref={scrollRef} />
       </main>
 
-      {/* WhatsApp Input Bar */}
-      <footer className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto p-3 bg-[#F0F2F5]/95 backdrop-blur-md border-t border-black/5 z-20">
+      {/* INPUT BAR */}
+      <footer className="p-3 bg-white border-t border-gray-100">
         <div className="flex items-center gap-3">
-          <div className="flex-1 bg-white rounded-2xl flex items-center px-4 py-2 shadow-sm border border-black/10">
+          <div className="flex-1 bg-[#F0F2F5] rounded-full flex items-center px-5 py-1">
             <Input 
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               placeholder="Type a message"
-              className="border-none bg-transparent focus-visible:ring-0 shadow-none text-[15px] h-10 p-0 text-black font-bold placeholder:text-gray-400"
+              className="border-none bg-transparent focus-visible:ring-0 shadow-none text-[15px] h-10 p-0 text-black font-semibold placeholder:text-gray-400"
             />
           </div>
           <Button 
             onClick={handleSend}
             size="icon" 
-            className="rounded-full h-12 w-12 bg-[#25D366] hover:bg-[#20bd5b] transition-all active:scale-90 shrink-0 shadow-xl border-2 border-white/20"
+            className="rounded-full h-12 w-12 bg-[#25D366] hover:bg-[#20bd5b] shadow-lg shrink-0"
           >
-            <Send size={24} className="text-white ml-1" />
+            <Send size={22} className="text-white ml-1" />
           </Button>
         </div>
       </footer>
