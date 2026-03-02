@@ -119,7 +119,7 @@ export function SupportBot() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                placeholder="Order ID search karein..."
+                placeholder="Type your message..."
                 className="h-12 bg-white dark:bg-slate-800 border-none rounded-2xl px-4 text-sm font-bold shadow-inner"
               />
               <Button 

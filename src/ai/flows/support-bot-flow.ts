@@ -21,7 +21,7 @@ const getOrderDetails = ai.defineTool(
     description: 'Retrieves details for a specific SocialBoost order using its Order ID (e.g., SB-123456).',
     inputSchema: z.object({
       orderId: z.string().describe('The Order ID to look up (starts with SB-).'),
-      userId: z.string().describe('The ID of the currently logged-in user to help find their specific order.'),
+      userId: z.string().describe('The ID of the currently logged-in user.'),
     }),
     outputSchema: z.object({
       found: z.boolean().describe('Whether the order was found.'),
@@ -41,7 +41,7 @@ const getOrderDetails = ai.defineTool(
       // Clean the Order ID
       const cleanId = input.orderId.trim().toUpperCase();
       
-      // Primary Search: Search the user's specific collection (Most reliable & No index required)
+      // Primary Search: Search the user's specific collection
       const userOrdersRef = collection(db, 'users', input.userId, 'orders');
       const qUser = query(userOrdersRef, where('orderId', '==', cleanId), limit(1));
       const snapshotUser = await getDocs(qUser);
@@ -62,7 +62,6 @@ const getOrderDetails = ai.defineTool(
         message: `Aapka order ${cleanId} abhi nahi mil pa raha hai. Kripya check karein ki ID sahi hai ya thodi der baad koshish karein. Aap @social_boost.bot ko Instagram par bhi contact kar sakte hain. 😔` 
       };
     } catch (e: any) {
-      console.error("Support bot tool error:", e);
       return { 
         found: false, 
         message: "Aapka order detail fetch karne mein dikkat aa rahi hai. Kripya thodi der baad koshish karein ya @social_boost.bot ko Instagram par contact karein. 😔" 
@@ -90,16 +89,16 @@ const supportBotPrompt = ai.definePrompt({
   input: { schema: SupportBotInputSchema },
   output: { schema: SupportBotOutputSchema },
   tools: [getOrderDetails],
-  prompt: `You are the SocialBoost Support Bot, a helpful and professional AI assistant.
+  prompt: `You are the SocialBoost Support Bot, a professional and friendly AI assistant.
 Your goal is to help users with their SMM orders and wallet balances.
 
 GUIDELINES:
-1. If a user provides an Order ID (e.g., SB-123456), ALWAYS use the getOrderDetails tool. Pass both the Order ID and the current User ID to the tool.
-2. If the tool finds the order, explain the current status (Pending, Processing, Completed, or Rejected) clearly to the user.
-3. If the tool returns found: false or if there is any error, use the message provided by the tool to inform the user.
-4. If they ask how to add money or for a QR code, provide the UPI ID "smmxpressbot@slc" and suggest they click the "Add Funds" button in the header.
-5. If they ask for help or the bot is confused, suggest contacting the owner @social_boost.bot on Instagram.
-6. Keep responses concise and friendly. Use Hinglish (Hindi written in English script) as the user prefers. Use emojis! 🚀
+1. If the user just says "Hi" or greets you, respond politely in Hinglish and ask how you can help. DO NOT call any tools for simple greetings.
+2. If a user provides an Order ID (starts with SB-), ALWAYS use the getOrderDetails tool.
+3. If the tool finds the order, explain the status (Pending, Processing, Completed, or Rejected) clearly.
+4. For payment help, give UPI ID "smmxpressbot@slc" and suggest clicking "Add Funds" in the header.
+5. If the user is frustrated or there's an error, suggest contacting @social_boost.bot on Instagram.
+6. Keep responses concise. Use Hinglish and emojis! 🚀
 
 User Message: "{{{message}}}"
 User ID: "{{{userId}}}"`,
@@ -112,11 +111,21 @@ const supportBotFlow = ai.defineFlow(
     outputSchema: SupportBotOutputSchema,
   },
   async (input) => {
-    const { output } = await supportBotPrompt(input);
-    if (!output) {
-      throw new Error('Failed to generate response from Support Bot.');
+    try {
+      const { output } = await supportBotPrompt(input);
+      if (!output) {
+        return {
+          reply: "Aapka message samajhne mein thodi dikkat hui. Kripya phir se koshish karein ya @social_boost.bot ko Instagram par contact karein. 😔",
+          action: 'none'
+        };
+      }
+      return output;
+    } catch (error) {
+      return {
+        reply: "Aapka order detail fetch karne mein dikkat aa rahi hai. Kripya thodi der baad koshish karein ya @social_boost.bot ko Instagram par contact karein. 😔",
+        action: 'none'
+      };
     }
-    return output;
   }
 );
 
