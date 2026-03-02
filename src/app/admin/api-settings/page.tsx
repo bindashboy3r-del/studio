@@ -19,7 +19,7 @@ import { useUser, useFirestore } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { doc, setDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { getApiBalance } from "@/app/actions/smm-api";
-import { SERVICES, Platform } from "@/app/lib/constants";
+import { SERVICES } from "@/app/lib/constants";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function ApiSettingsPage() {
@@ -188,29 +188,27 @@ export default function ApiSettingsPage() {
 
           <ScrollArea className="h-[400px] pr-4">
             <div className="space-y-6">
-              {Object.entries(SERVICES).map(([platform, services]) => (
-                <div key={platform} className="space-y-4">
-                  <h3 className="text-[11px] font-black uppercase text-slate-800 tracking-[0.2em] border-b pb-2">{platform}</h3>
-                  <div className="grid gap-4">
-                    {services.map(s => (
-                      <div key={s.id} className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl">
-                        <div className="flex-1">
-                          <p className="text-[12px] font-black text-slate-700">{s.name}</p>
-                          <p className="text-[9px] font-bold text-slate-400">Rate: ₹{s.pricePer1000}/1k</p>
-                        </div>
-                        <div className="w-32">
-                          <Input 
-                            placeholder="API ID" 
-                            value={serviceMappings[s.id] || ""}
-                            onChange={(e) => updateMapping(s.id, e.target.value)}
-                            className="h-10 bg-white border-slate-100 rounded-xl text-center font-black text-xs"
-                          />
-                        </div>
+              <div className="space-y-4">
+                <h3 className="text-[11px] font-black uppercase text-slate-800 tracking-[0.2em] border-b pb-2">Instagram Services</h3>
+                <div className="grid gap-4">
+                  {SERVICES.instagram.map(s => (
+                    <div key={s.id} className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl">
+                      <div className="flex-1">
+                        <p className="text-[12px] font-black text-slate-700">{s.name}</p>
+                        <p className="text-[9px] font-bold text-slate-400">Rate: ₹{s.pricePer1000}/1k</p>
                       </div>
-                    ))}
-                  </div>
+                      <div className="w-32">
+                        <Input 
+                          placeholder="API ID" 
+                          value={serviceMappings[s.id] || ""}
+                          onChange={(e) => updateMapping(s.id, e.target.value)}
+                          className="h-10 bg-white border-slate-100 rounded-xl text-center font-black text-xs"
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           </ScrollArea>
         </section>

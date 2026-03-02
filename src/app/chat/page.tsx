@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -56,7 +55,6 @@ import { placeApiOrder } from "@/app/actions/smm-api";
 type ChatState = 
   | 'idle' 
   | 'initial'
-  | 'choosing_platform' 
   | 'choosing_service' 
   | 'entering_quantity' 
   | 'choosing_payment_method'
@@ -253,7 +251,7 @@ export default function ChatPage() {
     if (user && !isMessagesLoading && !hasInitialGreeted.current) {
       hasInitialGreeted.current = true;
       setChatState('initial');
-      botReply("Send 'Hi' to start create order");
+      botReply("Send 'Hi' to start Instagram growth! 🚀");
     }
   }, [user, isMessagesLoading]);
 
@@ -265,7 +263,7 @@ export default function ChatPage() {
     const orderData = {
       userId: user.uid,
       orderId: orderId,
-      platform: PLATFORMS[currentOrder.platform!],
+      platform: 'Instagram',
       service: currentOrder.service?.name,
       link: link,
       quantity: currentOrder.quantity,
@@ -283,7 +281,7 @@ export default function ChatPage() {
       isSuccessCard: true,
       successDetails: {
         orderId,
-        platform: PLATFORMS[currentOrder.platform!],
+        platform: 'Instagram',
         service: currentOrder.service?.name,
         quantity: currentOrder.quantity,
         price: finalPrice,
@@ -328,7 +326,6 @@ export default function ChatPage() {
           finalStatus = 'Processing'; // Auto-process if API succeeded
         } else {
           apiError = apiResult.error;
-          // Status remains Pending so admin can check what went wrong
         }
       }
     }
@@ -339,7 +336,7 @@ export default function ChatPage() {
     batch.set(orderRef, {
       userId: user.uid,
       orderId: orderId,
-      platform: PLATFORMS[currentOrder.platform!],
+      platform: 'Instagram',
       service: currentOrder.service.name,
       link: link,
       quantity: currentOrder.quantity,
@@ -361,7 +358,7 @@ export default function ChatPage() {
         isSuccessCard: true,
         successDetails: {
           orderId,
-          platform: PLATFORMS[currentOrder.platform!],
+          platform: 'Instagram',
           service: currentOrder.service?.name,
           quantity: currentOrder.quantity,
           price: finalPrice,
@@ -382,11 +379,12 @@ export default function ChatPage() {
     const cleanText = text.toLowerCase();
 
     if (cleanText === 'hi' || cleanText.includes("main menu") || cleanText.includes("start")) {
-      setChatState('choosing_platform');
-      setCurrentOrder({});
+      setChatState('choosing_service');
+      setCurrentOrder({ platform: 'instagram' });
+      const options = SERVICES.instagram.map((s, i) => `${i + 1}. INSTAGRAM ${s.name.toUpperCase()}`);
       botReply(
-        "👋 Welcome to SocialBoost Bot!\n\nSelect a platform to begin:",
-        ["1. INSTAGRAM SERVICES", "2. YOUTUBE SERVICES"]
+        "👋 Welcome back to SocialBoost!\n\nSelect an Instagram service to start:",
+        options
       );
       return;
     }
@@ -401,63 +399,23 @@ export default function ChatPage() {
       return;
     }
 
-    if (cleanText.includes("instagram services")) {
-      setCurrentOrder({ platform: 'instagram' });
-      setChatState('choosing_service');
-      const options = SERVICES.instagram.map((s, i) => `${i + 1}. INSTAGRAM ${s.name.toUpperCase()}`);
-      botReply("Perfect. Niche di gayi Instagram service select karein:", options);
-      return;
-    }
-
-    if (cleanText.includes("youtube services")) {
-      setCurrentOrder({ platform: 'youtube' });
-      setChatState('choosing_service');
-      const options = SERVICES.youtube.map((s, i) => `${i + 1}. YOUTUBE ${s.name.toUpperCase()}`);
-      botReply("Perfect. Niche di gayi YouTube service select karein:", options);
-      return;
-    }
-
-    const allServices = [...SERVICES.instagram, ...SERVICES.youtube];
+    const allServices = SERVICES.instagram;
     const matchedService = allServices.find(s => cleanText.includes(s.name.toLowerCase()));
-    if (matchedService && (cleanText.includes("instagram") || cleanText.includes("youtube"))) {
-      if (matchedService.pricePer1000 === -1) {
-        botReply("This time service unavailable Coming Soon possible");
-        return;
-      }
-      const detectedPlatform: Platform = cleanText.includes("instagram") ? 'instagram' : 'youtube';
-      setCurrentOrder({ platform: detectedPlatform, service: matchedService });
+    if (matchedService && cleanText.includes("instagram")) {
+      setCurrentOrder({ platform: 'instagram', service: matchedService });
       setChatState('entering_quantity');
-      botReply(`📊 Aapne ${PLATFORMS[detectedPlatform]} ${matchedService.name} select kiya hai.\n\nKitni quantity chahiye? (Minimum 100)`);
+      botReply(`📊 You've selected Instagram ${matchedService.name}.\n\nHow many do you want? (Minimum 100)`);
       return;
     }
 
     switch (chatState) {
-      case 'choosing_platform':
-        if (cleanText.includes("1") || cleanText.includes("instagram")) {
-          setCurrentOrder({ platform: 'instagram' });
-          setChatState('choosing_service');
-          const options = SERVICES.instagram.map((s, i) => `${i + 1}. INSTAGRAM ${s.name.toUpperCase()}`);
-          botReply("Perfect. Select an Instagram service:", options);
-        } else if (cleanText.includes("2") || cleanText.includes("youtube")) {
-          setCurrentOrder({ platform: 'youtube' });
-          setChatState('choosing_service');
-          const options = SERVICES.youtube.map((s, i) => `${i + 1}. YOUTUBE ${s.name.toUpperCase()}`);
-          botReply("Perfect. Select a YouTube service:", options);
-        }
-        break;
       case 'choosing_service':
         const sIndex = parseInt(text) - 1;
-        const sPlatform = currentOrder.platform;
-        if (!sPlatform) return;
-        const sService = SERVICES[sPlatform][sIndex];
+        const sService = SERVICES.instagram[sIndex];
         if (sService) {
-          if (sService.pricePer1000 === -1) {
-            botReply("This time service unavailable Coming Soon possible");
-            return;
-          }
-          setCurrentOrder({ ...currentOrder, service: sService });
+          setCurrentOrder({ platform: 'instagram', service: sService });
           setChatState('entering_quantity');
-          botReply(`📊 You've selected ${PLATFORMS[sPlatform]} ${sService.name}.\n\nHow many do you want? (Minimum 100)`);
+          botReply(`📊 You've selected Instagram ${sService.name}.\n\nHow many do you want? (Minimum 100)`);
         }
         break;
       case 'entering_quantity':
@@ -469,7 +427,7 @@ export default function ChatPage() {
           setCurrentOrder({ ...currentOrder, quantity: qty });
           setChatState('choosing_payment_method');
           botReply(
-            `✅ Order: ${qty} ${PLATFORMS[currentOrder.platform!]} ${currentOrder.service!.name}\n💰 Price: ₹${price.toFixed(2)}\n💳 Your Balance: ₹${walletBalance.toFixed(0)}\n\nChoose payment method:`,
+            `✅ Order: ${qty} Instagram ${currentOrder.service!.name}\n💰 Price: ₹${price.toFixed(2)}\n💳 Wallet: ₹${walletBalance.toFixed(0)}\n\nChoose payment method:`,
             ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]
           );
         }
@@ -478,11 +436,11 @@ export default function ChatPage() {
         const finalPrice = (currentOrder.quantity! / 1000) * currentOrder.service!.pricePer1000;
         if (cleanText.includes("wallet")) {
           if (walletBalance < finalPrice) {
-            botReply(`❌ Insufficient balance! (Needs ₹${finalPrice.toFixed(2)}, have ₹${walletBalance.toFixed(0)}).\n\nNiche di gayi list mein se select karein:`, ["📲 PAY VIA UPI QR", "💰 ADD FUNDS"]);
+            botReply(`❌ Insufficient balance! (Needs ₹${finalPrice.toFixed(2)}, have ₹${walletBalance.toFixed(0)}).`, ["📲 PAY VIA UPI QR", "💰 ADD FUNDS"]);
           } else {
             setCurrentOrder({ ...currentOrder, paymentMethod: 'wallet' });
             setChatState('confirming_price');
-            botReply(`💰 Paying ₹${finalPrice.toFixed(2)} from your wallet.\n\nEnter the target link (Instagram/YouTube URL) to complete order:`);
+            botReply(`💰 Paying ₹${finalPrice.toFixed(2)} from wallet.\n\nEnter the Target Link (Post/Profile URL):`);
           }
         } else if (cleanText.includes("upi")) {
           setCurrentOrder({ ...currentOrder, paymentMethod: 'upi' });
@@ -498,7 +456,7 @@ export default function ChatPage() {
         }
         break;
       default:
-        botReply("Send 'Hi' to see the main menu or 'History' to view your orders.");
+        botReply("Type 'Hi' for the menu or check your 'History'.");
         break;
     }
   };
@@ -559,7 +517,7 @@ export default function ChatPage() {
         <div className="flex flex-col items-start">
           {globalBonus > 0 && (
             <span className="text-[8px] font-black text-emerald-600 dark:text-emerald-400 animate-pulse mb-0.5 tracking-tighter uppercase">
-              Add fund & get {globalBonus}% Extra!
+              Get {globalBonus}% Extra Fund!
             </span>
           )}
           <button 
@@ -650,7 +608,7 @@ export default function ChatPage() {
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              placeholder="Type 'Hi' for Main Menu..."
+              placeholder="Type 'Hi' for Menu..."
               className="border-none bg-transparent focus-visible:ring-0 shadow-none text-[15px] h-11 p-0 text-black dark:text-white font-bold placeholder:text-gray-400"
             />
           </div>
@@ -664,18 +622,5 @@ export default function ChatPage() {
         </div>
       </footer>
     </div>
-  );
-}
-
-function BotIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M12 8V4H8" />
-      <rect width="16" height="12" x="4" y="8" rx="2" />
-      <path d="M2 14h2" />
-      <path d="M20 14h2" />
-      <path d="M15 13v2" />
-      <path d="M9 13v2" />
-    </svg>
   );
 }

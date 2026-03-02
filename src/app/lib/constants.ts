@@ -1,5 +1,4 @@
-
-export type Platform = 'instagram' | 'youtube';
+export type Platform = 'instagram';
 
 export interface SMMService {
   id: string;
@@ -9,7 +8,6 @@ export interface SMMService {
 
 export const PLATFORMS: Record<Platform, string> = {
   instagram: 'Instagram',
-  youtube: 'YouTube',
 };
 
 export const SERVICES: Record<Platform, SMMService[]> = {
@@ -21,11 +19,5 @@ export const SERVICES: Record<Platform, SMMService[]> = {
     { id: 'shares', name: 'Shares', pricePer1000: 7.0 },
     { id: 'story_views', name: 'Story Views', pricePer1000: 65.0 },
     { id: 'reel_views', name: 'Reel Views', pricePer1000: 0.56 },
-  ],
-  youtube: [
-    { id: 'subscribers', name: 'Subscribers', pricePer1000: -1 }, // Coming Soon
-    { id: 'likes', name: 'Likes', pricePer1000: 136.0 },
-    { id: 'views', name: 'Views', pricePer1000: 124.0 },
-    { id: 'comments', name: 'Comments', pricePer1000: -1 }, // Coming Soon
   ],
 };
