@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -14,7 +13,7 @@ import { MessageBubble } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, LogOut, Rocket } from "lucide-react";
+import { Send, LogOut, MoreVertical, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PLATFORMS, SERVICES, Platform, SMMService } from "@/app/lib/constants";
 import { intelligentOrderParsing } from "@/ai/flows/intelligent-order-parsing";
@@ -58,7 +57,6 @@ export default function ChatPage() {
   useEffect(() => {
     if (!user || !db) return;
 
-    // Path must match firestore.rules: /users/{userId}/chatMessages/{chatMessageId}
     const q = query(
       collection(db, "users", user.uid, "chatMessages"),
       orderBy("timestamp", "asc")
@@ -93,7 +91,7 @@ export default function ChatPage() {
     if (!user || !db) return;
     const path = `users/${user.uid}/chatMessages`;
     const data = {
-      userId: user.uid, // Required field in security rules
+      userId: user.uid,
       sender,
       text,
       timestamp: serverTimestamp()
@@ -135,16 +133,18 @@ export default function ChatPage() {
     setInputValue("");
     await addMessage('user', text);
 
-    if (chatState === 'initial') {
+    if (chatState === 'initial' && text.toLowerCase() === 'hi') {
       setChatState('choosing_platform');
       botReply(`What can I help you with today?\n\n1️⃣ Instagram Services\n2️⃣ YouTube Services`);
       return;
+    } else if (chatState === 'initial') {
+      botReply("Send 'Hi' to start creating your order.");
+      return;
     }
 
-    // Attempt AI parsing if the bot is in a flexible state
     if (chatState === 'choosing_platform' || chatState === 'idle') {
       try {
-        if (text.length > 5) { // Only try AI for longer inputs
+        if (text.length > 5) {
           const parsed = await intelligentOrderParsing({ requestText: text });
           if (parsed && parsed.platform && parsed.service && parsed.quantity && parsed.link) {
             const platformServices = SERVICES[parsed.platform as Platform];
@@ -164,7 +164,7 @@ export default function ChatPage() {
           }
         }
       } catch (e) {
-        // Fallback to guided flow if AI parsing fails or doesn't find a match
+        // Fallback
       }
     }
 
@@ -189,7 +189,6 @@ export default function ChatPage() {
         const index = parseInt(text) - 1;
         const platform = currentOrder.platform;
         if (!platform) {
-          botReply("Something went wrong. Let's start over.");
           startOrderFlow();
           return;
         }
@@ -224,7 +223,7 @@ export default function ChatPage() {
       case 'confirming':
         if (text.toLowerCase() === 'confirm') {
           const orderData = {
-            userId: user.uid, // Required field in security rules
+            userId: user.uid,
             platform: currentOrder.platform,
             service: currentOrder.service?.id,
             link: currentOrder.link,
@@ -245,45 +244,60 @@ export default function ChatPage() {
             });
 
           setChatState('idle');
-          botReply("Order placed successfully! 🎉\nWe are processing it now. Check back soon for updates.");
+          botReply("Order placed successfully! 🎉\nWe are processing it now.");
           setTimeout(() => startOrderFlow(), 3000);
         } else {
           setChatState('idle');
-          botReply("No problem. Let's start fresh.");
+          botReply("Order cancelled.");
           setTimeout(() => startOrderFlow(), 2000);
         }
         break;
 
       default:
-        botReply("I didn't understand that. Let's restart the process.");
-        startOrderFlow();
+        botReply("I didn't understand that. Send 'Hi' to start.");
+        setChatState('initial');
         break;
     }
   };
 
   return (
-    <div className="flex flex-col h-screen dark chat-bg max-w-md mx-auto relative overflow-hidden">
-      <header className="bg-card border-b p-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+    <div className="flex flex-col h-screen whatsapp-bg max-w-lg mx-auto overflow-hidden relative shadow-2xl">
+      {/* WhatsApp Header */}
+      <header className="bg-[#0F5C53] text-white p-3 px-4 flex items-center justify-between sticky top-0 z-20 shadow-md h-[60px]">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground border border-primary/20">
-            <Rocket size={20} />
+          <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center border border-white/10">
+            <Rocket size={20} className="text-white" />
           </div>
           <div>
-            <h1 className="font-bold text-sm">SocialBoost Bot</h1>
-            <p className="text-[10px] text-primary flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-              Active
+            <h1 className="font-bold text-base leading-tight">SocialBoost</h1>
+            <p className="text-[12px] text-white/80 flex items-center">
+              <span className="status-dot" />
+              Active Server
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="ghost" size="icon" onClick={() => auth?.signOut()} className="hover:bg-destructive/10 hover:text-destructive">
-            <LogOut size={18} />
-          </Button>
+        <div className="flex items-center gap-4">
+          <Search size={20} className="text-white/80 cursor-pointer" />
+          <div className="group relative">
+            <MoreVertical size={20} className="text-white/80 cursor-pointer" />
+            <div className="hidden group-hover:block absolute right-0 top-full mt-2 bg-white rounded-md shadow-xl border w-32 py-1 text-[#2E2E2E] z-30">
+              <button 
+                onClick={() => auth?.signOut()}
+                className="w-full px-4 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2"
+              >
+                <LogOut size={14} /> Log out
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-4 scrollbar-hide">
+      {/* Chat Area */}
+      <main className="flex-1 overflow-y-auto p-4 flex flex-col scroll-smooth">
+        <div className="mx-auto bg-[#D9FDD3]/80 px-4 py-1.5 rounded-lg text-[12px] text-[#2E2E2E]/80 shadow-sm mb-6 uppercase tracking-wider font-semibold">
+          Messages are secured
+        </div>
+        
         {messages.map((m) => (
           <MessageBubble 
             key={m.id} 
@@ -296,21 +310,24 @@ export default function ChatPage() {
         <div ref={scrollRef} />
       </main>
 
-      <footer className="p-3 bg-background border-t">
-        <div className="flex items-center gap-2 max-w-lg mx-auto bg-muted/30 rounded-full px-2 py-1 shadow-inner border border-primary/10">
-          <Input 
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSend()}
-            placeholder="How can we boost you?"
-            className="border-none bg-transparent focus-visible:ring-0 shadow-none text-sm h-10"
-          />
+      {/* WhatsApp Input Bar */}
+      <footer className="p-2 pb-4 px-3 bg-[#EFEAE2]">
+        <div className="flex items-center gap-2">
+          <div className="flex-1 bg-white rounded-full flex items-center px-4 py-1.5 shadow-sm border border-black/5">
+            <Input 
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSend()}
+              placeholder="Type a message"
+              className="border-none bg-transparent focus-visible:ring-0 shadow-none text-[15px] h-9 p-0 text-[#2E2E2E]"
+            />
+          </div>
           <Button 
             onClick={handleSend}
             size="icon" 
-            className="rounded-full h-9 w-9 bg-primary hover:bg-primary/90 transition-transform active:scale-95 shrink-0"
+            className="rounded-full h-11 w-11 bg-[#25D366] hover:bg-[#20bd5b] transition-all active:scale-90 shrink-0 shadow-md"
           >
-            <Send size={18} className="ml-0.5" />
+            <Send size={20} className="text-white ml-1" />
           </Button>
         </div>
       </footer>
