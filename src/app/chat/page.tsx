@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -405,8 +404,9 @@ export default function ChatPage() {
     if (links.length === 0) return;
     await addMessage('user', `Added ${links.length} links for bulk order.`);
     setCurrentOrder({ ...currentOrder, bulkLinks: links });
+    const selectedService = currentOrder.items[0].service;
     setChatState('entering_quantity'); 
-    botReply(`📊 Quantity PER LINK for ${currentOrder.items[0].service.name}?`);
+    botReply(`📊 Quantity PER LINK for ${selectedService.name}? (Min ${selectedService.minQuantity})`);
   };
 
   const handleComboFromCard = async (items: { serviceId: string, quantity: number }[], link: string) => {
@@ -490,15 +490,16 @@ export default function ChatPage() {
           } else {
             setCurrentOrder({ ...currentOrder, items: [{ service: selected, quantity: 0, link: '' }] });
             setChatState('entering_quantity');
-            botReply(`📊 Quantity for ${selected.name}? (Min 10)`);
+            botReply(`📊 Quantity for ${selected.name}? (Min ${selected.minQuantity})`);
           }
         }
         break;
 
       case 'entering_quantity':
         const qty = parseInt(text);
-        if (isNaN(qty) || qty < 10) {
-          botReply("Invalid quantity (Min 10).");
+        const currentService = currentOrder.items[0].service;
+        if (isNaN(qty) || qty < currentService.minQuantity) {
+          botReply(`Invalid quantity (Min ${currentService.minQuantity} for ${currentService.name}).`);
         } else {
           const updatedItems = currentOrder.items.map(item => ({ ...item, quantity: qty }));
           setCurrentOrder({ ...currentOrder, items: updatedItems });

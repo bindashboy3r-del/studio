@@ -1,4 +1,3 @@
-
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { 
@@ -193,7 +192,10 @@ export function MessageBubble({
     return { raw, discounted: raw * 0.95 };
   }, [comboItems]);
 
-  const isComboValid = comboItems.length >= 1 && comboItems.some(i => i.quantity >= 10) && comboLink.trim() !== "";
+  const isComboValid = comboItems.length >= 1 && comboItems.every(item => {
+    const s = SERVICES.instagram.find(sv => sv.id === item.serviceId);
+    return item.quantity >= (s?.minQuantity || 100);
+  }) && comboLink.trim() !== "";
 
   return (
     <div className={cn("flex w-full mb-4", isUser ? "justify-end" : "justify-start")}>
@@ -404,6 +406,7 @@ export function MessageBubble({
                 <div className="space-y-3">
                   {comboItems.map((item, idx) => {
                     const s = SERVICES.instagram.find(sv => sv.id === item.serviceId);
+                    const min = s?.minQuantity || 100;
                     return (
                       <div key={idx} className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 animate-in slide-in-from-bottom-2 duration-300">
                         <div className="flex items-center justify-between mb-3">
@@ -415,7 +418,7 @@ export function MessageBubble({
                         <div className="relative">
                           <Input 
                             type="number"
-                            placeholder="Qty (Min 10)"
+                            placeholder={`Qty (Min ${min})`}
                             value={item.quantity || ""}
                             onChange={(e) => updateComboQuantity(idx, parseInt(e.target.value) || 0)}
                             className="h-10 bg-white dark:bg-slate-800 border-none rounded-xl px-4 text-xs font-bold shadow-inner"
@@ -441,7 +444,7 @@ export function MessageBubble({
                         onClick={() => addComboService(s.id)}
                         className="text-[10px] font-black uppercase tracking-widest py-3 hover:bg-slate-50 dark:hover:bg-slate-800"
                       >
-                        {s.name}
+                        {s.name} (Min {s.minQuantity})
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>
