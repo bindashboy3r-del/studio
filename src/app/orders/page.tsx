@@ -1,7 +1,8 @@
 
 "use client";
 
-import { query, collection, orderBy, limit } from "firebase/firestore";
+import { useMemo } from "react";
+import { query, collection } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { Button } from "@/components/ui/button";
@@ -13,36 +14,39 @@ export default function OrdersHistoryPage() {
   const db = useFirestore();
   const router = useRouter();
 
+  // We remove the server-side orderBy to avoid the composite index requirement.
+  // We will sort the results in memory.
   const ordersQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
-    return query(
-      collection(db, "users", user.uid, "orders"),
-      orderBy("createdAt", "desc"),
-      limit(50)
-    );
+    return collection(db, "users", user.uid, "orders");
   }, [db, user]);
 
-  const { data: ordersData, isLoading } = useCollection(ordersQuery);
+  const { data: rawOrdersData, isLoading } = useCollection(ordersQuery);
 
-  const orders = ordersData?.map(order => {
-    let createdAt = new Date();
-    if (order.createdAt) {
-      if (typeof order.createdAt.toDate === 'function') {
-        createdAt = order.createdAt.toDate();
-      } else {
-        const parsed = new Date(order.createdAt);
-        if (isValid(parsed)) createdAt = parsed;
+  const orders = useMemo(() => {
+    if (!rawOrdersData) return [];
+    
+    const processed = rawOrdersData.map(order => {
+      let createdAt = new Date();
+      if (order.createdAt) {
+        if (typeof order.createdAt.toDate === 'function') {
+          createdAt = order.createdAt.toDate();
+        } else {
+          const parsed = new Date(order.createdAt);
+          if (isValid(parsed)) createdAt = parsed;
+        }
       }
-    }
-    return { ...order, createdAt };
-  }) || [];
+      return { ...order, createdAt };
+    });
+
+    // Sort in memory: Recent orders first
+    return processed.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }, [rawOrdersData]);
 
   return (
     <div className="min-h-screen bg-[#E9EBF0] dark:bg-slate-950 flex items-center justify-center p-4 md:p-8 font-body">
-      {/* Centered Order History Card */}
       <div className="w-full max-w-lg bg-[#F0F2F5] dark:bg-slate-900 rounded-[3rem] shadow-[0_30px_60px_rgba(0,0,0,0.12)] overflow-hidden flex flex-col max-h-[90vh]">
         
-        {/* Header */}
         <header className="bg-white dark:bg-slate-900 px-8 py-6 flex items-center justify-between border-b border-gray-100 dark:border-slate-800">
           <div className="flex items-center gap-3">
             <div className="text-[#312ECB]">
@@ -60,7 +64,6 @@ export default function OrdersHistoryPage() {
           </button>
         </header>
 
-        {/* Orders List Container */}
         <main className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -73,17 +76,14 @@ export default function OrdersHistoryPage() {
                 key={order.id} 
                 className="bg-white dark:bg-slate-800 p-5 rounded-[1.8rem] shadow-sm border border-gray-50 dark:border-slate-700/50 flex flex-col gap-1 relative group hover:shadow-md transition-shadow"
               >
-                {/* ID Tag */}
                 <div className="absolute top-4 right-4 bg-slate-50 dark:bg-slate-900 px-3 py-1 rounded-full text-[9px] font-black text-[#312ECB]/40 dark:text-white/30 uppercase tracking-tighter">
                   #{order.id.slice(0, 8).toUpperCase()}
                 </div>
 
-                {/* Service Name */}
                 <h3 className="text-[13px] font-black uppercase text-[#312ECB] dark:text-blue-400 tracking-wide pr-20">
                   {order.platform} {order.service}
                 </h3>
 
-                {/* Details Row */}
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-tight">
                     QTY: {order.quantity}
@@ -92,9 +92,12 @@ export default function OrdersHistoryPage() {
                   <span className="text-[11px] font-bold text-[#25D366] dark:text-emerald-400 uppercase tracking-tight">
                     ₹{order.price?.toFixed(0)}
                   </span>
+                  <span className="text-slate-200 dark:text-slate-700">•</span>
+                  <Badge variant="outline" className="text-[8px] h-4 font-black px-1.5 border-slate-200 dark:border-slate-700 text-slate-400">
+                    {order.status || 'Pending'}
+                  </Badge>
                 </div>
 
-                {/* Date Tag */}
                 <div className="mt-1 self-end text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
                   {isValid(order.createdAt) ? format(order.createdAt, 'd MMM').toUpperCase() : ''}
                 </div>
@@ -123,7 +126,6 @@ export default function OrdersHistoryPage() {
           )}
         </main>
 
-        {/* Footer Branding */}
         <footer className="p-6 bg-slate-50 dark:bg-slate-950/30 text-center">
           <p className="text-[9px] font-black text-slate-300 dark:text-slate-700 uppercase tracking-[0.4em]">
             SOCIALBOOST GROWTH LOGS

@@ -5,7 +5,6 @@ import { useState, useEffect } from "react";
 import { 
   collectionGroup, 
   query, 
-  orderBy, 
   onSnapshot, 
   updateDoc, 
   doc,
@@ -33,7 +32,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, isValid } from "date-fns";
-import { ChevronLeft, RefreshCw, ExternalLink, Copy, Download, AlertTriangle, Filter } from "lucide-react";
+import { ChevronLeft, RefreshCw, ExternalLink, Copy, Filter } from "lucide-react";
 import { useFirestore, useUser } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
@@ -45,7 +44,6 @@ export default function TrackerPage() {
   const { toast } = useToast();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -57,7 +55,9 @@ export default function TrackerPage() {
   useEffect(() => {
     if (!user || !db || user.email !== "chetanmadhav4@gmail.com") return;
 
-    const q = query(collectionGroup(db, "orders"), orderBy("createdAt", "desc"));
+    // We remove the server-side orderBy to avoid the COLLECTION_GROUP index error.
+    // We will sort the data in Javascript instead.
+    const q = collectionGroup(db, "orders");
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const ords = snapshot.docs.map(doc => {
@@ -80,9 +80,12 @@ export default function TrackerPage() {
           createdAt
         };
       });
+
+      // Sort in memory: Recent orders first
+      ords.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
       setOrders(ords);
       setLoading(false);
-      setError(null);
     }, (err) => {
       console.error("Tracker Error:", err);
       const contextualError = new FirestorePermissionError({
@@ -114,14 +117,14 @@ export default function TrackerPage() {
             `Your order for ${order.service} is approved and processing!` :
             `Sorry, your order for ${order.service} was rejected. Check details for info.`;
 
-          await addDoc(collection(db, "users", order.userId, "notifications"), {
+          addDoc(collection(db, "users", order.userId, "notifications"), {
             title: notifTitle,
             message: notifMsg,
             orderId: order.id,
             status: newStatus,
             read: false,
             createdAt: serverTimestamp()
-          });
+          }).catch(e => console.error("Notification failed", e));
         }
       })
       .catch((err) => {
