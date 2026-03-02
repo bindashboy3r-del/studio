@@ -194,7 +194,7 @@ export function MessageBubble({
 
   const isComboValid = comboItems.length >= 1 && comboItems.every(item => {
     const s = SERVICES.instagram.find(sv => sv.id === item.serviceId);
-    return item.quantity >= (s?.minQuantity || 100);
+    return item.quantity >= (s?.minQuantity || 10);
   }) && comboLink.trim() !== "";
 
   return (
@@ -406,7 +406,7 @@ export function MessageBubble({
                 <div className="space-y-3">
                   {comboItems.map((item, idx) => {
                     const s = SERVICES.instagram.find(sv => sv.id === item.serviceId);
-                    const min = s?.minQuantity || 100;
+                    const min = s?.minQuantity || 10;
                     return (
                       <div key={idx} className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 animate-in slide-in-from-bottom-2 duration-300">
                         <div className="flex items-center justify-between mb-3">
