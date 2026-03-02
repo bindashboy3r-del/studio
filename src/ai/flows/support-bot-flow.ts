@@ -9,7 +9,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { getFirestore, collection, query, where, getDocs, limit, collectionGroup } from 'firebase/firestore';
 import { firebaseConfig } from '@/firebase/config';
 
 /**
@@ -21,7 +21,6 @@ const getOrderDetails = ai.defineTool(
     description: 'Retrieves details for a specific SocialBoost order using its Order ID (e.g., SB-123456).',
     inputSchema: z.object({
       orderId: z.string().describe('The Order ID to look up (starts with SB-).'),
-      userId: z.string().describe('The ID of the currently logged-in user.'),
     }),
     outputSchema: z.object({
       found: z.boolean().describe('Whether the order was found.'),
@@ -40,14 +39,12 @@ const getOrderDetails = ai.defineTool(
 
       const cleanId = input.orderId.trim().toUpperCase();
       
-      // Note: Since this is server-side with client SDK, it may face permission issues
-      // if rules are strict. We handle this gracefully.
-      const userOrdersRef = collection(db, 'users', input.userId, 'orders');
-      const qUser = query(userOrdersRef, where('orderId', '==', cleanId), limit(1));
-      const snapshotUser = await getDocs(qUser);
+      // Use collectionGroup to find the order across all user subcollections
+      const q = query(collectionGroup(db, 'orders'), where('orderId', '==', cleanId), limit(1));
+      const snapshot = await getDocs(q);
       
-      if (!snapshotUser.empty) {
-        const data = snapshotUser.docs[0].data();
+      if (!snapshot.empty) {
+        const data = snapshot.docs[0].data();
         return {
           found: true,
           status: data.status || 'Pending',
@@ -59,13 +56,12 @@ const getOrderDetails = ai.defineTool(
       
       return { 
         found: false, 
-        message: `Aapka order ${cleanId} abhi mil nahi raha hai. Kripya check karein ki ID sahi hai ya History page check karein. Agar koi issue hai toh @social_boost.bot ko Instagram par contact karein. 😔` 
+        message: `Maafi chahte hain, order ID ${cleanId} nahi mil raha hai. Kripya check karein ki ID sahi hai ya History page dekhein. 😔` 
       };
     } catch (e: any) {
-      // Fail gracefully so the chat doesn't crash
       return { 
         found: false, 
-        message: "Aapka order detail fetch karne mein thodi dikkat ho rahi hai. Kripya History page check karein ya @social_boost.bot ko Instagram par contact karein. 😔" 
+        message: "Server busy hai, kripya thodi der baad try karein ya Instagram par contact karein. 😔" 
       };
     }
   }
@@ -90,27 +86,14 @@ const supportBotPrompt = ai.definePrompt({
   input: { schema: SupportBotInputSchema },
   output: { schema: SupportBotOutputSchema },
   tools: [getOrderDetails],
-  prompt: `You are the SocialBoost Full-Service Support Bot, a professional and friendly AI assistant.
-Your goal is to help users with EVERYTHING related to SocialBoost: orders, pricing, payments, and general help.
+  prompt: `You are the SocialBoost Pro AI Assistant. You are friendly, powerful, and talk in Hinglish.
 
-PRICING DATA (Use this for calculations):
-- Instagram Followers: ₹89 per 1000
-- Instagram Likes: ₹18 per 1000
-- Instagram Views: ₹0.60 per 1000
-- Instagram Shares: ₹7 per 1000
-- Instagram Story Views: ₹65 per 1000
-- Instagram Comments: ₹260 per 1000
-- Instagram Reel Views: ₹0.56 per 1000
-- YouTube Likes: ₹136 per 1000
-- YouTube Views: ₹124 per 1000
-
-GUIDELINES:
-1. GREETINGS: If the user says "Hi", "Hello", or "Start", respond warmly in Hinglish. DO NOT call getOrderDetails for greetings.
-2. PRICE CALCULATION: If a user asks "How much for [QTY] [SERVICE]?", calculate it using (Qty/1000 * Rate). For example, 4664 followers is (4664/1000 * 89) = ₹415.10. Tell them clearly.
-3. ORDER LOOKUP: Only use getOrderDetails if the user provides a specific Order ID starting with "SB-".
-4. PAYMENTS: For UPI or QR code help, give the UPI ID "smmxpressbot@slc" and tell them to use the "Add Funds" button.
-5. CONTACT: For manual help, always point to @social_boost.bot on Instagram.
-6. TONE: Use Hinglish (Hindi written in English), be helpful, and use emojis! 🚀
+CAPABILITIES:
+1. ORDER STATUS: If a user gives an Order ID (like SB-123456), use getOrderDetails to find it. Tell them exactly what is happening (Pending, Processing, or Complete).
+2. PAYMENTS: For UPI help, give UPI ID "smmxpressbot@slc".
+3. NO MANUAL MONEY ADD: If a user asks "paisa add kar do", "mera balance badha do", or "I paid but money not added", DO NOT try to add money. Tell them clearly that ONLY the admin can do this. Give them the admin's Instagram: @social_boost.bot or tell them to wait 30-60 mins for verification.
+4. PRICING: Instagram Followers @ ₹89/1k, Likes @ ₹18/1k, Views @ ₹0.60/1k.
+5. TONE: Use emojis, be respectful, and speak in Hinglish (Hindi written in English).
 
 User Message: "{{{message}}}"
 User ID: "{{{userId}}}"`,
@@ -119,14 +102,12 @@ User ID: "{{{userId}}}"`,
 export async function supportBot(input: z.infer<typeof SupportBotInputSchema>): Promise<z.infer<typeof SupportBotOutputSchema>> {
   try {
     const { output } = await supportBotPrompt(input);
-    if (!output) {
-      throw new Error('No output from model');
-    }
+    if (!output) throw new Error('No output from model');
     return output;
   } catch (error) {
     console.error('SupportBot Flow Error:', error);
     return {
-      reply: "Maafi chahte hain, aapka message samajhne mein dikkat hui. Kripya phir se koshish karein ya @social_boost.bot ko Instagram par contact karein. 😔",
+      reply: "Sorry, kuch technical issue hai. Kripya admin ko @social_boost.bot par contact karein. 😔",
       action: 'none'
     };
   }

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -56,6 +55,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { placeApiOrder } from "@/app/actions/smm-api";
+import { SupportBot } from "@/components/SupportBot";
 
 type ChatState = 
   | 'idle' 
@@ -472,13 +472,11 @@ export default function ChatPage() {
     // 2. Check for Platform/Service Selection AT ANY TIME
     const selectedService = SERVICES.instagram.find(s => cleanText.includes(s.name.toLowerCase()));
     if (selectedService) {
-      // If user clicks a service name, reset to that service immediately
       if (currentOrder.type === 'bulk') {
         setCurrentOrder(prev => ({ ...prev, items: [{ service: selectedService, quantity: 0, link: '' }] }));
         setChatState('entering_bulk_links');
         botReply("🔗 Add your target links one by one below:", [], { isBulkLinkCard: true });
       } else {
-        // Default to single order if not in a specific mode
         setCurrentOrder({ type: 'single', platform: 'instagram', items: [{ service: selectedService, quantity: 0, link: '' }] });
         setChatState('entering_quantity');
         botReply(`📊 Quantity for ${selectedService.name}? (Min ${selectedService.minQuantity})`);
@@ -525,11 +523,6 @@ export default function ChatPage() {
 
     // 4. Handle State Transitions
     switch (chatState) {
-      case 'choosing_service':
-        // This case is now partially handled by the global service detection above, 
-        // but kept for fallback or specific logic.
-        break;
-
       case 'entering_quantity':
         const qty = parseInt(text);
         const activeService = currentOrder.items[0]?.service;
@@ -755,6 +748,7 @@ export default function ChatPage() {
           </Button>
         </div>
       </footer>
+      <SupportBot />
     </div>
   );
 }
