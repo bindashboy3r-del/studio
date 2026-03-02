@@ -186,8 +186,6 @@ export default function ChatPage() {
         errorEmitter.emit('permission-error', permissionError);
       });
 
-    await addMessage('user', `Link: ${link}, UTR: ${utr}`);
-    
     setChatState('idle');
     botReply("Order submitted successfully!", [], {
       isSuccessCard: true,
