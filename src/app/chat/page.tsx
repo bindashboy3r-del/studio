@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -19,10 +18,7 @@ import {
   LogOut, 
   Bell, 
   Moon, 
-  User, 
   Rocket,
-  Settings,
-  ShieldCheck,
   History,
   Bot
 } from "lucide-react";
@@ -297,14 +293,14 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen max-w-lg mx-auto overflow-hidden relative shadow-2xl bg-white">
+    <div className="flex flex-col h-screen max-w-lg mx-auto overflow-hidden relative shadow-2xl bg-white font-body">
       {/* 1. TOP BAR (WHITE) */}
       <div className="bg-white px-4 py-3 flex items-center justify-between border-b border-gray-100 z-40">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white shadow-md">
+          <div className="w-10 h-10 rounded-full bg-[#312ECB] flex items-center justify-center text-white shadow-md">
             <Rocket size={24} className="fill-current" />
           </div>
-          <h1 className="text-xl font-black italic tracking-tighter text-blue-900">SOCIALBOOST</h1>
+          <h1 className="text-xl font-black italic tracking-tighter text-[#312ECB]">SOCIALBOOST</h1>
         </div>
 
         <div className="flex items-center gap-4">
@@ -316,7 +312,7 @@ export default function ChatPage() {
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="w-10 h-10 rounded-full bg-blue-900 text-white font-bold text-xs">
+              <Button variant="ghost" size="icon" className="w-10 h-10 rounded-full bg-[#312ECB] text-white font-bold text-xs">
                 {user?.displayName?.[0] || 'U'}
               </Button>
             </DropdownMenuTrigger>
@@ -333,26 +329,26 @@ export default function ChatPage() {
 
       {/* 2. SUB-HEADER BAR (WHITE) */}
       <div className="bg-white px-5 py-2 flex items-center justify-between border-b border-gray-100 z-30">
-        <span className="text-[10px] font-black italic text-blue-900/40 tracking-widest uppercase">
+        <span className="text-[10px] font-black italic text-[#312ECB]/40 tracking-widest uppercase">
           Automated Assistant
         </span>
         
         <Sheet>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="sm" className="text-[10px] font-black text-blue-900 uppercase tracking-widest gap-2">
+            <Button variant="ghost" size="sm" className="text-[10px] font-black text-[#312ECB] uppercase tracking-widest gap-2">
               <History size={14} /> Recent Orders
             </Button>
           </SheetTrigger>
           <SheetContent className="bg-white">
             <SheetHeader>
-              <SheetTitle className="text-xl font-black text-blue-900">Your Recent Orders</SheetTitle>
+              <SheetTitle className="text-xl font-black text-[#312ECB]">Your Recent Orders</SheetTitle>
               <SheetDescription>Track your active growth services.</SheetDescription>
             </SheetHeader>
             <div className="mt-8 space-y-4">
               {ordersData?.map((order: any) => (
                 <div key={order.id} className="p-4 border border-gray-100 rounded-xl bg-slate-50/50">
                   <div className="flex justify-between items-start mb-2">
-                    <span className="font-black text-xs uppercase text-blue-900">{order.platform} - {order.service}</span>
+                    <span className="font-black text-xs uppercase text-[#312ECB]">{order.platform} - {order.service}</span>
                     <Badge variant="outline" className="text-[10px] font-black uppercase">{order.status}</Badge>
                   </div>
                   <div className="text-[10px] text-slate-500 font-bold mb-1 truncate">{order.link}</div>
@@ -372,8 +368,8 @@ export default function ChatPage() {
         </Sheet>
       </div>
 
-      {/* 3. BOT BANNER (TEAL) */}
-      <div className="bg-[#054640] px-5 py-4 flex items-center gap-4 z-20">
+      {/* 3. BOT BANNER (DEEP BLUE) */}
+      <div className="bg-[#312ECB] px-5 py-4 flex items-center gap-4 z-20 shadow-md">
         <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
           <Bot size={28} className="text-white/80" />
         </div>
