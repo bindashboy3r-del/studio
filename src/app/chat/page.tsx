@@ -30,7 +30,8 @@ import {
   User as UserIcon,
   Zap,
   Clock,
-  Circle
+  Circle,
+  Instagram
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PLATFORMS, SERVICES, Platform, SMMService } from "@/app/lib/constants";
@@ -387,7 +388,7 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-screen max-w-lg mx-auto overflow-hidden relative shadow-2xl bg-white dark:bg-slate-950 font-body">
-      {/* Top Header - Matches Screenshot */}
+      {/* Top Header */}
       <header className="bg-white dark:bg-slate-900 px-5 py-4 flex items-center justify-between border-b border-gray-50 dark:border-slate-800 z-50">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-[14px] bg-[#312ECB] flex items-center justify-center text-white shadow-lg">
@@ -443,7 +444,7 @@ export default function ChatPage() {
         </div>
       </header>
 
-      {/* Sub-Header - Matches Screenshot */}
+      {/* Sub-Header */}
       <div className="bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 px-6 py-3 flex items-center justify-between z-40">
         <h2 className="text-[11px] font-black italic uppercase tracking-[0.2em] text-[#312ECB]">AUTOMATED ASSISTANT</h2>
         <button 
@@ -454,7 +455,7 @@ export default function ChatPage() {
         </button>
       </div>
 
-      {/* Bot Identity Bar - Green Bar from Screenshot */}
+      {/* Bot Identity Bar */}
       <div className="bg-[#005B41] px-6 py-4 flex items-center gap-4 z-40 shadow-sm">
         <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
           <BotIcon className="text-white w-6 h-6" />
@@ -469,7 +470,7 @@ export default function ChatPage() {
       </div>
 
       <main className="flex-1 overflow-y-auto p-4 flex flex-col whatsapp-bg relative">
-        {/* Stylish Centered Broadcast Card - Styled like the Popup from screenshot */}
+        {/* Centered Broadcast Card */}
         {activeBroadcast && (
           <div className="fixed inset-0 flex items-center justify-center z-[100] p-6 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
             <div className="w-full max-w-[400px] bg-[#F0F2F5] dark:bg-slate-900 rounded-[3rem] shadow-[0_30px_60px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col animate-in zoom-in-95 duration-500">
@@ -499,10 +500,16 @@ export default function ChatPage() {
                 </p>
               </div>
 
-              <footer className="p-6 bg-slate-50 dark:bg-slate-800/50 text-center">
-                <p className="text-[9px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-[0.4em]">
-                  SOCIALBOOST GLOBAL UPDATE
+              <footer className="p-6 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center gap-3 border-t border-gray-100 dark:border-slate-700">
+                <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.4em]">
+                  CREATED BY
                 </p>
+                <div className="flex items-center gap-1.5">
+                  <Instagram size={14} className="text-[#E1306C] drop-shadow-[0_0_8px_rgba(225,48,108,0.8)]" />
+                  <span className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest">
+                    @bindash_boy3
+                  </span>
+                </div>
               </footer>
             </div>
           </div>
