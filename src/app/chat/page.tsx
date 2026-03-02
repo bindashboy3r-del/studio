@@ -490,15 +490,15 @@ export default function ChatPage() {
           } else {
             setCurrentOrder({ ...currentOrder, items: [{ service: selected, quantity: 0, link: '' }] });
             setChatState('entering_quantity');
-            botReply(`📊 Quantity for ${selected.name}? (Min 100)`);
+            botReply(`📊 Quantity for ${selected.name}? (Min 10)`);
           }
         }
         break;
 
       case 'entering_quantity':
         const qty = parseInt(text);
-        if (isNaN(qty) || qty < 100) {
-          botReply("Invalid quantity (Min 100).");
+        if (isNaN(qty) || qty < 10) {
+          botReply("Invalid quantity (Min 10).");
         } else {
           const updatedItems = currentOrder.items.map(item => ({ ...item, quantity: qty }));
           setCurrentOrder({ ...currentOrder, items: updatedItems });

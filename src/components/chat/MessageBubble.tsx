@@ -1,3 +1,4 @@
+
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { 
@@ -192,7 +193,7 @@ export function MessageBubble({
     return { raw, discounted: raw * 0.95 };
   }, [comboItems]);
 
-  const isComboValid = comboItems.length >= 1 && comboItems.some(i => i.quantity >= 100) && comboLink.trim() !== "";
+  const isComboValid = comboItems.length >= 1 && comboItems.some(i => i.quantity >= 10) && comboLink.trim() !== "";
 
   return (
     <div className={cn("flex w-full mb-4", isUser ? "justify-end" : "justify-start")}>
@@ -414,7 +415,7 @@ export function MessageBubble({
                         <div className="relative">
                           <Input 
                             type="number"
-                            placeholder="Qty (Min 100)"
+                            placeholder="Qty (Min 10)"
                             value={item.quantity || ""}
                             onChange={(e) => updateComboQuantity(idx, parseInt(e.target.value) || 0)}
                             className="h-10 bg-white dark:bg-slate-800 border-none rounded-xl px-4 text-xs font-bold shadow-inner"
