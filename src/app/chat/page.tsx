@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -13,7 +14,7 @@ import {
   doc,
   writeBatch,
   increment,
-  updateDoc
+  getDoc
 } from "firebase/firestore";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
@@ -50,6 +51,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { placeApiOrder } from "@/app/actions/smm-api";
 
 type ChatState = 
   | 'idle' 
@@ -58,10 +60,7 @@ type ChatState =
   | 'choosing_service' 
   | 'entering_quantity' 
   | 'choosing_payment_method'
-  | 'confirming_price'
-  | 'awaiting_upi_payment'
-  | 'awaiting_fund_amount'
-  | 'awaiting_fund_payment';
+  | 'confirming_price';
 
 interface OrderInProgress {
   platform?: Platform;
@@ -70,7 +69,6 @@ interface OrderInProgress {
   quantity?: number;
   utrId?: string;
   paymentMethod?: 'wallet' | 'upi';
-  fundAmount?: number;
 }
 
 export default function ChatPage() {
@@ -92,7 +90,6 @@ export default function ChatPage() {
   const hasInitialGreeted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // User Profile Listener for Balance
   const userDocRef = useMemoFirebase(() => {
     if (!db || !user) return null;
     return doc(db, "users", user.uid);
@@ -133,7 +130,6 @@ export default function ChatPage() {
     return () => unsubscribe();
   }, [db]);
 
-  // Global Bonus Listener
   useEffect(() => {
     if (!db) return;
     const unsub = onSnapshot(doc(db, "globalSettings", "finance"), (snap) => {
@@ -280,14 +276,7 @@ export default function ChatPage() {
       createdAt: serverTimestamp()
     };
 
-    addDoc(collection(db, "users", user.uid, "orders"), orderData)
-      .catch(async (error) => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: `users/${user.uid}/orders`,
-          operation: 'create',
-          requestResourceData: orderData,
-        }));
-      });
+    addDoc(collection(db, "users", user.uid, "orders"), orderData);
 
     setChatState('idle');
     botReply("Order submitted successfully!", [], {
@@ -314,10 +303,39 @@ export default function ChatPage() {
     }
 
     const orderId = `SB-W-${Math.floor(100000 + Math.random() * 900000)}`;
-    const batch = writeBatch(db);
+    
+    // Check for API settings
+    const apiSnap = await getDoc(doc(db, "globalSettings", "api"));
+    let apiOrderId = null;
+    let apiError = null;
+    let finalStatus = 'Pending';
 
-    // 1. Create the order
+    if (apiSnap.exists()) {
+      const apiData = apiSnap.data();
+      const serviceId = apiData.serviceMappings?.[currentOrder.service.id];
+      
+      if (apiData.apiUrl && apiData.apiKey && serviceId) {
+        const apiResult = await placeApiOrder({
+          apiUrl: apiData.apiUrl,
+          apiKey: apiData.apiKey,
+          serviceId: serviceId,
+          link: link,
+          quantity: currentOrder.quantity!
+        });
+
+        if (apiResult.success) {
+          apiOrderId = apiResult.order;
+          finalStatus = 'Processing'; // Auto-process if API succeeded
+        } else {
+          apiError = apiResult.error;
+          // Status remains Pending so admin can check what went wrong
+        }
+      }
+    }
+
+    const batch = writeBatch(db);
     const orderRef = doc(collection(db, "users", user.uid, "orders"));
+    
     batch.set(orderRef, {
       userId: user.uid,
       orderId: orderId,
@@ -326,20 +344,20 @@ export default function ChatPage() {
       link: link,
       quantity: currentOrder.quantity,
       price: finalPrice,
-      status: 'Pending',
+      status: finalStatus,
       paymentMethod: 'Wallet',
+      apiOrderId: apiOrderId,
+      apiError: apiError,
       createdAt: serverTimestamp()
     });
 
-    // 2. Deduct from balance
-    const userRef = doc(db, "users", user.uid);
-    batch.update(userRef, {
+    batch.update(doc(db, "users", user.uid), {
       balance: increment(-finalPrice)
     });
 
     await batch.commit().then(() => {
       setChatState('idle');
-      botReply("✅ Payment successful from Wallet!", [], {
+      botReply(`✅ Payment successful from Wallet!${apiOrderId ? '\n🚀 Order sent to API server.' : ''}`, [], {
         isSuccessCard: true,
         successDetails: {
           orderId,
@@ -363,7 +381,6 @@ export default function ChatPage() {
     await addMessage('user', text);
     const cleanText = text.toLowerCase();
 
-    // Global Commands
     if (cleanText === 'hi' || cleanText.includes("main menu") || cleanText.includes("start")) {
       setChatState('choosing_platform');
       setCurrentOrder({});
@@ -384,7 +401,6 @@ export default function ChatPage() {
       return;
     }
 
-    // Platform Selection
     if (cleanText.includes("instagram services")) {
       setCurrentOrder({ platform: 'instagram' });
       setChatState('choosing_service');
@@ -427,8 +443,6 @@ export default function ChatPage() {
           setChatState('choosing_service');
           const options = SERVICES.youtube.map((s, i) => `${i + 1}. YOUTUBE ${s.name.toUpperCase()}`);
           botReply("Perfect. Select a YouTube service:", options);
-        } else {
-          botReply("Please select from the options provided.");
         }
         break;
       case 'choosing_service':
@@ -444,8 +458,6 @@ export default function ChatPage() {
           setCurrentOrder({ ...currentOrder, service: sService });
           setChatState('entering_quantity');
           botReply(`📊 You've selected ${PLATFORMS[sPlatform]} ${sService.name}.\n\nHow many do you want? (Minimum 100)`);
-        } else {
-          botReply("Invalid selection. Please choose from the list.");
         }
         break;
       case 'entering_quantity':
@@ -474,13 +486,10 @@ export default function ChatPage() {
           }
         } else if (cleanText.includes("upi")) {
           setCurrentOrder({ ...currentOrder, paymentMethod: 'upi' });
-          setChatState('awaiting_upi_payment');
           botReply(`📸 Scan QR to pay ₹${finalPrice.toFixed(2)}:`, [], {
             isPaymentCard: true,
             paymentPrice: finalPrice
           });
-        } else {
-          botReply("Please select a payment method.");
         }
         break;
       case 'confirming_price':
@@ -496,7 +505,6 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-screen max-w-lg mx-auto overflow-hidden relative shadow-2xl bg-white dark:bg-slate-950 font-body">
-      {/* Top Header */}
       <header className="bg-white dark:bg-slate-900 px-5 py-4 flex items-center justify-between border-b border-gray-100 dark:border-slate-800 z-50">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-[14px] bg-[#312ECB] flex items-center justify-center text-white shadow-lg">
@@ -538,11 +546,6 @@ export default function ChatPage() {
                   </div>
                 )}
               </ScrollArea>
-              {notificationsData.length > 0 && (
-                <div className="p-3 border-t border-gray-100 dark:border-slate-800 text-center">
-                  <button onClick={clearAllNotifications} className="text-[9px] font-black uppercase tracking-widest text-[#312ECB] hover:underline">Clear All</button>
-                </div>
-              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -552,7 +555,6 @@ export default function ChatPage() {
         </div>
       </header>
 
-      {/* Sub-Header */}
       <div className="bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 px-6 py-3 flex items-center justify-between z-40">
         <div className="flex flex-col items-start">
           {globalBonus > 0 && (
@@ -577,22 +579,7 @@ export default function ChatPage() {
         </button>
       </div>
 
-      {/* Bot Identity Bar */}
-      <div className="bg-[#005B41] px-6 py-4 flex items-center gap-4 z-40 shadow-sm">
-        <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
-          <BotIcon className="text-white w-6 h-6" />
-        </div>
-        <div className="flex flex-col">
-          <h3 className="text-[14px] font-black text-white uppercase tracking-tight">SOCIALBOOST BOT</h3>
-          <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-[#25D366] animate-pulse" />
-            <span className="text-[9px] font-black text-[#25D366] uppercase tracking-widest">ACTIVE SERVER</span>
-          </div>
-        </div>
-      </div>
-
       <main className="flex-1 overflow-y-auto p-4 flex flex-col whatsapp-bg relative">
-        {/* Centered Broadcast Card */}
         {activeBroadcast && (
           <div className="fixed inset-0 flex items-center justify-center z-[100] p-6 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
             <div className="w-full max-w-[400px] bg-[#F0F2F5] dark:bg-slate-900 rounded-[3rem] shadow-[0_30px_60px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col animate-in zoom-in-95 duration-500">
@@ -682,15 +669,7 @@ export default function ChatPage() {
 
 function BotIcon({ className }: { className?: string }) {
   return (
-    <svg 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
-      className={className}
-    >
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
       <path d="M12 8V4H8" />
       <rect width="16" height="12" x="4" y="8" rx="2" />
       <path d="M2 14h2" />

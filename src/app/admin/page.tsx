@@ -13,7 +13,8 @@ import {
   Bell, 
   LogOut,
   Zap,
-  Wallet
+  Wallet,
+  Settings2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -23,7 +24,8 @@ export default function AdminHub() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!isUserLoading && (!user || user.email !== "chetanmadhav4@gmail.com")) {
+    const ADMIN_EMAIL = "chetanmadhav4@gmail.com";
+    if (!isUserLoading && (!user || user.email !== ADMIN_EMAIL)) {
       router.push("/admin/login");
     }
   }, [user, isUserLoading, router]);
@@ -41,28 +43,35 @@ export default function AdminHub() {
       title: "LIVE TRACKER",
       subtitle: "APPROVE & REJECT ORDERS",
       icon: <LayoutGrid size={28} />,
-      color: "bg-[#10B981]", // Emerald Green
+      color: "bg-[#10B981]", 
       path: "/admin/tracker"
     },
     {
       title: "FUND REQUESTS",
       subtitle: "APPROVE WALLET TOP-UPS",
       icon: <Wallet size={28} />,
-      color: "bg-[#F59E0B]", // Amber
+      color: "bg-[#F59E0B]", 
       path: "/admin/funds"
+    },
+    {
+      title: "API SETTINGS",
+      subtitle: "CONNECT SMM PANEL",
+      icon: <Settings2 size={28} />,
+      color: "bg-[#7C3AED]", 
+      path: "/admin/api-settings"
     },
     {
       title: "BROADCAST MSG",
       subtitle: "REAL-TIME ANNOUNCEMENTS",
       icon: <Megaphone size={28} />,
-      color: "bg-[#312ECB]", // Royal Blue
+      color: "bg-[#312ECB]", 
       path: "/admin/broadcast"
     },
     {
       title: "ALL USERS",
       subtitle: "DATABASE & CONTACT LIST",
       icon: <Users size={28} />,
-      color: "bg-[#1F2937]", // Dark Gray/Black
+      color: "bg-[#1F2937]", 
       path: "/admin/users"
     }
   ];
