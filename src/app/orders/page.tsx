@@ -1,3 +1,4 @@
+
 "use client";
 
 import { query, collection, orderBy, limit } from "firebase/firestore";
@@ -5,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { Button } from "@/components/ui/button";
 import { History, X } from "lucide-react";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 
 export default function OrdersHistoryPage() {
   const { user } = useUser();
@@ -21,7 +22,20 @@ export default function OrdersHistoryPage() {
     );
   }, [db, user]);
 
-  const { data: orders, isLoading } = useCollection(ordersQuery);
+  const { data: ordersData, isLoading } = useCollection(ordersQuery);
+
+  const orders = ordersData?.map(order => {
+    let createdAt = new Date();
+    if (order.createdAt) {
+      if (typeof order.createdAt.toDate === 'function') {
+        createdAt = order.createdAt.toDate();
+      } else {
+        const parsed = new Date(order.createdAt);
+        if (isValid(parsed)) createdAt = parsed;
+      }
+    }
+    return { ...order, createdAt };
+  }) || [];
 
   return (
     <div className="min-h-screen bg-[#E9EBF0] dark:bg-slate-950 flex items-center justify-center p-4 md:p-8 font-body">
@@ -82,7 +96,7 @@ export default function OrdersHistoryPage() {
 
                 {/* Date Tag */}
                 <div className="mt-1 self-end text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                  {order.createdAt?.toDate ? format(order.createdAt.toDate(), 'd MMM').toUpperCase() : ''}
+                  {isValid(order.createdAt) ? format(order.createdAt, 'd MMM').toUpperCase() : ''}
                 </div>
               </div>
             ))

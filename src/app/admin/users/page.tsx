@@ -12,7 +12,7 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 import { ChevronLeft, RefreshCw, User as UserIcon, Mail } from "lucide-react";
 import { useFirestore, useUser } from "@/firebase";
 
@@ -35,11 +35,26 @@ export default function AllUsersPage() {
     const q = query(collection(db, "users"), orderBy("createdAt", "desc"));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const usrs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt ? new Date(doc.data().createdAt) : new Date()
-      }));
+      const usrs = snapshot.docs.map(doc => {
+        const data = doc.data();
+        let createdAt = new Date();
+        
+        // Robust date parsing
+        if (data.createdAt) {
+          if (typeof data.createdAt.toDate === 'function') {
+            createdAt = data.createdAt.toDate();
+          } else {
+            const parsed = new Date(data.createdAt);
+            if (isValid(parsed)) createdAt = parsed;
+          }
+        }
+
+        return {
+          id: doc.id,
+          ...data,
+          createdAt
+        };
+      });
       setUsers(usrs);
       setLoading(false);
     });
@@ -96,7 +111,7 @@ export default function AllUsersPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right text-[11px] font-bold text-slate-400 uppercase">
-                    {format(u.createdAt, 'MMM dd, yyyy')}
+                    {isValid(u.createdAt) ? format(u.createdAt, 'MMM dd, yyyy') : 'N/A'}
                   </TableCell>
                 </TableRow>
               ))}

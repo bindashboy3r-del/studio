@@ -37,8 +37,9 @@ export default function AuthPage() {
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
       
-      // Automatic redirect based on user role
-      if (result.user.email === ADMIN_EMAIL) {
+      // Role-based redirection logic
+      const userEmail = result.user.email?.toLowerCase();
+      if (userEmail === ADMIN_EMAIL.toLowerCase()) {
         router.push("/admin");
       } else {
         router.push("/chat");
@@ -69,8 +70,8 @@ export default function AuthPage() {
         createdAt: new Date().toISOString()
       });
       
-      // Redirect based on user role
-      if (result.user.email === ADMIN_EMAIL) {
+      const userEmail = result.user.email?.toLowerCase();
+      if (userEmail === ADMIN_EMAIL.toLowerCase()) {
         router.push("/admin");
       } else {
         router.push("/chat");
