@@ -1,3 +1,4 @@
+
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { 
@@ -407,7 +408,7 @@ export function MessageBubble({
             </div>
 
             <div className="space-y-4">
-              <ScrollArea className="max-h-[450px] pr-2">
+              <ScrollArea className="max-h-[550px] pr-2">
                 <div className="space-y-3">
                   {comboItems.map((item, idx) => {
                     const s = SERVICES.instagram.find(sv => sv.id === item.serviceId);

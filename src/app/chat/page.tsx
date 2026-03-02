@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -325,7 +326,7 @@ export default function ChatPage() {
     const totalPrice = calculateTotalPrice();
     
     if (walletBalance < totalPrice) {
-      botReply("❌ Insufficient balance! Please add funds.");
+      botReply("❌ Insufficient balance! Please add funds.", ["➕ ADD FUNDS", "🏠 MAIN MENU"]);
       return;
     }
 
@@ -542,10 +543,15 @@ export default function ChatPage() {
 
       case 'choosing_payment_method':
         if (cleanText.includes("wallet")) {
+          const total = calculateTotalPrice();
+          if (walletBalance < total) {
+            botReply("❌ Insufficient balance! Please add funds.", ["➕ ADD FUNDS", "🏠 MAIN MENU"]);
+            return;
+          }
           if (currentOrder.type === 'single') {
             botReply("💳 Confirm Wallet Payment:", [], {
               isWalletCard: true,
-              paymentPrice: calculateTotalPrice()
+              paymentPrice: total
             });
           } else {
             handleBundleWalletSubmit();
