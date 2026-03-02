@@ -102,13 +102,18 @@ export default function ChatPage() {
     document.documentElement.classList.toggle('dark', newTheme === 'dark');
   };
 
-  // Global Broadcast Listener
+  // Global Broadcast Listener - Finds the first active slot
   useEffect(() => {
     if (!db) return;
-    const broadcastRef = doc(db, "globalAnnouncements", "current");
-    const unsubscribe = onSnapshot(broadcastRef, (snapshot) => {
-      if (snapshot.exists() && snapshot.data().active) {
-        setActiveBroadcast(snapshot.data());
+    const broadcastQuery = query(
+      collection(db, "globalAnnouncements"),
+      where("active", "==", true),
+      limit(1)
+    );
+    
+    const unsubscribe = onSnapshot(broadcastQuery, (snapshot) => {
+      if (!snapshot.empty) {
+        setActiveBroadcast(snapshot.docs[0].data());
       } else {
         setActiveBroadcast(null);
       }
