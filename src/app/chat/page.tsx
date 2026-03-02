@@ -13,7 +13,8 @@ import {
   onSnapshot,
   updateDoc,
   doc,
-  writeBatch
+  writeBatch,
+  deleteDoc
 } from "firebase/firestore";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
@@ -47,7 +48,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 
 type ChatState = 
   | 'idle' 
@@ -104,12 +105,21 @@ export default function ChatPage() {
     if (!db || !user) return null;
     return query(
       collection(db, "users", user.uid, "notifications"),
-      orderBy("createdAt", "desc"),
       limit(20)
     );
   }, [db, user]);
 
-  const { data: notificationsData } = useCollection(notificationsQuery);
+  const { data: rawNotifications } = useCollection(notificationsQuery);
+  
+  const notificationsData = useMemo(() => {
+    if (!rawNotifications) return [];
+    return [...rawNotifications].sort((a: any, b: any) => {
+      const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt).getTime();
+      const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt).getTime();
+      return dateB - dateA;
+    });
+  }, [rawNotifications]);
+
   const unreadCount = useMemo(() => 
     notificationsData?.filter(n => !n.read).length || 0
   , [notificationsData]);
@@ -124,7 +134,24 @@ export default function ChatPage() {
       const ref = doc(db, "users", user.uid, "notifications", n.id);
       batch.update(ref, { read: true });
     });
-    await batch.commit();
+    await batch.commit().catch(e => console.error("Failed to mark read", e));
+  };
+
+  const clearAllNotifications = async () => {
+    if (!db || !user || !notificationsData || notificationsData.length === 0) return;
+    
+    const batch = writeBatch(db);
+    notificationsData.forEach(n => {
+      const ref = doc(db, "users", user.uid, "notifications", n.id);
+      batch.delete(ref);
+    });
+    
+    await batch.commit().then(() => {
+      toast({ title: "Notifications Cleared" });
+    }).catch(e => {
+      console.error("Failed to clear", e);
+      toast({ variant: "destructive", title: "Clear Failed", description: "Could not remove notifications." });
+    });
   };
 
   const messagesQuery = useMemoFirebase(() => {
@@ -392,19 +419,22 @@ export default function ChatPage() {
               <ScrollArea className="h-[300px]">
                 {notificationsData && notificationsData.length > 0 ? (
                   <div className="divide-y divide-gray-100 dark:divide-slate-800">
-                    {notificationsData.map((notif) => (
-                      <div key={notif.id} className={`p-4 transition-colors ${notif.read ? 'opacity-60' : 'bg-blue-50/30 dark:bg-blue-900/10'}`}>
-                        <div className="flex justify-between items-start mb-1">
-                          <h4 className="text-[11px] font-black uppercase text-[#312ECB]">{notif.title}</h4>
-                          <span className="text-[9px] font-bold text-slate-400">
-                            {notif.createdAt?.toDate ? format(notif.createdAt.toDate(), 'HH:mm') : ''}
-                          </span>
+                    {notificationsData.map((notif) => {
+                       const notifDate = notif.createdAt?.toDate ? notif.createdAt.toDate() : new Date(notif.createdAt);
+                       return (
+                        <div key={notif.id} className={`p-4 transition-colors ${notif.read ? 'opacity-60' : 'bg-blue-50/30 dark:bg-blue-900/10'}`}>
+                          <div className="flex justify-between items-start mb-1">
+                            <h4 className="text-[11px] font-black uppercase text-[#312ECB]">{notif.title}</h4>
+                            <span className="text-[9px] font-bold text-slate-400">
+                              {isValid(notifDate) ? format(notifDate, 'HH:mm') : ''}
+                            </span>
+                          </div>
+                          <p className="text-[12px] font-semibold text-slate-600 dark:text-slate-300 leading-snug">
+                            {notif.message}
+                          </p>
                         </div>
-                        <p className="text-[12px] font-semibold text-slate-600 dark:text-slate-300 leading-snug">
-                          {notif.message}
-                        </p>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full py-20 text-slate-400 space-y-2">
@@ -415,7 +445,7 @@ export default function ChatPage() {
               </ScrollArea>
               {notificationsData && notificationsData.length > 0 && (
                 <div className="p-2 border-t border-gray-100 dark:border-slate-800 text-center">
-                  <button onClick={markAllAsRead} className="text-[9px] font-black uppercase tracking-widest text-[#312ECB] hover:underline">
+                  <button onClick={clearAllNotifications} className="text-[9px] font-black uppercase tracking-widest text-[#312ECB] hover:underline">
                     Clear All
                   </button>
                 </div>

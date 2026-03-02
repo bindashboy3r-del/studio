@@ -26,7 +26,7 @@ service cloud.firestore {
       allow read: if isOwner(userId) || isAdmin();
       allow create: if isAdmin();
       allow update: if isOwner(userId) || isAdmin();
-      allow delete: if isAdmin();
+      allow delete: if isOwner(userId) || isAdmin();
     }
 
     match /users/{userId}/orders/{orderId} {
