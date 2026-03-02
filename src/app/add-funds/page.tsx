@@ -72,7 +72,6 @@ export default function AddFundsPage() {
         utrId: utr,
         status: 'Pending',
         createdAt: serverTimestamp(),
-        offerApplied: false // To be managed by admin
       });
       
       toast({ 
@@ -159,7 +158,7 @@ export default function AddFundsPage() {
               <div className="bg-blue-50/50 p-4 rounded-2xl flex items-start gap-3 border border-blue-100/50">
                 <Info size={16} className="text-[#312ECB] mt-0.5" />
                 <p className="text-[10px] font-bold text-blue-600 uppercase leading-relaxed">
-                  Note: Check Admin Announcements for active bonus offers (e.g. 10% Extra). Bonus is applied upon approval.
+                  Note: Check Admin Announcements for active bonus offers. Credit will be applied upon approval.
                 </p>
               </div>
 

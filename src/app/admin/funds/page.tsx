@@ -22,8 +22,8 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronLeft, RefreshCw, Check, X as CloseIcon, Zap } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ChevronLeft, RefreshCw, Check, X as CloseIcon, Zap, Wallet } from "lucide-react";
 import { useFirestore, useUser } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { errorEmitter } from "@/firebase/error-emitter";
@@ -36,7 +36,7 @@ export default function FundRequestsPage() {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const [applyBonus, setApplyBonus] = useState<Record<string, boolean>>({});
+  const [creditAmounts, setCreditAmounts] = useState<Record<string, string>>({});
   const router = useRouter();
 
   const ADMIN_EMAIL = "chetanmadhav4@gmail.com";
@@ -64,6 +64,16 @@ export default function FundRequestsPage() {
       });
 
       reqs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      
+      // Initialize credit amounts state with original amounts for pending requests
+      const initialAmounts: Record<string, string> = {};
+      reqs.forEach(r => {
+        if (r.status === 'Pending') {
+          initialAmounts[r.id] = r.amount.toString();
+        }
+      });
+      setCreditAmounts(prev => ({ ...initialAmounts, ...prev }));
+      
       setRequests(reqs);
       setLoading(false);
     }, (error) => {
@@ -85,17 +95,15 @@ export default function FundRequestsPage() {
 
     setProcessingId(request.id);
     
+    const finalAmount = action === 'Approved' ? parseFloat(creditAmounts[request.id] || request.amount) : 0;
+    
     const batch = writeBatch(db);
-    const isBonus = applyBonus[request.id];
-    const bonusMultiplier = isBonus ? 1.1 : 1.0;
-    const finalAmount = request.amount * bonusMultiplier;
 
     // 1. Update the request status
     const reqRef = doc(db, "fundRequests", request.id);
     batch.update(reqRef, { 
       status: action,
       finalCreditAmount: finalAmount,
-      bonusApplied: isBonus,
       processedBy: admin.uid,
       processedAt: serverTimestamp()
     });
@@ -113,7 +121,7 @@ export default function FundRequestsPage() {
     batch.set(notifRef, {
       title: action === 'Approved' ? '💰 Wallet Refilled!' : '❌ Fund Request Rejected',
       message: action === 'Approved' 
-        ? `₹${finalAmount.toFixed(0)} has been added to your wallet${isBonus ? ' (includes 10% bonus!)' : ''}.`
+        ? `₹${finalAmount.toFixed(0)} has been credited to your wallet. Balance updated!`
         : `Your fund request for ₹${request.amount} was rejected. Please contact support.`,
       read: false,
       createdAt: serverTimestamp()
@@ -138,8 +146,8 @@ export default function FundRequestsPage() {
       });
   };
 
-  const toggleBonus = (id: string) => {
-    setApplyBonus(prev => ({ ...prev, [id]: !prev[id] }));
+  const updateAmount = (id: string, val: string) => {
+    setCreditAmounts(prev => ({ ...prev, [id]: val }));
   };
 
   if (loading) return (
@@ -157,7 +165,7 @@ export default function FundRequestsPage() {
           </button>
           <div>
             <h1 className="text-2xl font-black tracking-tight text-[#111B21]">FUND REQUESTS</h1>
-            <p className="text-[10px] font-black text-[#F59E0B] uppercase tracking-widest">Verify Wallet Top-ups</p>
+            <p className="text-[10px] font-black text-[#F59E0B] uppercase tracking-widest">Verify & Credit Wallet Funds</p>
           </div>
         </header>
 
@@ -166,8 +174,8 @@ export default function FundRequestsPage() {
             <TableHeader className="bg-slate-50">
               <TableRow className="border-slate-100 hover:bg-transparent">
                 <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">User</TableHead>
-                <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Amount</TableHead>
-                <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Offer (10%)</TableHead>
+                <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Requested</TableHead>
+                <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Credit Amount (Editable)</TableHead>
                 <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">UTR ID</TableHead>
                 <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Status</TableHead>
                 <TableHead className="text-right text-[10px] font-black uppercase tracking-widest py-6">Actions</TableHead>
@@ -182,23 +190,25 @@ export default function FundRequestsPage() {
                       <span className="text-[10px] font-bold text-slate-400">{req.userEmail}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="font-black text-emerald-600 text-sm">₹{req.amount}</TableCell>
+                  <TableCell className="font-black text-slate-400 text-sm">₹{req.amount}</TableCell>
                   <TableCell>
                     {req.status === 'Pending' ? (
-                      <div className="flex items-center gap-2">
-                        <Checkbox 
-                          id={`bonus-${req.id}`} 
-                          checked={applyBonus[req.id] || false} 
-                          onCheckedChange={() => toggleBonus(req.id)}
-                        />
-                        <label htmlFor={`bonus-${req.id}`} className="text-[9px] font-black uppercase text-blue-600 flex items-center gap-1 cursor-pointer">
-                          <Zap size={10} className="fill-current" /> Add 10%
-                        </label>
+                      <div className="flex items-center gap-2 max-w-[120px]">
+                        <div className="relative w-full">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-emerald-600">₹</span>
+                          <Input 
+                            type="number"
+                            value={creditAmounts[req.id] || ""}
+                            onChange={(e) => updateAmount(req.id, e.target.value)}
+                            className="h-10 bg-emerald-50 border-none rounded-xl pl-6 text-sm font-black text-emerald-700 shadow-inner focus-visible:ring-1 focus-visible:ring-emerald-500/20"
+                          />
+                        </div>
                       </div>
                     ) : (
-                      <span className="text-[9px] font-black uppercase text-slate-300">
-                        {req.bonusApplied ? 'Bonus Added' : 'No Bonus'}
-                      </span>
+                      <div className="flex items-center gap-1.5 text-emerald-600 font-black text-sm">
+                        <Wallet size={14} />
+                        ₹{req.finalCreditAmount || req.amount}
+                      </div>
                     )}
                   </TableCell>
                   <TableCell><code className="bg-slate-100 px-3 py-1 rounded-lg text-[11px] font-black">{req.utrId}</code></TableCell>
@@ -233,12 +243,7 @@ export default function FundRequestsPage() {
                         </Button>
                       </div>
                     ) : (
-                      <div className="flex flex-col items-end">
-                        <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Processed</span>
-                        {req.finalCreditAmount && (
-                          <span className="text-[10px] font-black text-emerald-600">Total: ₹{req.finalCreditAmount.toFixed(0)}</span>
-                        )}
-                      </div>
+                      <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Locked</span>
                     )}
                   </TableCell>
                 </TableRow>
