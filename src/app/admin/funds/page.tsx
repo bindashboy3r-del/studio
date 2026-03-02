@@ -6,12 +6,9 @@ import {
   collection, 
   query, 
   onSnapshot, 
-  updateDoc, 
   doc,
-  serverTimestamp,
   writeBatch,
   increment,
-  addDoc
 } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { 
@@ -25,9 +22,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronLeft, RefreshCw, Wallet, Check, X as CloseIcon, Zap } from "lucide-react";
+import { ChevronLeft, RefreshCw, Check, X as CloseIcon, Zap } from "lucide-react";
 import { useFirestore, useUser } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 
 export default function FundRequestsPage() {
   const { user: admin, isUserLoading } = useUser();
@@ -35,11 +34,15 @@ export default function FundRequestsPage() {
   const { toast } = useToast();
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [processingId, setProcessingId] = useState<string | null>(null);
   const [applyBonus, setApplyBonus] = useState<Record<string, boolean>>({});
   const router = useRouter();
 
+  const ADMIN_EMAIL = "chetanmadhav4@gmail.com";
+  const ADMIN_ID = "s55uL0f8PmcypR75usVYOLwVs7O2";
+
   useEffect(() => {
-    if (!isUserLoading && (!admin || admin.email !== "chetanmadhav4@gmail.com")) {
+    if (!isUserLoading && (!admin || (admin.email !== ADMIN_EMAIL && admin.uid !== ADMIN_ID))) {
       router.push("/admin/login");
     }
   }, [admin, isUserLoading, router]);
@@ -62,13 +65,20 @@ export default function FundRequestsPage() {
       reqs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
       setRequests(reqs);
       setLoading(false);
+    }, (error) => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: 'fundRequests',
+        operation: 'list'
+      }));
     });
     
     return () => unsubscribe();
   }, [admin, db]);
 
   const handleRequest = async (request: any, action: 'Approved' | 'Rejected') => {
-    if (!db) return;
+    if (!db || !admin) return;
+    setProcessingId(request.id);
+    
     const batch = writeBatch(db);
     const isBonus = applyBonus[request.id];
     const bonusMultiplier = isBonus ? 1.1 : 1.0;
@@ -76,11 +86,14 @@ export default function FundRequestsPage() {
 
     // 1. Update the request status
     const reqRef = doc(db, "fundRequests", request.id);
-    batch.update(reqRef, { 
+    const requestUpdate = { 
       status: action,
       finalCreditAmount: finalAmount,
-      bonusApplied: isBonus
-    });
+      bonusApplied: isBonus,
+      processedBy: admin.uid,
+      processedAt: new Date().toISOString()
+    };
+    batch.update(reqRef, requestUpdate);
 
     // 2. If approved, update user balance
     if (action === 'Approved') {
@@ -90,23 +103,34 @@ export default function FundRequestsPage() {
       });
     }
 
-    // 3. Create notification for user
-    const notifRef = collection(db, "users", request.userId, "notifications");
-    addDoc(notifRef, {
+    // 3. Create notification for user (using batch)
+    const notifRef = doc(collection(db, "users", request.userId, "notifications"));
+    batch.set(notifRef, {
       title: action === 'Approved' ? '💰 Wallet Refilled!' : '❌ Fund Request Rejected',
       message: action === 'Approved' 
         ? `₹${finalAmount.toFixed(0)} has been added to your wallet${isBonus ? ' (includes 10% bonus!)' : ''}.`
-        : `Your fund request for ₹${request.amount} was rejected. Incorrect UTR ID.`,
+        : `Your fund request for ₹${request.amount} was rejected. Please contact support.`,
       read: false,
-      createdAt: serverTimestamp()
+      createdAt: new Date().toISOString()
     });
 
-    await batch.commit().then(() => {
-      toast({ 
-        title: `Request ${action}`, 
-        description: action === 'Approved' ? `₹${finalAmount.toFixed(0)} credited to user.` : `Request denied.` 
+    batch.commit()
+      .then(() => {
+        toast({ 
+          title: `Request ${action}`, 
+          description: action === 'Approved' ? `₹${finalAmount.toFixed(0)} credited to user.` : `Request denied.` 
+        });
+      })
+      .catch((err) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: `batch-operation (fundRequests/${request.id})`,
+          operation: 'write',
+          requestResourceData: { action, finalAmount }
+        }));
+      })
+      .finally(() => {
+        setProcessingId(null);
       });
-    });
   };
 
   const toggleBonus = (id: string) => {
@@ -185,10 +209,21 @@ export default function FundRequestsPage() {
                   <TableCell className="text-right">
                     {req.status === 'Pending' ? (
                       <div className="flex justify-end gap-2">
-                        <Button size="sm" onClick={() => handleRequest(req, 'Approved')} className="bg-emerald-500 hover:bg-emerald-600 h-10 w-10 rounded-xl p-0 shadow-lg">
-                          <Check size={18} />
+                        <Button 
+                          size="sm" 
+                          disabled={processingId === req.id}
+                          onClick={() => handleRequest(req, 'Approved')} 
+                          className="bg-emerald-500 hover:bg-emerald-600 h-10 w-10 rounded-xl p-0 shadow-lg"
+                        >
+                          {processingId === req.id ? <RefreshCw className="animate-spin h-4 w-4" /> : <Check size={18} />}
                         </Button>
-                        <Button size="sm" variant="destructive" onClick={() => handleRequest(req, 'Rejected')} className="h-10 w-10 rounded-xl p-0 shadow-lg">
+                        <Button 
+                          size="sm" 
+                          variant="destructive" 
+                          disabled={processingId === req.id}
+                          onClick={() => handleRequest(req, 'Rejected')} 
+                          className="h-10 w-10 rounded-xl p-0 shadow-lg"
+                        >
                           <CloseIcon size={18} />
                         </Button>
                       </div>
