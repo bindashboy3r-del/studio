@@ -94,13 +94,13 @@ export default function ChatPage() {
   };
 
   // Real-time Notification Listener for User - Only shows "UNREAD" notifications
+  // Removed orderBy to prevent Firestore index errors
   useEffect(() => {
     if (!db || !user) return;
 
     const notifQuery = query(
       collection(db, "users", user.uid, "notifications"),
-      where("read", "==", false),
-      orderBy("createdAt", "desc")
+      where("read", "==", false)
     );
 
     const unsubscribe = onSnapshot(notifQuery, (snapshot) => {
@@ -113,7 +113,7 @@ export default function ChatPage() {
             description: data.message,
             duration: 8000,
           });
-          // MARK AS READ IMMEDIATELY so it only pops up once
+          // MARK AS READ IMMEDIATELY so it only pops up once as requested
           updateDoc(change.doc.ref, { read: true }).catch(err => console.error("Could not mark as read", err));
         }
       });
@@ -200,8 +200,8 @@ export default function ChatPage() {
     if (!link || !utr || !db || !user) return;
     
     const finalPrice = (currentOrder.quantity! / 1000) * currentOrder.service!.pricePer1000;
-    // Generate unique Order ID
-    const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}`;
+    // Generate truly unique Order ID with prefix, random numbers and part of timestamp
+    const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}-${Date.now().toString().slice(-4)}`;
     
     const orderData = {
       userId: user.uid,

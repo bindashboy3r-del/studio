@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
+import { collection, query, onSnapshot } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { 
   Table, 
@@ -32,7 +32,8 @@ export default function AllUsersPage() {
   useEffect(() => {
     if (!admin || !db) return;
 
-    const q = query(collection(db, "users"), orderBy("createdAt", "desc"));
+    // Use a simple query without orderBy to avoid index errors
+    const q = query(collection(db, "users"));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const usrs = snapshot.docs.map(doc => {
@@ -55,6 +56,10 @@ export default function AllUsersPage() {
           createdAt
         };
       });
+
+      // Client-side sort to ensure consistent order without composite index
+      usrs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      
       setUsers(usrs);
       setLoading(false);
     });
