@@ -393,7 +393,7 @@ export default function ChatPage() {
           <div className="w-10 h-10 rounded-[14px] bg-[#312ECB] flex items-center justify-center text-white shadow-lg">
             <Zap className="fill-current" size={20} />
           </div>
-          <h1 className="text-[20px] font-black italic tracking-tighter text-[#312ECB] dark:text-white uppercase">INSTAFLOW</h1>
+          <h1 className="text-[20px] font-black italic tracking-tighter text-[#312ECB] dark:text-white uppercase">SOCIALBOOST</h1>
         </div>
         <div className="flex items-center gap-4">
           <button onClick={toggleTheme} className="text-slate-400 hover:text-[#312ECB] transition-colors">
@@ -460,7 +460,7 @@ export default function ChatPage() {
           <BotIcon className="text-white w-6 h-6" />
         </div>
         <div className="flex flex-col">
-          <h3 className="text-[14px] font-black text-white uppercase tracking-tight">INSTAFLOW BOT</h3>
+          <h3 className="text-[14px] font-black text-white uppercase tracking-tight">SOCIALBOOST BOT</h3>
           <div className="flex items-center gap-1.5">
             <div className="w-2 h-2 rounded-full bg-[#25D366] animate-pulse" />
             <span className="text-[9px] font-black text-[#25D366] uppercase tracking-widest">ACTIVE SERVER</span>
@@ -469,23 +469,41 @@ export default function ChatPage() {
       </div>
 
       <main className="flex-1 overflow-y-auto p-4 flex flex-col whatsapp-bg relative">
-        {/* Stylish Broadcast Card - Glassmorphism Style */}
+        {/* Stylish Centered Broadcast Card - Styled like the Popup from screenshot */}
         {activeBroadcast && (
-          <div className="sticky top-4 self-center w-full max-w-[92%] z-50 mb-8 animate-in zoom-in-95 duration-500">
-            <div className="backdrop-blur-xl bg-white/25 dark:bg-[#312ECB]/25 border border-white/40 dark:border-white/10 rounded-[2.5rem] p-6 shadow-2xl flex flex-col items-center text-center space-y-3 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-[#312ECB]/30 blur-3xl rounded-full -mr-12 -mt-12" />
-              <div className="w-12 h-12 rounded-2xl bg-[#312ECB] flex items-center justify-center text-white shadow-xl relative z-10">
-                <Megaphone size={24} />
-              </div>
-              <div className="relative z-10">
-                <span className="text-[9px] font-black text-[#312ECB] dark:text-white/50 uppercase tracking-[0.4em] mb-1.5 block">Important Announcement</span>
-                <p className="text-[15px] font-black text-[#111B21] dark:text-white leading-relaxed whitespace-pre-wrap">
+          <div className="fixed inset-0 flex items-center justify-center z-[100] p-6 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
+            <div className="w-full max-w-[400px] bg-[#F0F2F5] dark:bg-slate-900 rounded-[3rem] shadow-[0_30px_60px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col animate-in zoom-in-95 duration-500">
+              <header className="bg-white dark:bg-slate-800 px-8 py-6 flex items-center justify-between border-b border-gray-100 dark:border-slate-700">
+                <div className="flex items-center gap-3">
+                  <div className="text-[#312ECB]">
+                    <Megaphone size={24} strokeWidth={3} />
+                  </div>
+                  <h1 className="text-[20px] font-black uppercase tracking-tight text-[#111B21] dark:text-white">
+                    ANNOUNCEMENT
+                  </h1>
+                </div>
+                <button 
+                  onClick={() => setActiveBroadcast(null)}
+                  className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </header>
+
+              <div className="p-8 flex-1 flex flex-col items-center justify-center space-y-4">
+                <div className="w-16 h-16 rounded-[1.5rem] bg-[#312ECB] flex items-center justify-center text-white shadow-xl">
+                  <Megaphone size={32} />
+                </div>
+                <p className="text-[15px] font-black text-[#111B21] dark:text-white text-center leading-relaxed whitespace-pre-wrap">
                   {activeBroadcast.text}
                 </p>
               </div>
-              <button onClick={() => setActiveBroadcast(null)} className="absolute top-4 right-4 text-slate-400 hover:text-[#312ECB] transition-colors p-1">
-                <X size={20} />
-              </button>
+
+              <footer className="p-6 bg-slate-50 dark:bg-slate-800/50 text-center">
+                <p className="text-[9px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-[0.4em]">
+                  SOCIALBOOST GLOBAL UPDATE
+                </p>
+              </footer>
             </div>
           </div>
         )}

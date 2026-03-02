@@ -53,10 +53,10 @@ export default function OrdersHistoryPage() {
   }, [rawOrdersData]);
 
   return (
-    <div className="min-h-screen bg-[#E9EBF0] dark:bg-slate-950 flex items-center justify-center p-4 md:p-8 font-body">
-      <div className="w-full max-w-lg bg-[#F0F2F5] dark:bg-slate-900 rounded-[3rem] shadow-[0_30px_60px_rgba(0,0,0,0.12)] overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="min-h-screen bg-slate-200/50 dark:bg-slate-950 flex items-center justify-center p-4 md:p-8 font-body">
+      <div className="w-full max-w-lg bg-[#F0F2F5] dark:bg-slate-900 rounded-[3rem] shadow-[0_30px_60px_rgba(0,0,0,0.12)] overflow-hidden flex flex-col h-[85vh] animate-in zoom-in-95 duration-500">
         
-        <header className="bg-white dark:bg-slate-900 px-8 py-6 flex items-center justify-between border-b border-gray-100 dark:border-slate-800">
+        <header className="bg-white dark:bg-slate-800 px-8 py-6 flex items-center justify-between border-b border-gray-100 dark:border-slate-700">
           <div className="flex items-center gap-3">
             <div className="text-[#312ECB]">
               <History size={24} strokeWidth={3} />
@@ -67,13 +67,13 @@ export default function OrdersHistoryPage() {
           </div>
           <button 
             onClick={() => router.back()}
-            className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors"
+            className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors"
           >
             <X size={20} />
           </button>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">
+        <main className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/30 dark:bg-slate-900/50">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
               <div className="w-12 h-12 border-4 border-[#312ECB] border-t-transparent rounded-full animate-spin" />
@@ -83,37 +83,37 @@ export default function OrdersHistoryPage() {
             orders.map((order: any) => (
               <div 
                 key={order.id} 
-                className="bg-white dark:bg-slate-800 p-5 rounded-[1.8rem] shadow-sm border border-gray-50 dark:border-slate-700/50 flex flex-col gap-1 relative group hover:shadow-md transition-shadow"
+                className="bg-white dark:bg-slate-800 p-6 rounded-[1.8rem] shadow-sm border border-gray-50 dark:border-slate-700/50 flex flex-col gap-2 relative transition-all hover:shadow-md"
               >
-                <div className="absolute top-4 right-4 bg-slate-50 dark:bg-slate-900 px-3 py-1 rounded-full text-[9px] font-black text-[#312ECB]/40 dark:text-white/30 uppercase tracking-tighter">
+                <div className="absolute top-6 right-6 bg-[#312ECB]/5 dark:bg-blue-400/10 px-3 py-1 rounded-full text-[9px] font-black text-[#312ECB] dark:text-blue-400 uppercase tracking-tighter">
                   #{order.orderId || order.id.slice(0, 8).toUpperCase()}
                 </div>
 
-                <h3 className="text-[13px] font-black uppercase text-[#312ECB] dark:text-blue-400 tracking-wide pr-20">
+                <h3 className="text-[14px] font-black uppercase text-[#312ECB] dark:text-blue-400 tracking-wide pr-24">
                   {order.platform} {order.service}
                 </h3>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-tight">
+                <div className="flex items-center gap-3">
+                  <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase">
                     QTY: {order.quantity}
                   </span>
                   <span className="text-slate-200 dark:text-slate-700">•</span>
-                  <span className="text-[11px] font-bold text-[#25D366] dark:text-emerald-400 uppercase tracking-tight">
+                  <span className="text-[11px] font-bold text-[#25D366] dark:text-emerald-400 uppercase">
                     ₹{order.price?.toFixed(0)}
                   </span>
                   <span className="text-slate-200 dark:text-slate-700">•</span>
-                  <Badge variant="outline" className={`text-[8px] h-4 font-black px-1.5 border-none ${
+                  <Badge variant="outline" className={`text-[9px] h-5 font-black px-2 border-none rounded-lg ${
                     order.effectiveStatus === 'Processing' ? 'bg-blue-50 text-blue-600' :
                     order.effectiveStatus === 'Completed' ? 'bg-emerald-50 text-emerald-600' :
                     order.effectiveStatus === 'Cancelled' ? 'bg-red-50 text-red-600' :
                     'bg-slate-100 text-slate-400'
                   }`}>
-                    {order.effectiveStatus === 'Processing' && <Clock size={8} className="mr-1 inline animate-spin" />}
+                    {order.effectiveStatus === 'Processing' && <Clock size={10} className="mr-1 inline animate-spin" />}
                     {order.effectiveStatus}
                   </Badge>
                 </div>
 
-                <div className="mt-1 self-end text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                <div className="mt-1 self-end text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
                   {isValid(order.createdAt) ? format(order.createdAt, 'd MMM').toUpperCase() : ''}
                 </div>
               </div>
@@ -141,8 +141,8 @@ export default function OrdersHistoryPage() {
           )}
         </main>
 
-        <footer className="p-6 bg-slate-50 dark:bg-slate-950/30 text-center">
-          <p className="text-[9px] font-black text-slate-300 dark:text-slate-700 uppercase tracking-[0.4em]">
+        <footer className="p-6 bg-white dark:bg-slate-800 text-center border-t border-slate-50 dark:border-slate-700">
+          <p className="text-[10px] font-black text-slate-300 dark:text-slate-500 uppercase tracking-[0.6em]">
             SOCIALBOOST GROWTH LOGS
           </p>
         </footer>

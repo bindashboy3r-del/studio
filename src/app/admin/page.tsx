@@ -11,7 +11,8 @@ import {
   ChevronRight, 
   Moon, 
   Bell, 
-  LogOut 
+  LogOut,
+  Zap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -64,9 +65,9 @@ export default function AdminHub() {
       <header className="bg-white px-6 py-4 flex items-center justify-between border-b border-slate-100 sticky top-0 z-50">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-[#312ECB] rounded-xl flex items-center justify-center text-white shadow-lg">
-            <span className="font-black italic text-xl">S</span>
+            <Zap className="fill-current" size={20} />
           </div>
-          <h1 className="text-xl font-black italic tracking-tighter text-[#312ECB]">INSTAFLOW</h1>
+          <h1 className="text-xl font-black italic tracking-tighter text-[#312ECB] uppercase">SOCIALBOOST</h1>
         </div>
         <div className="flex items-center gap-5">
           <button className="text-slate-400 hover:text-[#312ECB] transition-colors">
@@ -77,7 +78,7 @@ export default function AdminHub() {
             <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
           </button>
           <div className="w-10 h-10 rounded-full bg-[#312ECB] flex items-center justify-center text-white font-black text-sm shadow-md">
-            C
+            {user.displayName?.[0] || 'A'}
           </div>
         </div>
       </header>
