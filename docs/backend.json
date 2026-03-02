@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -29,6 +30,21 @@
         "email",
         "createdAt"
       ]
+    },
+    "Notification": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Notification",
+      "type": "object",
+      "description": "System notification sent to a user about their order status.",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "title", "message", "read", "createdAt"]
     },
     "Service": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -129,6 +145,16 @@
             "$ref": "#/backend/entities/User"
           },
           "description": "User profile data."
+        }
+      },
+      {
+        "path": "/users/{userId}/notifications/{notificationId}",
+        "definition": {
+          "entityName": "Notification",
+          "schema": {
+            "$ref": "#/backend/entities/Notification"
+          },
+          "description": "Order updates for the user."
         }
       },
       {

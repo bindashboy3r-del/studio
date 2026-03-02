@@ -8,7 +8,10 @@ import {
   orderBy, 
   onSnapshot, 
   updateDoc, 
-  doc 
+  doc,
+  addDoc,
+  collection,
+  serverTimestamp
 } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { 
@@ -28,8 +31,9 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, isValid } from "date-fns";
-import { ChevronLeft, RefreshCw, ExternalLink, Copy, Download, AlertTriangle } from "lucide-react";
+import { ChevronLeft, RefreshCw, ExternalLink, Copy, Download, AlertTriangle, Filter } from "lucide-react";
 import { useFirestore, useUser } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
@@ -60,7 +64,6 @@ export default function TrackerPage() {
         const data = doc.data();
         let createdAt = new Date();
         
-        // Robust date parsing for Firestore Timestamps or ISO Strings
         if (data.createdAt) {
           if (typeof data.createdAt.toDate === 'function') {
             createdAt = data.createdAt.toDate();
@@ -82,33 +85,50 @@ export default function TrackerPage() {
       setError(null);
     }, (err) => {
       console.error("Tracker Error:", err);
-      if (err.message?.includes("index")) {
-        setError("Missing Index: Please visit the Firebase Console link in your error log to enable collectionGroup indexing.");
-      } else {
-        const contextualError = new FirestorePermissionError({
-          path: 'orders (collectionGroup)',
-          operation: 'list'
-        });
-        errorEmitter.emit('permission-error', contextualError);
-      }
+      const contextualError = new FirestorePermissionError({
+        path: 'orders (collectionGroup)',
+        operation: 'list'
+      });
+      errorEmitter.emit('permission-error', contextualError);
       setLoading(false);
     });
     
     return () => unsubscribe();
   }, [user, db]);
 
-  const updateStatus = async (orderPath: string, status: string) => {
+  const updateStatus = async (order: any, newStatus: string) => {
     if (!db) return;
-    const orderRef = doc(db, orderPath);
-    updateDoc(orderRef, { status })
-      .then(() => {
-        toast({ title: "Updated", description: `Order status set to ${status}` });
+    const orderRef = doc(db, order.path);
+    
+    updateDoc(orderRef, { status: newStatus })
+      .then(async () => {
+        toast({ title: "Status Updated", description: `Order ${order.id.slice(0, 8)} set to ${newStatus}` });
+        
+        // Create notification for user
+        if (order.userId) {
+          const notifTitle = newStatus === 'Completed' ? '✅ Order Approved' : 
+                            newStatus === 'Cancelled' ? '❌ Order Rejected' : 
+                            '🔄 Status Update';
+          
+          const notifMsg = newStatus === 'Completed' ? 
+            `Your order for ${order.service} is approved and processing!` :
+            `Sorry, your order for ${order.service} was rejected. Check details for info.`;
+
+          await addDoc(collection(db, "users", order.userId, "notifications"), {
+            title: notifTitle,
+            message: notifMsg,
+            orderId: order.id,
+            status: newStatus,
+            read: false,
+            createdAt: serverTimestamp()
+          });
+        }
       })
       .catch((err) => {
         const contextualError = new FirestorePermissionError({
-          path: orderPath,
+          path: order.path,
           operation: 'update',
-          requestResourceData: { status }
+          requestResourceData: { status: newStatus }
         });
         errorEmitter.emit('permission-error', contextualError);
       });
@@ -120,32 +140,93 @@ export default function TrackerPage() {
     toast({ title: "Copied", description: `${label} copied to clipboard.` });
   };
 
-  const exportOrders = () => {
-    const csv = [
-      ["Order ID", "Platform", "Service", "Link", "Quantity", "Price", "UTR ID", "Status", "Date"].join(","),
-      ...orders.map(o => [
-        o.id, 
-        o.platform || 'N/A', 
-        o.service || 'N/A', 
-        `"${o.link || ''}"`, 
-        o.quantity || 0, 
-        o.price || 0, 
-        o.utrId || 'N/A', 
-        o.status || 'Pending', 
-        isValid(o.createdAt) ? o.createdAt.toISOString() : ''
-      ].join(","))
-    ].join("\n");
-    
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.setAttribute('hidden', '');
-    a.setAttribute('href', url);
-    a.setAttribute('download', `socialboost_tracker_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`);
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
+  const pendingOrders = orders.filter(o => o.status === 'Pending' || o.status === 'Processing');
+  const historyOrders = orders.filter(o => o.status === 'Completed' || o.status === 'Cancelled');
+
+  const OrderTable = ({ data }: { data: any[] }) => (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader className="bg-slate-50">
+          <TableRow className="border-slate-100 hover:bg-transparent">
+            <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Timestamp</TableHead>
+            <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Service</TableHead>
+            <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Link</TableHead>
+            <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">UTR ID</TableHead>
+            <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Status</TableHead>
+            <TableHead className="text-right text-[10px] font-black uppercase tracking-widest py-6">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {data.map((order) => (
+            <TableRow key={order.id} className="border-slate-50 hover:bg-slate-50/50 transition-colors">
+              <TableCell className="text-[11px] font-bold text-slate-400 uppercase">
+                {isValid(order.createdAt) ? (
+                  <>
+                    {format(order.createdAt, 'MMM dd')}<br/>
+                    {format(order.createdAt, 'HH:mm')}
+                  </>
+                ) : 'Invalid Date'}
+              </TableCell>
+              <TableCell>
+                <div className="flex flex-col">
+                  <span className="font-black uppercase text-[10px] text-blue-600">{order.platform || 'Platform'}</span>
+                  <span className="text-sm font-bold text-slate-800">{order.service || 'N/A'} ({order.quantity || 0})</span>
+                </div>
+              </TableCell>
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  <span className="max-w-[120px] truncate text-[11px] font-bold text-slate-500">
+                    {order.link || 'No Link'}
+                  </span>
+                  {order.link && (
+                    <>
+                      <button onClick={() => copyToClipboard(order.link, "Link")} className="text-slate-300 hover:text-blue-600"><Copy size={12} /></button>
+                      <a href={order.link} target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-blue-600"><ExternalLink size={12} /></a>
+                    </>
+                  )}
+                </div>
+              </TableCell>
+              <TableCell>
+                <code className="bg-slate-100 px-3 py-1 rounded-lg text-[11px] font-black text-[#111B21]">
+                  {order.utrId || 'N/A'}
+                </code>
+              </TableCell>
+              <TableCell>
+                <Badge className={
+                  order.status === 'Pending' ? 'bg-yellow-500/10 text-yellow-600 border-none' : 
+                  order.status === 'Processing' ? 'bg-blue-500/10 text-blue-600 border-none' :
+                  order.status === 'Cancelled' ? 'bg-red-500/10 text-red-600 border-none' :
+                  'bg-emerald-500/10 text-emerald-600 border-none'
+                }>
+                  {order.status || 'Pending'}
+                </Badge>
+              </TableCell>
+              <TableCell className="text-right">
+                <Select defaultValue={order.status || 'Pending'} onValueChange={(val) => updateStatus(order, val)}>
+                  <SelectTrigger className="w-[120px] h-10 bg-white border-slate-200 rounded-xl text-[10px] font-black uppercase">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Pending" className="text-[10px] font-black uppercase">Pending</SelectItem>
+                    <SelectItem value="Processing" className="text-[10px] font-black uppercase">Processing</SelectItem>
+                    <SelectItem value="Completed" className="text-[10px] font-black uppercase text-emerald-600">Completed</SelectItem>
+                    <SelectItem value="Cancelled" className="text-[10px] font-black uppercase text-red-600">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </TableCell>
+            </TableRow>
+          ))}
+          {data.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={6} className="text-center py-20 text-slate-400 font-bold uppercase text-xs tracking-widest">
+                No orders in this category.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -166,104 +247,37 @@ export default function TrackerPage() {
             </button>
             <div>
               <h1 className="text-2xl font-black tracking-tight text-[#111B21]">LIVE TRACKER</h1>
-              <p className="text-[10px] font-black text-[#312ECB] uppercase tracking-widest">Approve & Reject Orders</p>
+              <p className="text-[10px] font-black text-[#312ECB] uppercase tracking-widest">Approve & Manage Orders</p>
             </div>
           </div>
-          <Button onClick={exportOrders} className="bg-emerald-500 hover:bg-emerald-600 rounded-2xl h-12 px-6 text-[11px] font-black uppercase tracking-widest gap-2 shadow-lg">
-            <Download size={16} /> Export Logs
-          </Button>
         </header>
 
-        {error && (
-          <div className="bg-red-50 border border-red-100 p-6 rounded-[2rem] flex items-center gap-4 text-red-600 font-bold text-sm">
-            <AlertTriangle size={20} />
-            {error}
-          </div>
-        )}
-
         <main className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-slate-50">
-                <TableRow className="border-slate-100 hover:bg-transparent">
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Timestamp</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Service</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Link</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">UTR ID</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Status</TableHead>
-                  <TableHead className="text-right text-[10px] font-black uppercase tracking-widest py-6">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {orders.map((order) => (
-                  <TableRow key={order.id} className="border-slate-50 hover:bg-slate-50/50 transition-colors">
-                    <TableCell className="text-[11px] font-bold text-slate-400 uppercase">
-                      {isValid(order.createdAt) ? (
-                        <>
-                          {format(order.createdAt, 'MMM dd')}<br/>
-                          {format(order.createdAt, 'HH:mm')}
-                        </>
-                      ) : 'Invalid Date'}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-black uppercase text-[10px] text-blue-600">{order.platform || 'Platform'}</span>
-                        <span className="text-sm font-bold text-slate-800">{order.service || 'N/A'} ({order.quantity || 0})</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className="max-w-[120px] truncate text-[11px] font-bold text-slate-500">
-                          {order.link || 'No Link'}
-                        </span>
-                        {order.link && (
-                          <>
-                            <button onClick={() => copyToClipboard(order.link, "Link")} className="text-slate-300 hover:text-blue-600"><Copy size={12} /></button>
-                            <a href={order.link} target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-blue-600"><ExternalLink size={12} /></a>
-                          </>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <code className="bg-slate-100 px-3 py-1 rounded-lg text-[11px] font-black text-[#111B21]">
-                        {order.utrId || 'N/A'}
-                      </code>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={
-                        order.status === 'Pending' ? 'bg-yellow-500/10 text-yellow-600 border-none' : 
-                        order.status === 'Processing' ? 'bg-blue-500/10 text-blue-600 border-none' :
-                        order.status === 'Cancelled' ? 'bg-red-500/10 text-red-600 border-none' :
-                        'bg-emerald-500/10 text-emerald-600 border-none'
-                      }>
-                        {order.status || 'Pending'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Select defaultValue={order.status || 'Pending'} onValueChange={(val) => updateStatus(order.path, val)}>
-                        <SelectTrigger className="w-[120px] h-10 bg-white border-slate-200 rounded-xl text-[10px] font-black uppercase">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Pending" className="text-[10px] font-black uppercase">Pending</SelectItem>
-                          <SelectItem value="Processing" className="text-[10px] font-black uppercase">Processing</SelectItem>
-                          <SelectItem value="Completed" className="text-[10px] font-black uppercase text-emerald-600">Completed</SelectItem>
-                          <SelectItem value="Cancelled" className="text-[10px] font-black uppercase text-red-600">Cancelled</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {orders.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-20 text-slate-400 font-bold uppercase text-xs tracking-widest">
-                      No orders found in the database.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          <Tabs defaultValue="pending" className="w-full">
+            <div className="px-8 pt-6 pb-2 border-b border-slate-50 flex items-center justify-between">
+              <TabsList className="bg-slate-100 rounded-2xl p-1 h-12">
+                <TabsTrigger value="pending" className="rounded-xl px-6 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-[#312ECB] data-[state=active]:text-white">
+                  Pending ({pendingOrders.length})
+                </TabsTrigger>
+                <TabsTrigger value="history" className="rounded-xl px-6 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-[#312ECB] data-[state=active]:text-white">
+                  History ({historyOrders.length})
+                </TabsTrigger>
+              </TabsList>
+              
+              <div className="flex items-center gap-3">
+                <Filter size={16} className="text-slate-300" />
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Auto-updating live</span>
+              </div>
+            </div>
+
+            <TabsContent value="pending" className="mt-0">
+              <OrderTable data={pendingOrders} />
+            </TabsContent>
+            
+            <TabsContent value="history" className="mt-0">
+              <OrderTable data={historyOrders} />
+            </TabsContent>
+          </Tabs>
         </main>
       </div>
     </div>

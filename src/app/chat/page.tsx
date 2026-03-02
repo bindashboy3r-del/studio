@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -7,6 +8,9 @@ import {
   query, 
   orderBy, 
   serverTimestamp,
+  where,
+  limit,
+  onSnapshot
 } from "firebase/firestore";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
@@ -28,6 +32,7 @@ import { PLATFORMS, SERVICES, Platform, SMMService } from "@/app/lib/constants";
 import { useAuth, useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
+import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,6 +65,7 @@ export default function ChatPage() {
   const auth = useAuth();
   const db = useFirestore();
   const router = useRouter();
+  const { toast } = useToast();
   
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -85,6 +91,33 @@ export default function ChatPage() {
     localStorage.setItem('theme', newTheme);
     document.documentElement.classList.toggle('dark', newTheme === 'dark');
   };
+
+  // Real-time Notification Listener for User
+  useEffect(() => {
+    if (!db || !user) return;
+
+    const notifQuery = query(
+      collection(db, "users", user.uid, "notifications"),
+      where("read", "==", false),
+      orderBy("createdAt", "desc"),
+      limit(1)
+    );
+
+    const unsubscribe = onSnapshot(notifQuery, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === "added") {
+          const data = change.doc.data();
+          toast({
+            title: data.title,
+            description: data.message,
+            duration: 8000,
+          });
+        }
+      });
+    });
+
+    return () => unsubscribe();
+  }, [db, user, toast]);
 
   const messagesQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
@@ -210,7 +243,6 @@ export default function ChatPage() {
 
     const cleanText = text.toLowerCase();
 
-    // Reset flow if "Hi" or "Main Menu" is detected
     if (cleanText === 'hi' || cleanText.includes("main menu")) {
       setChatState('choosing_platform');
       setCurrentOrder({});
@@ -221,7 +253,6 @@ export default function ChatPage() {
       return;
     }
 
-    // State jumping logic: If user clicks a specific service button from a previous message
     const instaServices = SERVICES.instagram;
     const youtubeServices = SERVICES.youtube;
 
@@ -242,7 +273,6 @@ export default function ChatPage() {
       return;
     }
 
-    // Standard State Machine
     switch (chatState) {
       case 'choosing_platform':
         if (cleanText.includes("1") || cleanText.includes("instagram")) {
