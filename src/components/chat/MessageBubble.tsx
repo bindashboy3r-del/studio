@@ -94,7 +94,6 @@ export function MessageBubble({
   const [bulkLinks, setBulkLinks] = useState<string[]>([]);
   const [currentBulkLink, setCurrentBulkLink] = useState("");
 
-  // Default Combo Services: Likes, Views, Comments
   const [comboItems, setComboItems] = useState<{ serviceId: string, quantity: number }[]>([
     { serviceId: 'likes', quantity: 0 },
     { serviceId: 'views', quantity: 0 },
@@ -164,7 +163,6 @@ export function MessageBubble({
     setBulkLinks(bulkLinks.filter((_, i) => i !== index));
   };
 
-  // Combo Card Logic: List all Instagram services that AREN'T currently in the combo
   const availableServices = useMemo(() => {
     const selectedIds = comboItems.map(i => i.serviceId);
     return SERVICES.instagram.filter(s => !selectedIds.includes(s.id));
