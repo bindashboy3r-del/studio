@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { SendHorizonal, Download, Rocket, Home, QrCode } from "lucide-react";
+import { SendHorizonal, Rocket, Home, QrCode, CreditCard } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,16 +30,8 @@ export function MessageBubble({
   const [link, setLink] = useState("");
   const [utr, setUtr] = useState("");
   
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=smmxpressbot@slc%26pn=SocialBoost%26am=${paymentPrice}%26cu=INR`;
-
-  const handleDownloadQR = () => {
-    const link = document.createElement('a');
-    link.href = qrUrl;
-    link.download = 'payment-qr.png';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  const upiLink = `upi://pay?pa=smmxpressbot@slc&pn=SocialBoost&am=${paymentPrice}&cu=INR`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiLink)}`;
 
   return (
     <div className={cn("flex w-full mb-4", isUser ? "justify-end" : "justify-start")}>
@@ -57,17 +49,14 @@ export function MessageBubble({
           <div className="space-y-6">
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-[12px] font-black text-[#111B21] dark:text-white uppercase tracking-tight">
-                <QrCode size={16} className="text-[#312ECB]" /> Payment QR Code
+                <QrCode size={16} className="text-[#312ECB]" /> Secure Payment
               </div>
               <p className="text-[13px] font-bold text-slate-700 dark:text-slate-300">
-                Kripya niche diye gaye QR code ko scan ya save karke <span className="text-[#312ECB] font-black">₹{paymentPrice?.toFixed(0)}</span> ka payment karein.
+                Kripya niche diye gaye button par click karke ya QR scan karke <span className="text-[#312ECB] font-black">₹{paymentPrice?.toFixed(0)}</span> ka payment karein.
               </p>
               <div className="bg-slate-50 dark:bg-slate-900 p-2 rounded-lg">
                 <p className="text-[11px] font-black text-slate-500 uppercase">UPI ID: <span className="text-[#312ECB] dark:text-blue-400">smmxpressbot@slc</span></p>
               </div>
-              <p className="text-[12px] font-bold text-slate-700 dark:text-slate-300 mt-2">
-                Payment ke baad 12-digit UTR ID niche form mein bharein:
-              </p>
             </div>
 
             <div className="flex flex-col items-center gap-4 py-2">
@@ -76,13 +65,16 @@ export function MessageBubble({
               </div>
               
               <Button 
-                onClick={handleDownloadQR}
-                className="w-full h-11 bg-[#312ECB] hover:bg-[#2825A6] rounded-xl text-[11px] font-black uppercase tracking-widest gap-2 shadow-lg"
+                asChild
+                className="w-full h-12 bg-[#312ECB] hover:bg-[#2825A6] rounded-xl text-[12px] font-black uppercase tracking-widest gap-2 shadow-lg"
               >
-                <Download size={16} /> Download QR Code
+                <a href={upiLink}>
+                  <CreditCard size={18} /> Pay Now (UPI)
+                </a>
               </Button>
-              <p className="text-[9px] font-black text-[#312ECB]/50 uppercase tracking-widest">
-                Kripya manual amount (₹{paymentPrice?.toFixed(0)}) enter karein.
+              
+              <p className="text-[10px] font-bold text-slate-700 dark:text-slate-300 text-center">
+                Payment ke baad 12-digit UTR ID niche form mein bharein:
               </p>
             </div>
 
