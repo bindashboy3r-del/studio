@@ -83,7 +83,7 @@ interface OrderInProgress {
 }
 
 export default function ChatPage() {
-  const { user, isUserLoading } = user();
+  const { user, isUserLoading } = useUser();
   const auth = useAuth();
   const db = useFirestore();
   const router = useRouter();
