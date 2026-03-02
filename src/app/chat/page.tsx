@@ -11,7 +11,9 @@ import {
   where,
   limit,
   onSnapshot,
-  updateDoc
+  updateDoc,
+  doc,
+  writeBatch
 } from "firebase/firestore";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
@@ -26,7 +28,9 @@ import {
   Rocket,
   History,
   Bot,
-  User as UserIcon
+  User as UserIcon,
+  CheckCircle2,
+  X
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PLATFORMS, SERVICES, Platform, SMMService } from "@/app/lib/constants";
@@ -42,6 +46,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { format } from "date-fns";
 
 type ChatState = 
   | 'idle' 
@@ -93,36 +99,33 @@ export default function ChatPage() {
     document.documentElement.classList.toggle('dark', newTheme === 'dark');
   };
 
-  // Real-time Notification Listener for User - Only shows "UNREAD" notifications
-  // Removed orderBy to prevent Firestore index errors
-  useEffect(() => {
-    if (!db || !user) return;
-
-    const notifQuery = query(
+  // Real-time Notifications Listener
+  const notificationsQuery = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return query(
       collection(db, "users", user.uid, "notifications"),
-      where("read", "==", false)
+      orderBy("createdAt", "desc"),
+      limit(20)
     );
+  }, [db, user]);
 
-    const unsubscribe = onSnapshot(notifQuery, (snapshot) => {
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === "added") {
-          const data = change.doc.data();
-          // Display Toast
-          toast({
-            title: data.title,
-            description: data.message,
-            duration: 8000,
-          });
-          // MARK AS READ IMMEDIATELY so it only pops up once as requested
-          updateDoc(change.doc.ref, { read: true }).catch(err => console.error("Could not mark as read", err));
-        }
-      });
-    }, (err) => {
-      console.error("Notification listener error", err);
+  const { data: notificationsData } = useCollection(notificationsQuery);
+  const unreadCount = useMemo(() => 
+    notificationsData?.filter(n => !n.read).length || 0
+  , [notificationsData]);
+
+  const markAllAsRead = async () => {
+    if (!db || !user || !notificationsData) return;
+    const unread = notificationsData.filter(n => !n.read);
+    if (unread.length === 0) return;
+
+    const batch = writeBatch(db);
+    unread.forEach(n => {
+      const ref = doc(db, "users", user.uid, "notifications", n.id);
+      batch.update(ref, { read: true });
     });
-
-    return () => unsubscribe();
-  }, [db, user, toast]);
+    await batch.commit();
+  };
 
   const messagesQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
@@ -200,7 +203,6 @@ export default function ChatPage() {
     if (!link || !utr || !db || !user) return;
     
     const finalPrice = (currentOrder.quantity! / 1000) * currentOrder.service!.pricePer1000;
-    // Generate truly unique Order ID with prefix, random numbers and part of timestamp
     const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}-${Date.now().toString().slice(-4)}`;
     
     const orderData = {
@@ -365,13 +367,62 @@ export default function ChatPage() {
           <h1 className="text-xl font-black italic tracking-tighter text-[#312ECB] dark:text-white">SOCIALBOOST</h1>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={toggleTheme} className="w-8 h-8 rounded-full text-slate-400 hover:text-[#312ECB]">
             {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
           </Button>
-          <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-slate-400">
-            <Bell size={18} />
-          </Button>
+          
+          {/* Notifications Bell */}
+          <DropdownMenu onOpenChange={(open) => open && markAllAsRead()}>
+            <DropdownMenuTrigger asChild>
+              <button className="relative w-8 h-8 rounded-full text-slate-400 hover:text-[#312ECB] flex items-center justify-center transition-colors">
+                <Bell size={18} />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-900 animate-pulse" />
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[300px] bg-white dark:bg-slate-900 border-gray-100 dark:border-slate-800 p-0 rounded-3xl overflow-hidden shadow-2xl">
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-widest text-[#111B21] dark:text-white">Notifications</span>
+                {unreadCount > 0 && (
+                  <span className="bg-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full">{unreadCount} NEW</span>
+                )}
+              </div>
+              <ScrollArea className="h-[300px]">
+                {notificationsData && notificationsData.length > 0 ? (
+                  <div className="divide-y divide-gray-100 dark:divide-slate-800">
+                    {notificationsData.map((notif) => (
+                      <div key={notif.id} className={`p-4 transition-colors ${notif.read ? 'opacity-60' : 'bg-blue-50/30 dark:bg-blue-900/10'}`}>
+                        <div className="flex justify-between items-start mb-1">
+                          <h4 className="text-[11px] font-black uppercase text-[#312ECB]">{notif.title}</h4>
+                          <span className="text-[9px] font-bold text-slate-400">
+                            {notif.createdAt?.toDate ? format(notif.createdAt.toDate(), 'HH:mm') : ''}
+                          </span>
+                        </div>
+                        <p className="text-[12px] font-semibold text-slate-600 dark:text-slate-300 leading-snug">
+                          {notif.message}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full py-20 text-slate-400 space-y-2">
+                    <Bell size={32} className="opacity-20" />
+                    <p className="text-[10px] font-black uppercase tracking-widest">No Alerts Yet</p>
+                  </div>
+                )}
+              </ScrollArea>
+              {notificationsData && notificationsData.length > 0 && (
+                <div className="p-2 border-t border-gray-100 dark:border-slate-800 text-center">
+                  <button onClick={markAllAsRead} className="text-[9px] font-black uppercase tracking-widest text-[#312ECB] hover:underline">
+                    Clear All
+                  </button>
+                </div>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="w-10 h-10 rounded-full bg-[#312ECB] text-white font-bold text-xs shadow-lg">
