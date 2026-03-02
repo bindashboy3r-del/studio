@@ -15,8 +15,7 @@ interface Message {
 }
 
 export function SupportBot() {
-  const { user } = userHook();
-  function userHook() { return useUser(); }
+  const { user } = useUser();
   
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
@@ -35,6 +34,7 @@ export function SupportBot() {
   // Clear history when the bot is closed
   const toggleBot = () => {
     if (isOpen) {
+      // Clear history when closing
       setMessages([{ role: 'bot', text: 'Hi! I am the SocialBoost Assistant. How can I help you today? 🚀' }]);
     }
     setIsOpen(!isOpen);
@@ -60,7 +60,7 @@ export function SupportBot() {
 
       setMessages(prev => [...prev, { role: 'bot', text: response.reply }]);
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'bot', text: "Aapka request abhi process nahi ho pa raha hai. Kripya thodi der baad phir se koshish karein ya @bindash_boy3 ko Instagram par contact karein. 🙏" }]);
+      setMessages(prev => [...prev, { role: 'bot', text: "Aapka request abhi process nahi ho pa raha hai. Kripya thodi der baad phir se koshish karein ya @social_boost.bot ko Instagram par contact karein. 🙏" }]);
     } finally {
       setIsLoading(false);
     }

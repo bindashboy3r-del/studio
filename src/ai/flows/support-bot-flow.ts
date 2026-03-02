@@ -8,8 +8,8 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, collection, collectionGroup, query, where, getDocs, limit } from 'firebase/firestore';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getFirestore, collection, query, where, getDocs, limit, collectionGroup } from 'firebase/firestore';
 import { firebaseConfig } from '@/firebase/config';
 
 /**
@@ -34,39 +34,42 @@ const getOrderDetails = ai.defineTool(
   },
   async (input) => {
     try {
-      // Initialize Firebase inside the tool to ensure it's ready on the server
-      if (!getApps().length) {
-        initializeApp(firebaseConfig);
-      }
-      const db = getFirestore();
+      // Ensure Firebase is initialized for server-side execution
+      const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+      const db = getFirestore(app);
 
       // Clean the Order ID
       const cleanId = input.orderId.trim().toUpperCase();
       
-      // Step 1: Try searching the user's specific collection (fastest, no index required)
+      // Step 1: Search the user's specific collection (No index required)
       const userOrdersRef = collection(db, 'users', input.userId, 'orders');
       const qUser = query(userOrdersRef, where('orderId', '==', cleanId), limit(1));
       const snapshotUser = await getDocs(qUser);
       
       let orderDoc = !snapshotUser.empty ? snapshotUser.docs[0] : null;
 
-      // Step 2: Fallback to collection group search if not found in current user's (e.g. if they logged in with a different email)
+      // Step 2: Fallback to collection group (Requires index, so we handle failure gracefully)
       if (!orderDoc) {
-        const qGroup = query(
-          collectionGroup(db, 'orders'),
-          where('orderId', '==', cleanId),
-          limit(1)
-        );
-        const snapshotGroup = await getDocs(qGroup);
-        if (!snapshotGroup.empty) {
-          orderDoc = snapshotGroup.docs[0];
+        try {
+          const qGroup = query(
+            collectionGroup(db, 'orders'),
+            where('orderId', '==', cleanId),
+            limit(1)
+          );
+          const snapshotGroup = await getDocs(qGroup);
+          if (!snapshotGroup.empty) {
+            orderDoc = snapshotGroup.docs[0];
+          }
+        } catch (groupError) {
+          // If collection group index is missing, we just proceed with the null result from Step 1
+          console.warn("Collection group search skipped or failed:", groupError);
         }
       }
       
       if (!orderDoc) {
         return { 
           found: false, 
-          message: `Aapka order ${cleanId} abhi nahi mil pa raha hai, database mein kuch error aa raha hai. Kripya thodi der baad phir se koshish karein ya @bindash_boy3 ko Instagram par contact karein. 😔` 
+          message: `Aapka order ${cleanId} abhi nahi mil pa raha hai. Kripya thodi der baad phir se koshish karein ya @social_boost.bot ko Instagram par contact karein. 😔` 
         };
       }
       
@@ -82,7 +85,7 @@ const getOrderDetails = ai.defineTool(
       console.error("Support bot tool error:", e);
       return { 
         found: false, 
-        message: "Database search failed. Kripya thodi der baad phir se koshish karein ya @bindash_boy3 ko Instagram par contact karein. 😔" 
+        message: "Aapka order detail fetch karne mein dikkat aa rahi hai. Kripya thodi der baad koshish karein ya @social_boost.bot ko Instagram par contact karein. 😔" 
       };
     }
   }
@@ -115,7 +118,7 @@ GUIDELINES:
 2. If the tool finds the order, explain the current status (Pending, Processing, Completed, or Rejected) clearly to the user.
 3. If the tool returns found: false or if there is any error, use the exact Hinglish message provided by the tool to inform the user.
 4. If they ask how to add money or for a QR code, provide the UPI ID "smmxpressbot@slc" and suggest they click the "Add Funds" button in the header.
-5. If they ask for help or the bot is confused, suggest contacting the owner @bindash_boy3 on Instagram.
+5. If they ask for help or the bot is confused, suggest contacting the owner @social_boost.bot on Instagram.
 6. Keep responses concise and friendly. Use Hinglish (Hindi written in English script) as the user prefers. Use emojis! 🚀
 
 User Message: "{{{message}}}"
