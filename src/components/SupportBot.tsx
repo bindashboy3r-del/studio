@@ -33,7 +33,7 @@ export function SupportBot() {
 
   const toggleBot = () => {
     if (isOpen) {
-      // Clear history when closing so next session starts fresh
+      // Clear history when closing so next session starts fresh as requested
       setMessages([{ role: 'bot', text: 'Hi! I am the SocialBoost Assistant. How can I help you today? 🚀' }]);
     }
     setIsOpen(!isOpen);
@@ -48,17 +48,21 @@ export function SupportBot() {
     setIsLoading(true);
 
     try {
+      // Pass the limited history for context
+      const chatHistory = messages.slice(-5).map(m => ({ 
+        role: m.role === 'user' ? 'user' : 'model' as 'user' | 'model', 
+        content: m.text 
+      }));
+
       const response = await supportBot({
         message: userMsg,
         userId: user.uid,
-        history: messages.map(m => ({ 
-          role: m.role === 'user' ? 'user' : 'model', 
-          content: m.text 
-        }))
+        history: chatHistory
       });
 
       setMessages(prev => [...prev, { role: 'bot', text: response.reply }]);
     } catch (error) {
+      console.error('SupportBot Component Error:', error);
       setMessages(prev => [...prev, { role: 'bot', text: "Aapka order detail fetch karne mein dikkat aa rahi hai. Kripya thodi der baad koshish karein ya @social_boost.bot ko Instagram par contact karein. 😔" }]);
     } finally {
       setIsLoading(false);
