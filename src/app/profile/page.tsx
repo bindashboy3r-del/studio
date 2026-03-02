@@ -21,7 +21,8 @@ import {
   Instagram,
   X,
   KeyRound,
-  Wallet
+  Wallet,
+  PlusCircle
 } from "lucide-react";
 import {
   Dialog,
@@ -32,11 +33,12 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useFirestore } from "@/firebase";
 
 export default function ProfilePage() {
   const { user } = useUser();
   const auth = useAuth();
-  const db = useMemoFirebase(() => { return null; }, []); // Dummy for build
+  const db = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -45,12 +47,13 @@ export default function ProfilePage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Re-use current user doc for balance display
-  const { data: userData } = useDoc(useMemoFirebase(() => {
-    // This is handled better in ChatPage, but let's provide it here too
-    // We need the firestore instance
-    return null; 
-  }, []));
+  // User Profile Listener for Balance
+  const userDocRef = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return doc(db, "users", user.uid);
+  }, [db, user]);
+  const { data: userData } = useDoc(userDocRef);
+  const walletBalance = userData?.balance || 0;
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,14 +121,14 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Wallet Balance</p>
-                  <p className="text-2xl font-black text-emerald-700">₹{(userData?.balance || 0).toFixed(0)}</p>
+                  <p className="text-2xl font-black text-emerald-700">₹{walletBalance.toFixed(0)}</p>
                 </div>
               </div>
               <Button 
-                onClick={() => router.push('/chat')}
-                className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl h-12 px-6 font-black uppercase text-[10px] tracking-widest"
+                onClick={() => router.push('/add-funds')}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl h-12 px-6 font-black uppercase text-[10px] tracking-widest gap-2 shadow-lg"
               >
-                Refill
+                <PlusCircle size={14} /> Refill
               </Button>
             </div>
             <div className="flex items-center gap-3 text-[10px] font-black uppercase text-[#312ECB] tracking-widest bg-[#312ECB]/5 p-3 rounded-2xl">

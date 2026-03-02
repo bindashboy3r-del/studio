@@ -345,27 +345,6 @@ export default function ChatPage() {
     });
   };
 
-  const handleFundSubmit = async (amount: number, utr: string) => {
-    if (!amount || !utr || !db || !user) return;
-    
-    const fundData = {
-      userId: user.uid,
-      userEmail: user.email,
-      displayName: user.displayName,
-      amount,
-      utrId: utr,
-      status: 'Pending',
-      createdAt: serverTimestamp()
-    };
-
-    await addDoc(collection(db, "fundRequests"), fundData).then(() => {
-      botReply(`✅ Fund request submitted for ₹${amount}!\n\nAdmin will verify your UTR ID: ${utr} and update your balance soon.`);
-      setChatState('idle');
-    }).catch(err => {
-      toast({ variant: "destructive", title: "Error", description: "Failed to submit fund request." });
-    });
-  };
-
   const handleSend = async (manualText?: string) => {
     const text = manualText || inputValue.trim();
     if (!text || !db || !user) return;
@@ -379,14 +358,13 @@ export default function ChatPage() {
       setCurrentOrder({});
       botReply(
         "👋 Welcome to SocialBoost Bot!\n\nSelect a platform to begin:",
-        ["1. INSTAGRAM SERVICES", "2. YOUTUBE SERVICES", "💰 ADD FUNDS", "📜 ORDER HISTORY"]
+        ["1. INSTAGRAM SERVICES", "2. YOUTUBE SERVICES"]
       );
       return;
     }
 
     if (cleanText.includes("add funds")) {
-      setChatState('awaiting_fund_amount');
-      botReply("💰 Kitna amount add karna chahte hain? (Minimum ₹10)");
+      router.push("/add-funds");
       return;
     }
 
@@ -423,19 +401,6 @@ export default function ChatPage() {
     }
 
     switch (chatState) {
-      case 'awaiting_fund_amount':
-        const fundAmt = parseFloat(text);
-        if (isNaN(fundAmt) || fundAmt < 10) {
-          botReply("Please enter a valid amount (Minimum ₹10).");
-        } else {
-          setCurrentOrder({ fundAmount: fundAmt });
-          setChatState('awaiting_fund_payment');
-          botReply(`📸 Scan QR to pay ₹${fundAmt.toFixed(0)} to add funds:`, [], {
-            isFundPaymentCard: true,
-            fundPrice: fundAmt
-          });
-        }
-        break;
       case 'choosing_platform':
         if (cleanText.includes("1") || cleanText.includes("instagram")) {
           setCurrentOrder({ platform: 'instagram' });
@@ -570,18 +535,14 @@ export default function ChatPage() {
 
       {/* Sub-Header */}
       <div className="bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 px-6 py-3 flex items-center justify-between z-40">
-        <div className="flex items-center gap-2">
-          <div className="bg-emerald-500/10 text-emerald-600 px-3 py-1 rounded-full flex items-center gap-1.5 border border-emerald-100">
-            <Wallet size={14} />
-            <span className="text-[11px] font-black tracking-tight">₹{walletBalance.toFixed(0)}</span>
-          </div>
-          <button 
-            onClick={() => handleSend("Add Funds")}
-            className="p-1 text-[#312ECB] hover:scale-110 transition-transform"
-          >
-            <PlusCircle size={18} />
-          </button>
-        </div>
+        <button 
+          onClick={() => router.push('/add-funds')}
+          className="flex items-center gap-2 bg-emerald-500/10 text-emerald-600 px-3 py-1.5 rounded-full border border-emerald-100 hover:bg-emerald-500/20 transition-colors"
+        >
+          <Wallet size={14} />
+          <span className="text-[11px] font-black tracking-tight">₹{walletBalance.toFixed(0)}</span>
+          <PlusCircle size={14} className="ml-1" />
+        </button>
         <button 
           onClick={() => router.push('/orders')}
           className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-[#312ECB] hover:opacity-70 transition-opacity"
@@ -661,9 +622,6 @@ export default function ChatPage() {
             onPaymentSubmit={handlePaymentSubmit}
             isSuccessCard={m.isSuccessCard}
             successDetails={m.successDetails}
-            isFundPaymentCard={m.isFundPaymentCard}
-            fundPrice={m.fundPrice}
-            onFundSubmit={handleFundSubmit}
             onOptionClick={(option) => handleSend(option)}
             timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} 
           />
