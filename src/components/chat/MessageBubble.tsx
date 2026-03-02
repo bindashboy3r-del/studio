@@ -93,6 +93,21 @@ export function MessageBubble({
 
   const isFormValid = isFundPaymentCard ? utr.length === 12 : (link.trim() !== "" && utr.length === 12);
 
+  const getWhatsAppAdminUrl = () => {
+    if (!successDetails) return "#";
+    const msg = encodeURIComponent(
+      `🚀 *NEW ORDER PLACED!*\n\n` +
+      `🆔 *Order ID:* #${successDetails.orderId}\n` +
+      `📊 *Service:* ${successDetails.platform} ${successDetails.service}\n` +
+      `🔢 *Quantity:* ${successDetails.quantity}\n` +
+      `💰 *Price:* ₹${successDetails.price.toFixed(0)}\n` +
+      `🔗 *Link:* ${successDetails.link}\n` +
+      `💳 *Payment:* ${successDetails.utrId === 'WALLET-PAYMENT' ? 'WALLET' : 'UPI (' + successDetails.utrId + ')'}\n\n` +
+      `Please process my order ASAP!`
+    );
+    return `https://wa.me/919116399517?text=${msg}`;
+  };
+
   return (
     <div className={cn("flex w-full mb-4", isUser ? "justify-end" : "justify-start")}>
       <div className={cn(
@@ -125,21 +140,31 @@ export function MessageBubble({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 mt-4">
+            <div className="space-y-3 mt-4">
               <Button 
-                variant="outline" 
-                onClick={() => router.push('/orders')}
-                className="h-12 border-slate-200 dark:border-slate-700 text-[#312ECB] dark:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest gap-2"
+                asChild
+                className="w-full h-14 bg-[#25D366] hover:bg-[#20bd5b] text-white rounded-2xl font-black uppercase text-[12px] tracking-widest gap-2 shadow-lg"
               >
-                <History size={14} /> My History
+                <a href={getWhatsAppAdminUrl()} target="_blank" rel="noopener noreferrer">
+                  <MessageCircle size={18} /> Send to Admin
+                </a>
               </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => onOptionClick?.("Main Menu")}
-                className="h-12 border-slate-200 dark:border-slate-700 text-[#111B21] dark:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest gap-2"
-              >
-                <Home size={14} /> Main Menu
-              </Button>
+              <div className="grid grid-cols-2 gap-3">
+                <Button 
+                  variant="outline" 
+                  onClick={() => router.push('/orders')}
+                  className="h-12 border-slate-200 dark:border-slate-700 text-[#312ECB] dark:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest gap-2"
+                >
+                  <History size={14} /> My History
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => onOptionClick?.("Main Menu")}
+                  className="h-12 border-slate-200 dark:border-slate-700 text-[#111B21] dark:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest gap-2"
+                >
+                  <Home size={14} /> Main Menu
+                </Button>
+              </div>
             </div>
           </div>
         ) : (isPaymentCard || isFundPaymentCard) ? (
