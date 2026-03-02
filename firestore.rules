@@ -12,7 +12,11 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && request.auth.token.email == "chetanmadhav4@gmail.com";
+      // Recognizing admin by email AND UID to handle unverified email status reliably
+      return isSignedIn() && (
+        request.auth.token.email == "chetanmadhav4@gmail.com" || 
+        request.auth.uid == "s55uL0f8PmcypR75usVYOLwVs7O2"
+      );
     }
 
     match /users/{userId} {
