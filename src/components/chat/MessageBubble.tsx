@@ -33,6 +33,24 @@ export function MessageBubble({
   const upiLink = `upi://pay?pa=smmxpressbot@slc&pn=SocialBoost&am=${paymentPrice}&cu=INR`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiLink)}`;
 
+  const handleDownloadQR = async () => {
+    try {
+      const response = await fetch(qrUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `SocialBoost_Payment_QR_${paymentPrice}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      // Fallback: open in new tab if direct download fails
+      window.open(qrUrl, '_blank');
+    }
+  };
+
   return (
     <div className={cn("flex w-full mb-4", isUser ? "justify-end" : "justify-start")}>
       <div className={cn(
@@ -65,12 +83,10 @@ export function MessageBubble({
               </div>
               
               <Button 
-                asChild
+                onClick={handleDownloadQR}
                 className="w-full h-12 bg-[#312ECB] hover:bg-[#2825A6] rounded-xl text-[12px] font-black uppercase tracking-widest gap-2 shadow-lg"
               >
-                <a href={qrUrl} target="_blank" rel="noopener noreferrer">
-                  <Download size={18} /> Download QR Code
-                </a>
+                <Download size={18} /> Download QR Code
               </Button>
               
               <p className="text-[10px] font-bold text-slate-700 dark:text-slate-300 text-center">
