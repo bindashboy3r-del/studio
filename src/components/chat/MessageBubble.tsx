@@ -1,12 +1,29 @@
 
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { SendHorizonal, Rocket, Home, QrCode, Download, MessageCircle, Copy, CheckCircle, Loader2, History, Wallet } from "lucide-react";
+import { 
+  SendHorizonal, 
+  Rocket, 
+  Home, 
+  QrCode, 
+  Download, 
+  MessageCircle, 
+  Copy, 
+  CheckCircle, 
+  Loader2, 
+  History, 
+  Wallet,
+  Plus,
+  Trash2,
+  Layers,
+  Link as LinkIcon
+} from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface SuccessDetails {
   orderId: string;
@@ -32,6 +49,8 @@ interface MessageBubbleProps {
   isFundPaymentCard?: boolean;
   fundPrice?: number;
   onFundSubmit?: (amount: number, utr: string) => void;
+  isBulkLinkCard?: boolean;
+  onBulkLinksSubmit?: (links: string[]) => void;
 }
 
 export function MessageBubble({ 
@@ -47,15 +66,22 @@ export function MessageBubble({
   successDetails,
   isFundPaymentCard,
   fundPrice,
-  onFundSubmit
+  onFundSubmit,
+  isBulkLinkCard,
+  onBulkLinksSubmit
 }: MessageBubbleProps) {
   const isUser = sender === 'user';
   const { toast } = useToast();
   const router = useRouter();
+  
   const [link, setLink] = useState("");
   const [utr, setUtr] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
   
+  // Bulk link specific state
+  const [bulkLinks, setBulkLinks] = useState<string[]>([]);
+  const [currentBulkLink, setCurrentBulkLink] = useState("");
+
   const price = paymentPrice || fundPrice || 0;
   const upiId = "smmxpressbot@slc";
   
@@ -106,6 +132,16 @@ export function MessageBubble({
       `Please process my order ASAP!`
     );
     return `https://wa.me/919116399517?text=${msg}`;
+  };
+
+  const addBulkLink = () => {
+    if (!currentBulkLink.trim()) return;
+    setBulkLinks([...bulkLinks, currentBulkLink.trim()]);
+    setCurrentBulkLink("");
+  };
+
+  const removeBulkLink = (index: number) => {
+    setBulkLinks(bulkLinks.filter((_, i) => i !== index));
   };
 
   return (
@@ -239,13 +275,75 @@ export function MessageBubble({
               </Button>
             </div>
           </div>
+        ) : isBulkLinkCard ? (
+          <div className="space-y-6 min-w-[280px]">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-[12px] font-black text-[#111B21] dark:text-white uppercase tracking-tight">
+                <Layers size={16} className="text-[#312ECB]" /> Bulk Link Input
+              </div>
+              <p className="text-[13px] font-bold text-slate-700 dark:text-slate-300">
+                Add links one-by-one to your bulk list.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
+                  <Input 
+                    placeholder="Paste link here..."
+                    value={currentBulkLink}
+                    onChange={(e) => setCurrentBulkLink(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && addBulkLink()}
+                    className="h-12 bg-slate-50 dark:bg-slate-900 border-none rounded-2xl pl-10 pr-5 text-sm font-bold shadow-inner"
+                  />
+                </div>
+                <Button 
+                  onClick={addBulkLink}
+                  className="h-12 w-12 bg-[#312ECB] rounded-2xl shadow-lg shrink-0"
+                >
+                  <Plus size={20} />
+                </Button>
+              </div>
+
+              <ScrollArea className={cn("h-[180px] bg-slate-50 dark:bg-slate-900 rounded-3xl p-4 border border-slate-100 dark:border-slate-800", bulkLinks.length === 0 && "flex items-center justify-center")}>
+                {bulkLinks.length > 0 ? (
+                  <div className="space-y-2">
+                    {bulkLinks.map((l, i) => (
+                      <div key={i} className="flex items-center justify-between bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm animate-in fade-in slide-in-from-left-2 duration-300">
+                        <span className="text-[11px] font-bold truncate max-w-[180px] text-slate-600 dark:text-slate-300">
+                          {l}
+                        </span>
+                        <button onClick={() => removeBulkLink(i)} className="text-red-400 hover:text-red-600 p-1">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center opacity-30 py-10">
+                    <Layers size={32} className="mb-2" />
+                    <p className="text-[10px] font-black uppercase tracking-widest">Links List Empty</p>
+                  </div>
+                )}
+              </ScrollArea>
+
+              <Button 
+                onClick={() => onBulkLinksSubmit?.(bulkLinks)}
+                disabled={bulkLinks.length === 0}
+                className="w-full h-14 bg-[#25D366] hover:bg-[#20bd5b] text-white rounded-2xl font-black uppercase text-[12px] tracking-widest gap-2 shadow-xl transition-all active:scale-95"
+              >
+                Submit {bulkLinks.length} Links
+              </Button>
+            </div>
+          </div>
         ) : (
           <p className="text-[14px] leading-relaxed font-bold text-black dark:text-white whitespace-pre-wrap">
             {text}
           </p>
         )}
 
-        {options && options.length > 0 && !isPaymentCard && !isSuccessCard && !isFundPaymentCard && (
+        {options && options.length > 0 && !isPaymentCard && !isSuccessCard && !isFundPaymentCard && !isBulkLinkCard && (
           <div className="mt-4 space-y-2">
             {options.map((option, idx) => (
               <button

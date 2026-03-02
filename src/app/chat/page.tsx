@@ -379,6 +379,14 @@ export default function ChatPage() {
     });
   };
 
+  const handleBulkLinksFromCard = async (links: string[]) => {
+    if (links.length === 0) return;
+    await addMessage('user', `Added ${links.length} links for bulk order.`);
+    setCurrentOrder({ ...currentOrder, bulkLinks: links } as any);
+    setChatState('entering_combo_quantities'); // Reuse for bulk qty
+    botReply(`📊 Quantity PER LINK for ${currentOrder.items[0].service.name}?`);
+  };
+
   const handleSend = async (manualText?: string) => {
     const text = manualText || inputValue.trim();
     if (!text || !db || !user) return;
@@ -429,7 +437,9 @@ export default function ChatPage() {
           if (currentOrder.type === 'bulk') {
             setCurrentOrder({ ...currentOrder, items: [{ service: selected, quantity: 0, link: '' }] });
             setChatState('entering_bulk_links');
-            botReply("🔗 Send your Instagram links (one per line):");
+            botReply("🔗 Add your target links one by one below:", [], {
+              isBulkLinkCard: true
+            });
           } else {
             setCurrentOrder({ ...currentOrder, items: [{ service: selected, quantity: 0, link: '' }] });
             setChatState('entering_quantity');
@@ -468,35 +478,6 @@ export default function ChatPage() {
           setCurrentOrder({ ...currentOrder, items: updatedItems });
           setChatState('confirming_price');
           botReply("🔗 Send the target Instagram link:");
-        }
-        break;
-
-      case 'entering_bulk_links':
-        const links = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-        if (links.length === 0) {
-          botReply("Please provide at least one link.");
-        } else {
-          setCurrentOrder({ ...currentOrder, bulkLinks: links } as any);
-          setChatState('entering_combo_quantities'); // Reuse for bulk qty
-          botReply(`📊 Quantity PER LINK for ${currentOrder.items[0].service.name}?`);
-        }
-        break;
-
-      case 'entering_combo_quantities':
-        const bQty = parseInt(text);
-        if (isNaN(bQty) || bQty < 100) {
-          botReply("Invalid quantity (Min 100).");
-        } else {
-          const links = (currentOrder as any).bulkLinks as string[];
-          const finalItems = links.map(l => ({
-            service: currentOrder.items[0].service,
-            quantity: bQty,
-            link: l
-          }));
-          setCurrentOrder({ ...currentOrder, items: finalItems });
-          setChatState('choosing_payment_method');
-          const total = finalItems.length * (bQty / 1000) * currentOrder.items[0].service.pricePer1000;
-          botReply(`💰 Total for ${links.length} links: ₹${total.toFixed(2)}\n💳 Wallet: ₹${walletBalance.toFixed(0)}`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]);
         }
         break;
 
@@ -685,6 +666,8 @@ export default function ChatPage() {
             onPaymentSubmit={m.onPaymentSubmit}
             isSuccessCard={m.isSuccessCard}
             successDetails={m.successDetails}
+            isBulkLinkCard={m.isBulkLinkCard}
+            onBulkLinksSubmit={(links) => handleBulkLinksFromCard(links)}
             onOptionClick={(option) => handleSend(option)}
             timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} 
           />
