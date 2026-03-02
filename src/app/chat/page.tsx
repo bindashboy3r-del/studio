@@ -6,18 +6,17 @@ import {
   addDoc, 
   query, 
   orderBy, 
-  onSnapshot, 
   serverTimestamp
 } from "firebase/firestore";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, LogOut, MoreVertical, Search } from "lucide-react";
+import { Send, LogOut, MoreVertical, Search, Rocket } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PLATFORMS, SERVICES, Platform, SMMService } from "@/app/lib/constants";
 import { intelligentOrderParsing } from "@/ai/flows/intelligent-order-parsing";
-import { useAuth, useFirestore, useUser } from "@/firebase";
+import { useAuth, useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 
@@ -41,45 +40,33 @@ export default function ChatPage() {
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
   const db = useFirestore();
-  const [messages, setMessages] = useState<any[]>([]);
+  const router = useRouter();
+  
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [chatState, setChatState] = useState<ChatState>('idle');
   const [currentOrder, setCurrentOrder] = useState<OrderInProgress>({});
   
   const scrollRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
+
+  // Memoize the query for chat messages
+  const messagesQuery = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return query(
+      collection(db, "users", user.uid, "chatMessages"),
+      orderBy("timestamp", "asc")
+    );
+  }, [db, user]);
+
+  const { data: messages = [], isLoading: isMessagesLoading } = useCollection(messagesQuery);
 
   useEffect(() => {
     if (!isUserLoading && !user) router.push("/");
   }, [user, isUserLoading, router]);
 
   useEffect(() => {
-    if (!user || !db) return;
-
-    const q = query(
-      collection(db, "users", user.uid, "chatMessages"),
-      orderBy("timestamp", "asc")
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const msgs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        timestamp: doc.data().timestamp?.toDate() || new Date()
-      }));
-      setMessages(msgs);
-      setTimeout(scrollToBottom, 100);
-    }, (error) => {
-      const contextualError = new FirestorePermissionError({
-        path: `users/${user.uid}/chatMessages`,
-        operation: 'list'
-      });
-      errorEmitter.emit('permission-error', contextualError);
-    });
-
-    return () => unsubscribe();
-  }, [user, db]);
+    scrollToBottom();
+  }, [messages, isTyping]);
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
@@ -110,22 +97,20 @@ export default function ChatPage() {
 
   const botReply = async (text: string) => {
     setIsTyping(true);
+    // Simulate thinking time
     setTimeout(async () => {
       await addMessage('bot', text);
       setIsTyping(false);
-    }, 1000);
+    }, 1200);
   };
 
-  const startOrderFlow = async () => {
-    setChatState('initial');
-    botReply(`Welcome to SocialBoost! 🚀\nI'm your assistant. Send 'Hi' to start creating your order.`);
-  };
-
+  // Bot initialization logic
   useEffect(() => {
-    if (messages.length === 0 && user && !isTyping && chatState === 'idle') {
-      startOrderFlow();
+    if (user && !isMessagesLoading && messages.length === 0 && chatState === 'idle') {
+      setChatState('initial');
+      botReply(`Welcome to SocialBoost! 🚀\nI'm your assistant. Send 'Hi' to start creating your order.`);
     }
-  }, [messages, user, chatState]);
+  }, [user, isMessagesLoading, messages.length, chatState]);
 
   const handleSend = async () => {
     if (!inputValue.trim() || !db || !user) return;
@@ -133,6 +118,7 @@ export default function ChatPage() {
     setInputValue("");
     await addMessage('user', text);
 
+    // Flow Logic
     if (chatState === 'initial' && text.toLowerCase() === 'hi') {
       setChatState('choosing_platform');
       botReply(`What can I help you with today?\n\n1️⃣ Instagram Services\n2️⃣ YouTube Services`);
@@ -142,6 +128,7 @@ export default function ChatPage() {
       return;
     }
 
+    // AI Parsing Fallback / Shortcut
     if (chatState === 'choosing_platform' || chatState === 'idle') {
       try {
         if (text.length > 5) {
@@ -164,10 +151,11 @@ export default function ChatPage() {
           }
         }
       } catch (e) {
-        // Fallback
+        // Fallback to manual flow if AI parsing fails or doesn't find a match
       }
     }
 
+    // Manual Selection Flow
     switch (chatState) {
       case 'choosing_platform':
         if (text === "1" || text.toLowerCase().includes("instagram")) {
@@ -189,7 +177,7 @@ export default function ChatPage() {
         const index = parseInt(text) - 1;
         const platform = currentOrder.platform;
         if (!platform) {
-          startOrderFlow();
+          setChatState('initial');
           return;
         }
         const service = SERVICES[platform][index];
@@ -245,11 +233,13 @@ export default function ChatPage() {
 
           setChatState('idle');
           botReply("Order placed successfully! 🎉\nWe are processing it now.");
-          setTimeout(() => startOrderFlow(), 3000);
+          setTimeout(() => {
+            setChatState('initial');
+            addMessage('bot', "Send 'Hi' to start creating another order.");
+          }, 3000);
         } else {
-          setChatState('idle');
-          botReply("Order cancelled.");
-          setTimeout(() => startOrderFlow(), 2000);
+          setChatState('initial');
+          botReply("Order cancelled. Send 'Hi' if you'd like to try again.");
         }
         break;
 
@@ -298,12 +288,12 @@ export default function ChatPage() {
           Messages are secured
         </div>
         
-        {messages.map((m) => (
+        {messages.map((m: any) => (
           <MessageBubble 
             key={m.id} 
             sender={m.sender} 
             text={m.text} 
-            timestamp={m.timestamp} 
+            timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} 
           />
         ))}
         {isTyping && <TypingIndicator />}
