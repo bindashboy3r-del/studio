@@ -49,34 +49,37 @@ export function MessageBubble({
   
   const price = paymentPrice || 0;
   const upiId = "smmxpressbot@slc";
-  const upiLink = `upi://pay?pa=${upiId}&pn=SocialBoost&am=${price}&cu=INR`;
   
-  // Using a very reliable QR provider
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(upiLink)}`;
+  // Construct UPI link for QR generation
+  const upiLink = `upi://pay?pa=${upiId}&pn=SocialBoost&am=${price.toFixed(2)}&cu=INR`;
+  
+  // Using QuickChart for high reliability and CORS support
+  const qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(upiLink)}&size=300&margin=1&centerImageUrl=https://picsum.photos/seed/rocket/64/64`;
 
   const handleDownloadQR = async () => {
     setIsDownloading(true);
     try {
       const response = await fetch(qrUrl);
+      if (!response.ok) throw new Error('Network response was not ok');
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
+      
       const a = document.createElement('a');
       a.style.display = 'none';
       a.href = url;
-      // Use a simple filename for better compatibility
-      a.download = `SocialBoost_Payment_QR.png`;
+      a.download = `SocialBoost_Payment_QR_${Date.now()}.png`;
       document.body.appendChild(a);
       a.click();
       
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       
-      toast({ title: "Success", description: "QR Code saved to your device." });
+      toast({ title: "Success", description: "QR Code saved to your gallery." });
     } catch (error) {
       console.error('Download failed:', error);
-      // Fallback: open in new tab
+      // Fallback: Open in new tab for manual long-press save
       window.open(qrUrl, '_blank');
-      toast({ title: "Note", description: "Long press the QR code in the new tab to save it." });
+      toast({ title: "Note", description: "Please long-press the QR code in the new tab to save it." });
     } finally {
       setIsDownloading(false);
     }
@@ -159,7 +162,7 @@ export function MessageBubble({
                 <QrCode size={16} className="text-[#312ECB]" /> Secure Payment Gateway
               </div>
               <p className="text-[13px] font-bold text-slate-700 dark:text-slate-300">
-                Kripya niche diye gaye QR code ko scan karein ya UPI ID copy karke <span className="text-[#312ECB] font-black">₹{price.toFixed(0)}</span> ka payment karein.
+                Kripya QR code scan karein ya UPI ID copy karke <span className="text-[#312ECB] font-black">₹{price.toFixed(0)}</span> ka payment karein.
               </p>
             </div>
 
@@ -187,7 +190,10 @@ export function MessageBubble({
                   className="w-48 h-48 block rounded-xl" 
                   crossOrigin="anonymous"
                   loading="eager"
-                  onError={() => toast({ variant: "destructive", title: "QR Error", description: "Failed to load QR code. Please use UPI ID." })}
+                  onError={(e) => {
+                    console.error('QR load error');
+                    toast({ variant: "destructive", title: "Error", description: "QR failed to load. Use UPI ID instead." });
+                  }}
                 />
               </div>
               
@@ -197,7 +203,7 @@ export function MessageBubble({
                 className="w-full h-12 bg-white dark:bg-slate-900 text-[#312ECB] hover:bg-slate-50 border-2 border-[#312ECB] rounded-xl text-[12px] font-black uppercase tracking-widest gap-2 shadow-sm"
               >
                 {isDownloading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-                {isDownloading ? "Starting..." : "Download QR Code"}
+                {isDownloading ? "Downloading..." : "Download QR Code"}
               </Button>
             </div>
 
@@ -205,7 +211,7 @@ export function MessageBubble({
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Target Link</label>
                 <Input 
-                  placeholder="Instagram Profile/Post Link"
+                  placeholder="Paste Instagram/YouTube link here"
                   value={link}
                   onChange={(e) => setLink(e.target.value)}
                   className="h-12 bg-slate-50 dark:bg-slate-900 border-none rounded-2xl px-5 text-sm font-bold shadow-inner"
