@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { SendHorizonal, Rocket, Home, QrCode, CreditCard } from "lucide-react";
+import { SendHorizonal, Rocket, Home, QrCode, Download } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,7 +52,7 @@ export function MessageBubble({
                 <QrCode size={16} className="text-[#312ECB]" /> Secure Payment
               </div>
               <p className="text-[13px] font-bold text-slate-700 dark:text-slate-300">
-                Kripya niche diye gaye button par click karke ya QR scan karke <span className="text-[#312ECB] font-black">₹{paymentPrice?.toFixed(0)}</span> ka payment karein.
+                Kripya niche diye gaye QR code ko scan karke ya download karke <span className="text-[#312ECB] font-black">₹{paymentPrice?.toFixed(0)}</span> ka payment karein.
               </p>
               <div className="bg-slate-50 dark:bg-slate-900 p-2 rounded-lg">
                 <p className="text-[11px] font-black text-slate-500 uppercase">UPI ID: <span className="text-[#312ECB] dark:text-blue-400">smmxpressbot@slc</span></p>
@@ -68,8 +68,8 @@ export function MessageBubble({
                 asChild
                 className="w-full h-12 bg-[#312ECB] hover:bg-[#2825A6] rounded-xl text-[12px] font-black uppercase tracking-widest gap-2 shadow-lg"
               >
-                <a href={upiLink}>
-                  <CreditCard size={18} /> Pay Now (UPI)
+                <a href={qrUrl} target="_blank" rel="noopener noreferrer">
+                  <Download size={18} /> Download QR Code
                 </a>
               </Button>
               
