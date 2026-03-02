@@ -10,7 +10,8 @@ import {
   serverTimestamp,
   where,
   limit,
-  onSnapshot
+  onSnapshot,
+  updateDoc
 } from "firebase/firestore";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
@@ -92,28 +93,32 @@ export default function ChatPage() {
     document.documentElement.classList.toggle('dark', newTheme === 'dark');
   };
 
-  // Real-time Notification Listener for User
+  // Real-time Notification Listener for User - Only shows "UNREAD" notifications
   useEffect(() => {
     if (!db || !user) return;
 
     const notifQuery = query(
       collection(db, "users", user.uid, "notifications"),
       where("read", "==", false),
-      orderBy("createdAt", "desc"),
-      limit(1)
+      orderBy("createdAt", "desc")
     );
 
     const unsubscribe = onSnapshot(notifQuery, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
         if (change.type === "added") {
           const data = change.doc.data();
+          // Display Toast
           toast({
             title: data.title,
             description: data.message,
             duration: 8000,
           });
+          // MARK AS READ IMMEDIATELY so it only pops up once
+          updateDoc(change.doc.ref, { read: true }).catch(err => console.error("Could not mark as read", err));
         }
       });
+    }, (err) => {
+      console.error("Notification listener error", err);
     });
 
     return () => unsubscribe();
@@ -200,7 +205,7 @@ export default function ChatPage() {
     
     const orderData = {
       userId: user.uid,
-      orderId: orderId, // Store the unique ID
+      orderId: orderId,
       platform: PLATFORMS[currentOrder.platform!],
       service: currentOrder.service?.name,
       link: link,
