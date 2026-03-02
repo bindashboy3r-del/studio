@@ -13,8 +13,8 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.email == "chetanmadhav4@gmail.com" || 
-        request.auth.uid == "s55uL0f8PmcypR75usVYOLwVs7O2"
+        request.auth.uid == "s55uL0f8PmcypR75usVYOLwVs7O2" ||
+        request.auth.token.email == "chetanmadhav4@gmail.com"
       );
     }
 

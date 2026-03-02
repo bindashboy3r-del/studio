@@ -9,6 +9,7 @@ import {
   doc,
   writeBatch,
   increment,
+  serverTimestamp,
 } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { 
@@ -77,6 +78,11 @@ export default function FundRequestsPage() {
 
   const handleRequest = async (request: any, action: 'Approved' | 'Rejected') => {
     if (!db || !admin) return;
+    if (!request.userId) {
+      toast({ variant: "destructive", title: "Error", description: "User ID missing in request." });
+      return;
+    }
+
     setProcessingId(request.id);
     
     const batch = writeBatch(db);
@@ -86,14 +92,13 @@ export default function FundRequestsPage() {
 
     // 1. Update the request status
     const reqRef = doc(db, "fundRequests", request.id);
-    const requestUpdate = { 
+    batch.update(reqRef, { 
       status: action,
       finalCreditAmount: finalAmount,
       bonusApplied: isBonus,
       processedBy: admin.uid,
-      processedAt: new Date().toISOString()
-    };
-    batch.update(reqRef, requestUpdate);
+      processedAt: serverTimestamp()
+    });
 
     // 2. If approved, update user balance
     if (action === 'Approved') {
@@ -103,7 +108,7 @@ export default function FundRequestsPage() {
       });
     }
 
-    // 3. Create notification for user (using batch)
+    // 3. Create notification for user
     const notifRef = doc(collection(db, "users", request.userId, "notifications"));
     batch.set(notifRef, {
       title: action === 'Approved' ? '💰 Wallet Refilled!' : '❌ Fund Request Rejected',
@@ -111,7 +116,7 @@ export default function FundRequestsPage() {
         ? `₹${finalAmount.toFixed(0)} has been added to your wallet${isBonus ? ' (includes 10% bonus!)' : ''}.`
         : `Your fund request for ₹${request.amount} was rejected. Please contact support.`,
       read: false,
-      createdAt: new Date().toISOString()
+      createdAt: serverTimestamp()
     });
 
     batch.commit()
@@ -125,7 +130,7 @@ export default function FundRequestsPage() {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: `batch-operation (fundRequests/${request.id})`,
           operation: 'write',
-          requestResourceData: { action, finalAmount }
+          requestResourceData: { action, finalAmount, userId: request.userId }
         }));
       })
       .finally(() => {
