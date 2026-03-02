@@ -21,6 +21,7 @@ import { useAuth, useFirestore, useUser } from "@/firebase";
 
 type ChatState = 
   | 'idle' 
+  | 'initial'
   | 'choosing_platform' 
   | 'choosing_service' 
   | 'entering_link' 
@@ -80,7 +81,7 @@ export default function ChatPage() {
 
   const addMessage = async (sender: 'user' | 'bot', text: string) => {
     if (!user || !db) return;
-    await addDoc(collection(db, "messages", user.uid, "user_messages"), {
+    addDoc(collection(db, "messages", user.uid, "user_messages"), {
       sender,
       text,
       timestamp: serverTimestamp()
@@ -96,8 +97,8 @@ export default function ChatPage() {
   };
 
   const startOrderFlow = async () => {
-    setChatState('choosing_platform');
-    botReply(`Welcome to SocialBoost! 🚀\nI'm your assistant. What can I help you with today?\n\n1️⃣ Instagram Services\n2️⃣ YouTube Services`);
+    setChatState('initial');
+    botReply(`Welcome to SocialBoost! 🚀\nI'm your assistant. Send 'Hi' to start creating your order.`);
   };
 
   useEffect(() => {
@@ -111,6 +112,12 @@ export default function ChatPage() {
     const text = inputValue.trim();
     setInputValue("");
     await addMessage('user', text);
+
+    if (chatState === 'initial') {
+      setChatState('choosing_platform');
+      botReply(`What can I help you with today?\n\n1️⃣ Instagram Services\n2️⃣ YouTube Services`);
+      return;
+    }
 
     if (chatState === 'choosing_platform' || chatState === 'idle') {
       try {
@@ -186,7 +193,7 @@ export default function ChatPage() {
 
       case 'confirming':
         if (text.toLowerCase() === 'confirm') {
-          await addDoc(collection(db, "orders"), {
+          addDoc(collection(db, "orders"), {
             uid: user?.uid,
             platform: currentOrder.platform,
             service: currentOrder.service?.id,
