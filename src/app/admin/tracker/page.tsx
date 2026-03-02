@@ -131,7 +131,7 @@ export default function TrackerPage() {
           const notifTitle = newStatus === 'Processing' ? '🔄 Order Processing' : '❌ Order Rejected';
           const notifMsg = newStatus === 'Processing' ? 
             `Your order for ${order.service} is being processed and will finish in 45 minutes!` :
-            `Sorry, your order for ${order.service} was rejected.`;
+            `Sorry, your order for ${order.service} was rejected. Reason: Wrong UTR ID.`;
 
           addDoc(collection(db, "users", order.userId, "notifications"), {
             title: notifTitle,
