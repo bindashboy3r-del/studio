@@ -4,128 +4,121 @@ service cloud.firestore {
 
     /**
      * CORE PHILOSOPHY
-     * This ruleset enforces a strict path-based ownership model combined with role-based access control 
-     * (RBAC) via an administrative roles collection. User data is isolated within private subtrees 
-     * where the path segment {userId} must match the authenticated user's UID.
+     * This ruleset implements a strict Path-Based Ownership model supplemented by a 
+     * Global Role-Based Access Control (RBAC) system for administrators. 
      * 
      * DATA STRUCTURE
-     * - /users/{userId}: Private user profiles.
-     * - /users/{userId}/messages/{messageId}: Private user-bot chat history.
-     * - /users/{userId}/orders/{orderId}: Private user orders (also accessible by admins).
-     * - /services/{serviceId}: Publicly readable service definitions, admin-managed.
-     * - /roles_admin/{userId}: Indicator collection for administrative privileges.
+     * - /users/{userId}: The root document for a user's profile.
+     * - /users/{userId}/orders/{orderId}: User-specific subcollection for service orders.
+     * - /users/{userId}/chatMessages/{chatMessageId}: User-specific subcollection for bot interactions.
+     * - /services/{serviceId}: Top-level collection for SMM service definitions.
+     * - /roles_admin/{userId}: Security-critical collection where document existence defines admin status.
      * 
      * KEY SECURITY DECISIONS
-     * - Authorization Independence: We rely on the {userId} in the path as the primary authority.
-     * - DBAC (Database Access Control): Admin status is determined by document existence in /roles_admin.
-     * - Relational Integrity: On creation, documents must include a field (e.g., userId or id) 
-     *   that matches the path ID to ensure data consistency.
-     * - Denormalization for Authorization: The userId is stored within documents to support 
-     *   potential future collection group queries and to maintain entity integrity.
+     * 1. Authorization Independence: Every document in a user subcollection contains a denormalized 
+     *    'userId' field. This allows rules to verify ownership and path-integrity without external reads.
+     * 2. Immutable Ownership: For orders and chat messages, the 'userId' field is strictly validated 
+     *    on creation and locked during updates to prevent data hijacking.
+     * 3. Admin Override: A dedicated global helper 'isAdmin()' checks a top-level collection 
+     *    to grant elevated privileges across all data paths.
+     * 4. Structural Segregation: Administrative roles are separated from user profiles to 
+     *    prevent privilege escalation via profile updates.
      */
 
     // --- Helper Functions ---
 
-    /** @description Checks if the user is authenticated with Firebase Auth. */
+    /** @description Checks if the request comes from a signed-in user. */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /** @description Checks if the provided userId matches the authenticated user's UID. */
+    /** @description Checks if the authenticated user matches the provided userId. */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    /** @description Checks if the authenticated user has an entry in the roles_admin collection. */
+    /** @description Checks if the user has administrative privileges via the roles_admin collection. */
     function isAdmin() {
       return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
 
-    /** @description Combines ownership check with a verification that the document exists. */
+    /** @description Combines ownership and existence checks for updates/deletes. */
     function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
+      return resource != null && isOwner(userId);
+    }
+
+    /** @description Helper to check if a user is an admin for existing documents. */
+    function isExistingAdmin() {
+      return resource != null && isAdmin();
     }
 
     // --- Collection Rules ---
 
     /**
-     * @description Rules for the User profile entity. Users can manage their own profile.
+     * @description Rules for the User profile document.
      * @path /users/{userId}
-     * @allow Authenticated user (create) where request.resource.data.id == userId.
-     * @deny Any user (update) attempting to change their internal 'id' field.
-     * @principle Enforces path-based ownership and relational integrity for user profiles.
+     * @allow Authenticated user (get, list, create, update) where userId matches auth.uid.
+     * @deny Any user attempting to modify another user's profile.
+     * @principle Path-based ownership for root user data.
      */
     match /users/{userId} {
-      allow get, list: if isOwner(userId);
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(userId);
+      allow get, list: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId) || isExistingAdmin();
+      allow delete: if isExistingAdmin();
     }
 
     /**
-     * @description Rules for chat messages between users and the bot.
-     * @path /users/{userId}/messages/{messageId}
-     * @allow User 'abc' (list) their own messages at /users/abc/messages.
-     * @deny User 'abc' (get) a message belonging to user 'xyz'.
-     * @principle Subcollection isolation ensures users only see their own chat history.
+     * @description Rules for the SMM Service definitions.
+     * @path /services/{serviceId}
+     * @allow Any signed-in user (get, list). Admins (create, update, delete).
+     * @deny Non-admin users attempting to modify service data or prices.
+     * @principle Public read (for auth users) with restricted administrative writes.
      */
-    match /users/{userId}/messages/{messageId} {
-      allow get, list: if isOwner(userId);
-      allow create: if isOwner(userId) && request.resource.data.userId == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-      allow delete: if isExistingOwner(userId);
+    match /services/{serviceId} {
+      allow get, list: if isSignedIn();
+      allow create: if isAdmin();
+      allow update, delete: if isExistingAdmin();
     }
 
     /**
-     * @description Rules for service orders. Private to users, but readable/updatable by admins.
+     * @description Rules for User Orders. Ensures users can place orders but not modify them.
      * @path /users/{userId}/orders/{orderId}
-     * @allow Admin (update) the status of any order.
-     * @deny User 'abc' (create) an order with a 'userId' field matching 'xyz'.
-     * @principle Dual-access model (Owner + Admin) for transactional data.
+     * @allow User (create, get, list) for their own path. Admin (full access).
+     * @deny User (update, delete) once order is placed.
+     * @principle Relational integrity and path-consistency validation.
      */
     match /users/{userId}/orders/{orderId} {
       allow get, list: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId) && request.resource.data.userId == userId;
-      allow update: if (isExistingOwner(userId) || isAdmin()) && request.resource.data.userId == resource.data.userId;
-      allow delete: if isExistingOwner(userId) || isAdmin();
+      allow update: if isExistingAdmin() && request.resource.data.userId == resource.data.userId;
+      allow delete: if isExistingAdmin();
     }
 
     /**
-     * @description Publicly readable collection of SMM services.
-     * @path /services/{serviceId}
-     * @allow Anonymous user (get) a service description.
-     * @deny Authenticated non-admin user (create) a new service.
-     * @principle Public read with role-restricted writes for global configuration data.
+     * @description Rules for Chat Messages. Secure private communication between user and bot.
+     * @path /users/{userId}/chatMessages/{chatMessageId}
+     * @allow User (full access) to their own chat history. Admin (read-only).
+     * @deny Access to any chat history not belonging to the auth user.
+     * @principle Path-based ownership with path-to-data consistency.
      */
-    match /services/{serviceId} {
-      allow get, list: if true;
-      allow create, update, delete: if isAdmin();
+    match /users/{userId}/chatMessages/{chatMessageId} {
+      allow get, list: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isExistingOwner(userId) || isExistingAdmin();
     }
 
     /**
-     * @description Administrative roles indicator collection.
+     * @description Rules for identifying Administrators.
      * @path /roles_admin/{userId}
-     * @allow Signed-in user (get) their own admin status.
-     * @deny User (list) all admins unless they are themselves an admin.
-     * @principle DBAC (Database Access Control) mapping for global roles.
+     * @allow Admins (read). System/Root (write).
+     * @deny Any user attempting to self-promote to admin.
+     * @principle Existence-based RBAC for global permissions.
      */
     match /roles_admin/{userId} {
-      allow get: if isSignedIn();
-      allow list: if isAdmin();
-      allow create, update, delete: if false; // Managed via Admin SDK or Cloud Functions
-    }
-
-    // --- Collection Group Rules ---
-
-    /**
-     * @description Collection group for orders to allow administrative overview.
-     * @path /{path=**}/orders/{orderId}
-     * @allow Admin (list) all orders across the entire database.
-     * @deny Regular user (list) all orders.
-     * @principle Supports cross-user administrative queries while maintaining security.
-     */
-    match /{path=**}/orders/{orderId} {
-      allow read, write: if isAdmin();
+      allow get, list: if isAdmin();
+      allow create, update, delete: if false; // Managed via Admin SDK/Console only.
     }
   }
 }
