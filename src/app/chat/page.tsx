@@ -159,16 +159,49 @@ export default function ChatPage() {
   }, [user, isMessagesLoading]);
 
   const handlePaymentSubmit = async (link: string, utr: string) => {
-    if (!link || !utr) return;
-    setCurrentOrder({ ...currentOrder, link, utrId: utr });
-    const finalPrice = (currentOrder.quantity! / 1000) * currentOrder.service!.pricePer1000;
+    if (!link || !utr || !db || !user) return;
     
-    setChatState('confirming');
+    const finalPrice = (currentOrder.quantity! / 1000) * currentOrder.service!.pricePer1000;
+    const orderId = `INSTA-${Math.floor(100000 + Math.random() * 900000)}`;
+    
+    const orderData = {
+      userId: user.uid,
+      platform: PLATFORMS[currentOrder.platform!],
+      service: currentOrder.service?.name,
+      link: link,
+      quantity: currentOrder.quantity,
+      price: finalPrice,
+      utrId: utr,
+      status: 'Pending',
+      createdAt: serverTimestamp()
+    };
+
+    // Save to Firestore
+    addDoc(collection(db, "users", user.uid, "orders"), orderData)
+      .catch(async (error) => {
+        const permissionError = new FirestorePermissionError({
+          path: `users/${user.uid}/orders`,
+          operation: 'create',
+          requestResourceData: orderData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      });
+
     await addMessage('user', `Link: ${link}, UTR: ${utr}`);
-    botReply(
-      `Order Review 📋\n\nPlatform: ${PLATFORMS[currentOrder.platform!]}\nService: ${currentOrder.service!.name}\nLink: ${link}\nQuantity: ${currentOrder.quantity}\nUTR ID: ${utr}\nTotal Price: ₹${finalPrice.toFixed(0)}\n\nType "Confirm" to final submit or "Cancel" to restart.`,
-      ["Confirm", "Cancel"]
-    );
+    
+    setChatState('idle');
+    botReply("Order created successfully!", [], {
+      isSuccessCard: true,
+      successDetails: {
+        orderId,
+        platform: PLATFORMS[currentOrder.platform!],
+        service: currentOrder.service?.name,
+        quantity: currentOrder.quantity,
+        price: finalPrice,
+        link: link,
+        utrId: utr
+      }
+    });
   };
 
   const handleSend = async (manualText?: string) => {
@@ -180,7 +213,6 @@ export default function ChatPage() {
 
     const cleanText = text.toLowerCase();
 
-    // Handle "Main Menu" at any point
     if (cleanText.includes("main menu")) {
       setChatState('initial');
       botReply("Send 'Hi' to start create order");
@@ -256,42 +288,6 @@ export default function ChatPage() {
             isPaymentCard: true,
             paymentPrice: finalPrice
           });
-        } else {
-          setChatState('initial');
-          botReply("Order cancelled. Send 'Hi' to start create order");
-        }
-        break;
-
-      case 'confirming':
-        if (cleanText === 'confirm') {
-          const orderData = {
-            userId: user.uid,
-            platform: PLATFORMS[currentOrder.platform!],
-            service: currentOrder.service?.name,
-            link: currentOrder.link,
-            quantity: currentOrder.quantity,
-            price: (currentOrder.quantity! / 1000) * currentOrder.service!.pricePer1000,
-            utrId: currentOrder.utrId,
-            status: 'Pending',
-            createdAt: serverTimestamp()
-          };
-          
-          addDoc(collection(db, "users", user.uid, "orders"), orderData)
-            .catch(async (error) => {
-              const permissionError = new FirestorePermissionError({
-                path: `users/${user.uid}/orders`,
-                operation: 'create',
-                requestResourceData: orderData,
-              });
-              errorEmitter.emit('permission-error', permissionError);
-            });
-
-          setChatState('idle');
-          botReply("Order placed successfully! 🎉\nWe are processing it now.");
-          setTimeout(() => {
-            setChatState('initial');
-            addMessage('bot', "Send 'Hi' to start create order");
-          }, 3000);
         } else {
           setChatState('initial');
           botReply("Order cancelled. Send 'Hi' to start create order");
@@ -381,6 +377,8 @@ export default function ChatPage() {
             isPaymentCard={m.isPaymentCard}
             paymentPrice={m.paymentPrice}
             onPaymentSubmit={handlePaymentSubmit}
+            isSuccessCard={m.isSuccessCard}
+            successDetails={m.successDetails}
             onOptionClick={(option) => handleSend(option)}
             timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} 
           />
