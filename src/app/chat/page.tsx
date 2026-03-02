@@ -195,10 +195,12 @@ export default function ChatPage() {
     if (!link || !utr || !db || !user) return;
     
     const finalPrice = (currentOrder.quantity! / 1000) * currentOrder.service!.pricePer1000;
+    // Generate unique Order ID
     const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}`;
     
     const orderData = {
       userId: user.uid,
+      orderId: orderId, // Store the unique ID
       platform: PLATFORMS[currentOrder.platform!],
       service: currentOrder.service?.name,
       link: link,

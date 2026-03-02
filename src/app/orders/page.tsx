@@ -48,6 +48,7 @@ export default function OrdersHistoryPage() {
       return { ...order, createdAt, effectiveStatus };
     });
 
+    // Client side sort since index is missing for combined query
     return processed.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }, [rawOrdersData]);
 
@@ -85,7 +86,7 @@ export default function OrdersHistoryPage() {
                 className="bg-white dark:bg-slate-800 p-5 rounded-[1.8rem] shadow-sm border border-gray-50 dark:border-slate-700/50 flex flex-col gap-1 relative group hover:shadow-md transition-shadow"
               >
                 <div className="absolute top-4 right-4 bg-slate-50 dark:bg-slate-900 px-3 py-1 rounded-full text-[9px] font-black text-[#312ECB]/40 dark:text-white/30 uppercase tracking-tighter">
-                  #{order.id.slice(0, 8).toUpperCase()}
+                  #{order.orderId || order.id.slice(0, 8).toUpperCase()}
                 </div>
 
                 <h3 className="text-[13px] font-black uppercase text-[#312ECB] dark:text-blue-400 tracking-wide pr-20">

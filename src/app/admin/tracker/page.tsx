@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, isValid, addMinutes, isAfter } from "date-fns";
-import { ChevronLeft, RefreshCw, ExternalLink, Copy, Filter, Clock } from "lucide-react";
+import { ChevronLeft, RefreshCw, ExternalLink, Copy, Clock } from "lucide-react";
 import { useFirestore, useUser } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
@@ -55,6 +55,7 @@ export default function TrackerPage() {
   useEffect(() => {
     if (!user || !db || user.email !== "chetanmadhav4@gmail.com") return;
 
+    // Fetch without orderBy to avoid index errors, then sort client-side
     const q = collectionGroup(db, "orders");
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -89,6 +90,7 @@ export default function TrackerPage() {
         };
       });
 
+      // Client side sort
       ords.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
       setOrders(ords);
       setLoading(false);
@@ -136,7 +138,7 @@ export default function TrackerPage() {
           addDoc(collection(db, "users", order.userId, "notifications"), {
             title: notifTitle,
             message: notifMsg,
-            orderId: order.id,
+            orderId: order.orderId || order.id,
             status: newStatus,
             read: false,
             createdAt: serverTimestamp()
@@ -167,7 +169,7 @@ export default function TrackerPage() {
       <Table>
         <TableHeader className="bg-slate-50">
           <TableRow className="border-slate-100 hover:bg-transparent">
-            <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Timestamp</TableHead>
+            <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Order ID</TableHead>
             <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Service</TableHead>
             <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Link</TableHead>
             <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">UTR ID</TableHead>
@@ -179,12 +181,8 @@ export default function TrackerPage() {
           {data.map((order) => (
             <TableRow key={order.id} className="border-slate-50 hover:bg-slate-50/50 transition-colors">
               <TableCell className="text-[11px] font-bold text-slate-400 uppercase">
-                {isValid(order.createdAt) ? (
-                  <>
-                    {format(order.createdAt, 'MMM dd')}<br/>
-                    {format(order.createdAt, 'HH:mm')}
-                  </>
-                ) : 'Invalid Date'}
+                <span className="text-[#111B21] font-black">{order.orderId || order.id.slice(0,8).toUpperCase()}</span><br/>
+                {isValid(order.createdAt) ? format(order.createdAt, 'MMM dd HH:mm') : 'N/A'}
               </TableCell>
               <TableCell>
                 <div className="flex flex-col">
