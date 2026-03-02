@@ -399,14 +399,14 @@ export function MessageBubble({
             </div>
 
             <div className="space-y-4">
-              <ScrollArea className="max-h-[250px] pr-2">
+              <ScrollArea className="max-h-[350px] pr-2">
                 <div className="space-y-3">
                   {comboItems.map((item, idx) => {
                     const s = SERVICES.instagram.find(sv => sv.id === item.serviceId);
                     return (
                       <div key={idx} className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 animate-in slide-in-from-bottom-2 duration-300">
                         <div className="flex items-center justify-between mb-3">
-                          <span className="text-[11px] font-black uppercase tracking-wider text-[#312ECB] dark:text-blue-400">{s?.name}</span>
+                          <span className="text-[11px] font-black uppercase tracking-wider text-[#312ECB] dark:text-blue-400">{s?.name || 'Service'}</span>
                           <button onClick={() => removeComboService(idx)} className="text-red-400 hover:text-red-600 p-1">
                             <Trash2 size={14} />
                           </button>
