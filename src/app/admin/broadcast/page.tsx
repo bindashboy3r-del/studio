@@ -7,18 +7,14 @@ import {
   ChevronLeft, 
   Megaphone, 
   Send, 
-  Info, 
-  LayoutGrid, 
-  Zap,
-  Radio,
-  X
+  Zap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useUser, useFirestore } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
-import { doc, setDoc, serverTimestamp, deleteDoc } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, deleteDoc, onSnapshot } from "firebase/firestore";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 
@@ -36,6 +32,24 @@ export default function BroadcastPage() {
       router.push("/admin/login");
     }
   }, [user, isUserLoading, router]);
+
+  // Sync state with Firestore
+  useEffect(() => {
+    if (!db || !user || user.email !== "chetanmadhav4@gmail.com") return;
+    const broadcastRef = doc(db, "globalAnnouncements", "current");
+    const unsubscribe = onSnapshot(broadcastRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        setIsLive(data.active);
+        if (data.active && data.text) {
+          setMessage(data.text);
+        }
+      } else {
+        setIsLive(false);
+      }
+    });
+    return () => unsubscribe();
+  }, [db, user]);
 
   const handlePublish = async () => {
     if (!message.trim() || !db) return;
@@ -74,9 +88,8 @@ export default function BroadcastPage() {
     deleteDoc(broadcastRef)
       .then(() => {
         setIsLive(false);
-        setMessage("");
         toast({
-          title: "Broadcast Cancelled",
+          title: "Broadcast Offline",
           description: "Announcement has been removed from all user feeds.",
         });
       })
@@ -88,9 +101,16 @@ export default function BroadcastPage() {
       });
   };
 
+  const toggleStatus = (val: boolean) => {
+    if (val) {
+      handlePublish();
+    } else {
+      handleCancel();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 font-body pb-10">
-      {/* Header matching provided screenshot layout */}
       <div className="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between sticky top-0 z-50">
         <div className="flex items-center gap-3">
           <button onClick={() => router.push("/admin")} className="p-2 hover:bg-slate-50 rounded-lg text-slate-400">
@@ -109,7 +129,6 @@ export default function BroadcastPage() {
           <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Real-time Global Announcements</p>
         </header>
 
-        {/* Live Broadcast Card */}
         <div className="bg-[#312ECB] rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl">
           <div className="flex items-center gap-6 relative z-10">
             <div className="w-16 h-16 rounded-[1.2rem] bg-white/10 flex items-center justify-center border border-white/20">
@@ -123,16 +142,18 @@ export default function BroadcastPage() {
 
           <div className="mt-8 flex items-center gap-4 relative z-10">
             <div className={`flex items-center gap-3 px-5 py-2.5 rounded-2xl ${isLive ? 'bg-[#25D366]' : 'bg-slate-900/40'} border border-white/10 transition-colors`}>
-              <Switch checked={isLive} onCheckedChange={(val) => !val && handleCancel()} className="data-[state=checked]:bg-white data-[state=unchecked]:bg-slate-700" />
+              <Switch 
+                checked={isLive} 
+                onCheckedChange={toggleStatus} 
+                className="data-[state=checked]:bg-white data-[state=unchecked]:bg-slate-700" 
+              />
               <span className="text-[11px] font-black uppercase tracking-widest">{isLive ? 'Online' : 'Offline'}</span>
             </div>
           </div>
           
-          {/* Decorative pattern */}
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10 blur-3xl" />
         </div>
 
-        {/* Message Content Area */}
         <div className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden">
           <div className="p-8 space-y-6">
             <div className="space-y-2">
@@ -168,10 +189,10 @@ export default function BroadcastPage() {
 
           <div className="bg-slate-50/50 p-8 flex flex-col gap-4 items-center">
             <button 
-              onClick={handleCancel}
+              onClick={() => { setMessage(""); handleCancel(); }}
               className="text-[11px] font-black text-slate-400 hover:text-red-500 uppercase tracking-[0.3em] transition-colors"
             >
-              Cancel
+              Clear Message
             </button>
             <Button 
               onClick={handlePublish}
