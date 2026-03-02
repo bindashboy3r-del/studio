@@ -109,7 +109,8 @@ export default function ChatPage() {
   useEffect(() => {
     if (user && !isMessagesLoading && messages.length === 0 && chatState === 'idle') {
       setChatState('initial');
-      botReply(`Welcome to SocialBoost! 🚀\nI'm your assistant. Send 'Hi' to start creating your order.`);
+      // Only show the prompt to start the order
+      botReply("Send 'Hi' to start creating your order.");
     }
   }, [user, isMessagesLoading, messages.length, chatState]);
 
