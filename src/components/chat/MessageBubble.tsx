@@ -164,7 +164,7 @@ export function MessageBubble({
     setBulkLinks(bulkLinks.filter((_, i) => i !== index));
   };
 
-  // Combo Card Logic
+  // Combo Card Logic: List all Instagram services that AREN'T currently in the combo
   const availableServices = useMemo(() => {
     const selectedIds = comboItems.map(i => i.serviceId);
     return SERVICES.instagram.filter(s => !selectedIds.includes(s.id));
@@ -192,7 +192,7 @@ export function MessageBubble({
     return { raw, discounted: raw * 0.95 };
   }, [comboItems]);
 
-  const isComboValid = comboItems.length >= 2 && comboItems.some(i => i.quantity >= 100) && comboLink.trim() !== "";
+  const isComboValid = comboItems.length >= 1 && comboItems.some(i => i.quantity >= 100) && comboLink.trim() !== "";
 
   return (
     <div className={cn("flex w-full mb-4", isUser ? "justify-end" : "justify-start")}>
