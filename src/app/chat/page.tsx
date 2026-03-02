@@ -25,7 +25,6 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PLATFORMS, SERVICES, Platform, SMMService } from "@/app/lib/constants";
-import { intelligentOrderParsing } from "@/ai/flows/intelligent-order-parsing";
 import { useAuth, useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
@@ -45,7 +44,7 @@ type ChatState =
   | 'choosing_service' 
   | 'entering_quantity' 
   | 'confirming_price'
-  | 'entering_link' 
+  | 'awaiting_payment'
   | 'confirming';
 
 interface OrderInProgress {
@@ -53,6 +52,7 @@ interface OrderInProgress {
   service?: SMMService;
   link?: string;
   quantity?: number;
+  utrId?: string;
 }
 
 export default function ChatPage() {
@@ -119,7 +119,7 @@ export default function ChatPage() {
     }
   };
 
-  const addMessage = async (sender: 'user' | 'bot', text: string, options?: string[]) => {
+  const addMessage = async (sender: 'user' | 'bot', text: string, options?: string[], extraData?: any) => {
     if (!user || !db) return;
     const path = `users/${user.uid}/chatMessages`;
     const data = {
@@ -127,7 +127,8 @@ export default function ChatPage() {
       sender,
       text,
       options: options || [],
-      timestamp: serverTimestamp()
+      timestamp: serverTimestamp(),
+      ...extraData
     };
 
     addDoc(collection(db, "users", user.uid, "chatMessages"), data)
@@ -141,10 +142,10 @@ export default function ChatPage() {
       });
   };
 
-  const botReply = async (text: string, options?: string[]) => {
+  const botReply = async (text: string, options?: string[], extraData?: any) => {
     setIsTyping(true);
     setTimeout(async () => {
-      await addMessage('bot', text, options);
+      await addMessage('bot', text, options, extraData);
       setIsTyping(false);
     }, 800);
   };
@@ -157,6 +158,19 @@ export default function ChatPage() {
     }
   }, [user, isMessagesLoading]);
 
+  const handlePaymentSubmit = async (link: string, utr: string) => {
+    if (!link || !utr) return;
+    setCurrentOrder({ ...currentOrder, link, utrId: utr });
+    const finalPrice = (currentOrder.quantity! / 1000) * currentOrder.service!.pricePer1000;
+    
+    setChatState('confirming');
+    await addMessage('user', `Link: ${link}, UTR: ${utr}`);
+    botReply(
+      `Order Review 📋\n\nPlatform: ${PLATFORMS[currentOrder.platform!]}\nService: ${currentOrder.service!.name}\nLink: ${link}\nQuantity: ${currentOrder.quantity}\nUTR ID: ${utr}\nTotal Price: ₹${finalPrice.toFixed(0)}\n\nType "Confirm" to final submit or "Cancel" to restart.`,
+      ["Confirm", "Cancel"]
+    );
+  };
+
   const handleSend = async (manualText?: string) => {
     const text = manualText || inputValue.trim();
     if (!text || !db || !user) return;
@@ -166,6 +180,13 @@ export default function ChatPage() {
 
     const cleanText = text.toLowerCase();
 
+    // Handle "Main Menu" at any point
+    if (cleanText.includes("main menu")) {
+      setChatState('initial');
+      botReply("Send 'Hi' to start create order");
+      return;
+    }
+
     if (chatState === 'initial' && cleanText === 'hi') {
       setChatState('choosing_platform');
       botReply(
@@ -174,13 +195,6 @@ export default function ChatPage() {
       );
       return;
     } else if (chatState === 'initial') {
-      botReply("Send 'Hi' to start create order");
-      return;
-    }
-
-    // Handle "Main Menu" at any point
-    if (cleanText.includes("main menu")) {
-      setChatState('initial');
       botReply("Send 'Hi' to start create order");
       return;
     }
@@ -236,22 +250,16 @@ export default function ChatPage() {
 
       case 'confirming_price':
         if (cleanText.includes("yes") || cleanText.includes("proceed")) {
-          setChatState('entering_link');
-          botReply(`Ab niche apne ${currentOrder.platform === 'instagram' ? 'Profile handle (@username) or Post URL' : 'Channel or Video URL'} ka link paste karein:`);
+          setChatState('awaiting_payment');
+          const finalPrice = (currentOrder.quantity! / 1000) * currentOrder.service!.pricePer1000;
+          botReply(`📸 Payment instructions for ₹${finalPrice.toFixed(0)}`, [], {
+            isPaymentCard: true,
+            paymentPrice: finalPrice
+          });
         } else {
           setChatState('initial');
           botReply("Order cancelled. Send 'Hi' to start create order");
         }
-        break;
-
-      case 'entering_link':
-        const finalPrice = (currentOrder.quantity! / 1000) * currentOrder.service!.pricePer1000;
-        setCurrentOrder({ ...currentOrder, link: text });
-        setChatState('confirming');
-        botReply(
-          `Order Details 📝\n\nPlatform: ${PLATFORMS[currentOrder.platform!]}\nService: ${currentOrder.service!.name}\nLink: ${text}\nQuantity: ${currentOrder.quantity}\nTotal Price: ₹${finalPrice.toFixed(0)}\n\nType "Confirm" to place order or "Cancel" to start over.`,
-          ["Confirm", "Cancel"]
-        );
         break;
 
       case 'confirming':
@@ -263,6 +271,7 @@ export default function ChatPage() {
             link: currentOrder.link,
             quantity: currentOrder.quantity,
             price: (currentOrder.quantity! / 1000) * currentOrder.service!.pricePer1000,
+            utrId: currentOrder.utrId,
             status: 'Pending',
             createdAt: serverTimestamp()
           };
@@ -369,6 +378,9 @@ export default function ChatPage() {
             sender={m.sender} 
             text={m.text} 
             options={m.options}
+            isPaymentCard={m.isPaymentCard}
+            paymentPrice={m.paymentPrice}
+            onPaymentSubmit={handlePaymentSubmit}
             onOptionClick={(option) => handleSend(option)}
             timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} 
           />
@@ -384,7 +396,7 @@ export default function ChatPage() {
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              placeholder="Type a message"
+              placeholder="Type a message (Hi)"
               className="border-none bg-transparent focus-visible:ring-0 shadow-none text-[15px] h-10 p-0 text-black dark:text-white font-bold placeholder:text-gray-400"
             />
           </div>
