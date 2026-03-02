@@ -404,6 +404,10 @@ export default function ChatPage() {
     const allServices = [...SERVICES.instagram, ...SERVICES.youtube];
     const matchedService = allServices.find(s => cleanText.includes(s.name.toLowerCase()));
     if (matchedService && (cleanText.includes("instagram") || cleanText.includes("youtube"))) {
+      if (matchedService.pricePer1000 === -1) {
+        botReply("This time service unavailable Coming Soon possible");
+        return;
+      }
       const detectedPlatform: Platform = cleanText.includes("instagram") ? 'instagram' : 'youtube';
       setCurrentOrder({ platform: detectedPlatform, service: matchedService });
       setChatState('entering_quantity');
@@ -433,6 +437,10 @@ export default function ChatPage() {
         if (!sPlatform) return;
         const sService = SERVICES[sPlatform][sIndex];
         if (sService) {
+          if (sService.pricePer1000 === -1) {
+            botReply("This time service unavailable Coming Soon possible");
+            return;
+          }
           setCurrentOrder({ ...currentOrder, service: sService });
           setChatState('entering_quantity');
           botReply(`📊 You've selected ${PLATFORMS[sPlatform]} ${sService.name}.\n\nHow many do you want? (Minimum 100)`);
@@ -449,27 +457,27 @@ export default function ChatPage() {
           setCurrentOrder({ ...currentOrder, quantity: qty });
           setChatState('choosing_payment_method');
           botReply(
-            `✅ Order: ${qty} ${PLATFORMS[currentOrder.platform!]} ${currentOrder.service!.name}\n💰 Price: ₹${price.toFixed(0)}\n💳 Your Balance: ₹${walletBalance.toFixed(0)}\n\nChoose payment method:`,
+            `✅ Order: ${qty} ${PLATFORMS[currentOrder.platform!]} ${currentOrder.service!.name}\n💰 Price: ₹${price.toFixed(2)}\n💳 Your Balance: ₹${walletBalance.toFixed(0)}\n\nChoose payment method:`,
             ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]
           );
         }
         break;
       case 'choosing_payment_method':
-        const price = (currentOrder.quantity! / 1000) * currentOrder.service!.pricePer1000;
+        const finalPrice = (currentOrder.quantity! / 1000) * currentOrder.service!.pricePer1000;
         if (cleanText.includes("wallet")) {
-          if (walletBalance < price) {
-            botReply(`❌ Insufficient balance! (Needs ₹${price.toFixed(0)}, have ₹${walletBalance.toFixed(0)}).\n\nNiche di gayi list mein se select karein:`, ["📲 PAY VIA UPI QR", "💰 ADD FUNDS"]);
+          if (walletBalance < finalPrice) {
+            botReply(`❌ Insufficient balance! (Needs ₹${finalPrice.toFixed(2)}, have ₹${walletBalance.toFixed(0)}).\n\nNiche di gayi list mein se select karein:`, ["📲 PAY VIA UPI QR", "💰 ADD FUNDS"]);
           } else {
             setCurrentOrder({ ...currentOrder, paymentMethod: 'wallet' });
             setChatState('confirming_price');
-            botReply(`💰 Paying ₹${price.toFixed(0)} from your wallet.\n\nEnter the target link (Instagram/YouTube URL) to complete order:`);
+            botReply(`💰 Paying ₹${finalPrice.toFixed(2)} from your wallet.\n\nEnter the target link (Instagram/YouTube URL) to complete order:`);
           }
         } else if (cleanText.includes("upi")) {
           setCurrentOrder({ ...currentOrder, paymentMethod: 'upi' });
           setChatState('awaiting_upi_payment');
-          botReply(`📸 Scan QR to pay ₹${price.toFixed(0)}:`, [], {
+          botReply(`📸 Scan QR to pay ₹${finalPrice.toFixed(2)}:`, [], {
             isPaymentCard: true,
-            paymentPrice: price
+            paymentPrice: finalPrice
           });
         } else {
           botReply("Please select a payment method.");
@@ -489,7 +497,7 @@ export default function ChatPage() {
   return (
     <div className="flex flex-col h-screen max-w-lg mx-auto overflow-hidden relative shadow-2xl bg-white dark:bg-slate-950 font-body">
       {/* Top Header */}
-      <header className="bg-white dark:bg-slate-900 px-5 py-4 flex items-center justify-between border-b border-gray-50 dark:border-slate-800 z-50">
+      <header className="bg-white dark:bg-slate-900 px-5 py-4 flex items-center justify-between border-b border-gray-100 dark:border-slate-800 z-50">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-[14px] bg-[#312ECB] flex items-center justify-center text-white shadow-lg">
             <Zap className="fill-current" size={20} />

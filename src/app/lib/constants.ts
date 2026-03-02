@@ -3,7 +3,7 @@ export type Platform = 'instagram' | 'youtube';
 export interface SMMService {
   id: string;
   name: string;
-  pricePer1000: number;
+  pricePer1000: number; // -1 indicates unavailable/Coming Soon
 }
 
 export const PLATFORMS: Record<Platform, string> = {
@@ -13,18 +13,18 @@ export const PLATFORMS: Record<Platform, string> = {
 
 export const SERVICES: Record<Platform, SMMService[]> = {
   instagram: [
-    { id: 'followers', name: 'Followers', pricePer1000: 90.0 }, // 100 = ₹9
-    { id: 'likes', name: 'Likes', pricePer1000: 40.0 },
-    { id: 'views', name: 'Views', pricePer1000: 20.0 },
-    { id: 'comments', name: 'Comments', pricePer1000: 250.0 },
-    { id: 'shares', name: 'Shares', pricePer1000: 60.0 },
-    { id: 'story_views', name: 'Story Views', pricePer1000: 30.0 },
-    { id: 'reel_views', name: 'Reel Views', pricePer1000: 25.0 },
+    { id: 'followers', name: 'Followers', pricePer1000: 89.0 },
+    { id: 'likes', name: 'Likes', pricePer1000: 18.0 },
+    { id: 'views', name: 'Views', pricePer1000: 0.60 },
+    { id: 'comments', name: 'Comments', pricePer1000: 260.0 },
+    { id: 'shares', name: 'Shares', pricePer1000: 7.0 },
+    { id: 'story_views', name: 'Story Views', pricePer1000: 65.0 },
+    { id: 'reel_views', name: 'Reel Views', pricePer1000: 0.56 },
   ],
   youtube: [
-    { id: 'subscribers', name: 'Subscribers', pricePer1000: 1200.0 },
-    { id: 'likes', name: 'Likes', pricePer1000: 350.0 },
-    { id: 'views', name: 'Views', pricePer1000: 280.0 },
-    { id: 'comments', name: 'Comments', pricePer1000: 500.0 },
+    { id: 'subscribers', name: 'Subscribers', pricePer1000: -1 }, // Coming Soon
+    { id: 'likes', name: 'Likes', pricePer1000: 136.0 },
+    { id: 'views', name: 'Views', pricePer1000: 124.0 },
+    { id: 'comments', name: 'Comments', pricePer1000: -1 }, // Coming Soon
   ],
 };
