@@ -83,7 +83,7 @@ interface OrderInProgress {
 }
 
 export default function ChatPage() {
-  const { user, isUserLoading } = useUser();
+  const { user, isUserLoading } = user();
   const auth = useAuth();
   const db = useFirestore();
   const router = useRouter();
@@ -458,6 +458,7 @@ export default function ChatPage() {
     await addMessage('user', text);
     const cleanText = text.toLowerCase();
 
+    // 1. Check for Reset Keywords
     if (cleanText === 'hi' || cleanText.includes("main menu") || cleanText.includes("start")) {
       setChatState('choosing_order_type');
       setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
@@ -465,6 +466,41 @@ export default function ChatPage() {
         "👋 Welcome! Choose your ordering method:",
         ["1. SINGLE ORDER", "2. COMBO ORDER (5% OFF! 🎁)", "3. BULK ORDER"]
       );
+      return;
+    }
+
+    // 2. Check for Platform/Service Selection AT ANY TIME
+    const selectedService = SERVICES.instagram.find(s => cleanText.includes(s.name.toLowerCase()));
+    if (selectedService) {
+      // If user clicks a service name, reset to that service immediately
+      if (currentOrder.type === 'bulk') {
+        setCurrentOrder(prev => ({ ...prev, items: [{ service: selectedService, quantity: 0, link: '' }] }));
+        setChatState('entering_bulk_links');
+        botReply("🔗 Add your target links one by one below:", [], { isBulkLinkCard: true });
+      } else {
+        // Default to single order if not in a specific mode
+        setCurrentOrder({ type: 'single', platform: 'instagram', items: [{ service: selectedService, quantity: 0, link: '' }] });
+        setChatState('entering_quantity');
+        botReply(`📊 Quantity for ${selectedService.name}? (Min ${selectedService.minQuantity})`);
+      }
+      return;
+    }
+
+    // 3. Check for Order Type Selection
+    if (cleanText.includes("single order")) {
+      setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
+      setChatState('choosing_service');
+      botReply("Select Instagram service:", SERVICES.instagram.map(s => s.name));
+      return;
+    } else if (cleanText.includes("combo order")) {
+      setCurrentOrder({ type: 'combo', platform: 'instagram', items: [] });
+      setChatState('choosing_combo_services');
+      botReply("🎁 Configure your Combo Order (Get 5% OFF!):", [], { isComboCard: true });
+      return;
+    } else if (cleanText.includes("bulk order")) {
+      setCurrentOrder({ type: 'bulk', platform: 'instagram', items: [] });
+      setChatState('choosing_service');
+      botReply("Select Instagram service for bulk:", SERVICES.instagram.map(s => s.name));
       return;
     }
 
@@ -487,47 +523,18 @@ export default function ChatPage() {
       return;
     }
 
+    // 4. Handle State Transitions
     switch (chatState) {
-      case 'choosing_order_type':
-        if (cleanText.includes("single")) {
-          setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
-          setChatState('choosing_service');
-          botReply("Select Instagram service:", SERVICES.instagram.map(s => s.name));
-        } else if (cleanText.includes("combo")) {
-          setCurrentOrder({ type: 'combo', platform: 'instagram', items: [] });
-          setChatState('choosing_combo_services');
-          botReply("🎁 Configure your Combo Order (Get 5% OFF!):", [], {
-            isComboCard: true
-          });
-        } else if (cleanText.includes("bulk")) {
-          setCurrentOrder({ type: 'bulk', platform: 'instagram', items: [] });
-          setChatState('choosing_service');
-          botReply("Select Instagram service for bulk:", SERVICES.instagram.map(s => s.name));
-        }
-        break;
-
       case 'choosing_service':
-        const selected = SERVICES.instagram.find(s => cleanText.includes(s.name.toLowerCase()));
-        if (selected) {
-          if (currentOrder.type === 'bulk') {
-            setCurrentOrder(prev => ({ ...prev, items: [{ service: selected, quantity: 0, link: '' }] }));
-            setChatState('entering_bulk_links');
-            botReply("🔗 Add your target links one by one below:", [], {
-              isBulkLinkCard: true
-            });
-          } else {
-            setCurrentOrder(prev => ({ ...prev, items: [{ service: selected, quantity: 0, link: '' }] }));
-            setChatState('entering_quantity');
-            botReply(`📊 Quantity for ${selected.name}? (Min ${selected.minQuantity})`);
-          }
-        }
+        // This case is now partially handled by the global service detection above, 
+        // but kept for fallback or specific logic.
         break;
 
       case 'entering_quantity':
         const qty = parseInt(text);
-        const currentService = currentOrder.items[0]?.service;
-        if (!currentService || isNaN(qty) || qty < currentService.minQuantity) {
-          botReply(`Invalid quantity (Min ${currentService?.minQuantity || 10} for ${currentService?.name || 'this service'}).`);
+        const activeService = currentOrder.items[0]?.service;
+        if (!activeService || isNaN(qty) || qty < activeService.minQuantity) {
+          botReply(`Invalid quantity (Min ${activeService?.minQuantity || 10} for ${activeService?.name || 'this service'}).`);
         } else {
           setCurrentOrder(prev => ({
             ...prev,
@@ -535,7 +542,7 @@ export default function ChatPage() {
           }));
           setChatState('choosing_payment_method');
           
-          let total = (qty / 1000) * currentService.pricePer1000;
+          let total = (qty / 1000) * activeService.pricePer1000;
           if (currentOrder.type === 'bulk' && currentOrder.bulkLinks) {
             total *= currentOrder.bulkLinks.length;
           }
@@ -544,7 +551,7 @@ export default function ChatPage() {
           }
 
           botReply(
-            `✅ Aapne Instagram ${currentService.name} select kiya hai.\n\n` +
+            `✅ Aapne Instagram ${activeService.name} select kiya hai.\n\n` +
             `📊 Quantity: ${qty}\n` +
             `💰 Total Price: ₹${total.toFixed(2)}\n\n` +
             `💳 Aapka Wallet: ₹${walletBalance.toFixed(2)}`, 
