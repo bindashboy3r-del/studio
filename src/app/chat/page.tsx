@@ -87,6 +87,7 @@ export default function ChatPage() {
   const [currentOrder, setCurrentOrder] = useState<OrderInProgress>({});
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [activeBroadcast, setActiveBroadcast] = useState<any>(null);
+  const [globalBonus, setGlobalBonus] = useState(0);
   
   const [sessionStartTime] = useState(() => Date.now());
   const hasInitialGreeted = useRef(false);
@@ -131,6 +132,17 @@ export default function ChatPage() {
       }
     });
     return () => unsubscribe();
+  }, [db]);
+
+  // Global Bonus Listener
+  useEffect(() => {
+    if (!db) return;
+    const unsub = onSnapshot(doc(db, "globalSettings", "finance"), (snap) => {
+      if (snap.exists()) {
+        setGlobalBonus(snap.data().bonusPercentage || 0);
+      }
+    });
+    return () => unsub();
   }, [db]);
 
   const notificationsQuery = useMemoFirebase(() => {
@@ -535,14 +547,21 @@ export default function ChatPage() {
 
       {/* Sub-Header */}
       <div className="bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 px-6 py-3 flex items-center justify-between z-40">
-        <button 
-          onClick={() => router.push('/add-funds')}
-          className="flex items-center gap-2 bg-emerald-500/10 text-emerald-600 px-3 py-1.5 rounded-full border border-emerald-100 hover:bg-emerald-500/20 transition-colors"
-        >
-          <Wallet size={14} />
-          <span className="text-[11px] font-black tracking-tight">₹{walletBalance.toFixed(0)}</span>
-          <PlusCircle size={14} className="ml-1" />
-        </button>
+        <div className="flex flex-col items-start">
+          {globalBonus > 0 && (
+            <span className="text-[8px] font-black text-emerald-600 dark:text-emerald-400 animate-pulse mb-0.5 tracking-tighter uppercase">
+              Add fund & get {globalBonus}% Extra!
+            </span>
+          )}
+          <button 
+            onClick={() => router.push('/add-funds')}
+            className="flex items-center gap-2 bg-emerald-500/10 text-emerald-600 px-3 py-1.5 rounded-full border border-emerald-100 hover:bg-emerald-500/20 transition-colors"
+          >
+            <Wallet size={14} />
+            <span className="text-[11px] font-black tracking-tight">₹{walletBalance.toFixed(0)}</span>
+            <PlusCircle size={14} className="ml-1" />
+          </button>
+        </div>
         <button 
           onClick={() => router.push('/orders')}
           className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-[#312ECB] hover:opacity-70 transition-opacity"
