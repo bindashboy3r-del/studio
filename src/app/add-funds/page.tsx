@@ -1,23 +1,22 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { 
   ChevronLeft, 
-  QrCode, 
   Copy, 
   Download, 
   Wallet, 
-  CheckCircle2, 
   Info,
-  CreditCard
+  Zap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useUser, useFirestore } from "@/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, onSnapshot } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 
 export default function AddFundsPage() {
   const { user } = useUser();
@@ -29,13 +28,23 @@ export default function AddFundsPage() {
   const [utr, setUtr] = useState("");
   const [loading, setLoading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [globalBonus, setGlobalBonus] = useState(0);
 
   const upiId = "smmxpressbot@slc";
   const numAmount = parseFloat(amount) || 0;
   
-  // QuickChart QR generation
   const upiLink = `upi://pay?pa=${upiId}&pn=SocialBoost&am=${numAmount.toFixed(2)}&cu=INR`;
   const qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(upiLink)}&size=400&margin=1&format=png`;
+
+  useEffect(() => {
+    if (!db) return;
+    const unsub = onSnapshot(doc(db, "globalSettings", "finance"), (snap) => {
+      if (snap.exists()) {
+        setGlobalBonus(snap.data().bonusPercentage || 0);
+      }
+    });
+    return () => unsub();
+  }, [db]);
 
   const handleDownloadQR = async () => {
     setIsDownloading(true);
@@ -110,6 +119,21 @@ export default function AddFundsPage() {
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10 blur-3xl" />
         </div>
 
+        {globalBonus > 0 && (
+          <div className="bg-emerald-500 rounded-3xl p-5 text-white flex items-center justify-between shadow-lg shadow-emerald-500/20 animate-pulse">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                <Zap className="fill-current" size={20} />
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-100">Limited Offer</p>
+                <h3 className="text-lg font-black uppercase">Get {globalBonus}% Extra!</h3>
+              </div>
+            </div>
+            <Badge className="bg-white text-emerald-600 font-black border-none">ACTIVE</Badge>
+          </div>
+        )}
+
         <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-gray-50 space-y-8">
           <div className="space-y-4">
             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Step 1: Enter Amount (Min ₹10)</label>
@@ -123,6 +147,11 @@ export default function AddFundsPage() {
                 className="h-14 bg-slate-50 border-none rounded-2xl pl-10 pr-5 text-lg font-black focus-visible:ring-1 focus-visible:ring-[#312ECB]/20"
               />
             </div>
+            {globalBonus > 0 && numAmount >= 10 && (
+              <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest ml-1">
+                + Extra ₹{((numAmount * globalBonus) / 100).toFixed(0)} will be added to your wallet!
+              </p>
+            )}
           </div>
 
           {numAmount >= 10 && (
@@ -158,7 +187,7 @@ export default function AddFundsPage() {
               <div className="bg-blue-50/50 p-4 rounded-2xl flex items-start gap-3 border border-blue-100/50">
                 <Info size={16} className="text-[#312ECB] mt-0.5" />
                 <p className="text-[10px] font-bold text-blue-600 uppercase leading-relaxed">
-                  Note: Check Admin Announcements for active bonus offers. Credit will be applied upon approval.
+                  Note: Funds are credited after verification. Check order status in history.
                 </p>
               </div>
 

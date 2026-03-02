@@ -10,6 +10,7 @@ import {
   writeBatch,
   increment,
   serverTimestamp,
+  setDoc,
 } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { 
@@ -23,7 +24,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ChevronLeft, RefreshCw, Check, X as CloseIcon, Zap, Wallet } from "lucide-react";
+import { ChevronLeft, RefreshCw, Check, X as CloseIcon, Wallet, Zap, Save } from "lucide-react";
 import { useFirestore, useUser } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { errorEmitter } from "@/firebase/error-emitter";
@@ -37,6 +38,8 @@ export default function FundRequestsPage() {
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [creditAmounts, setCreditAmounts] = useState<Record<string, string>>({});
+  const [globalBonus, setGlobalBonus] = useState("0");
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
   const router = useRouter();
 
   const ADMIN_EMAIL = "chetanmadhav4@gmail.com";
@@ -47,6 +50,17 @@ export default function FundRequestsPage() {
       router.push("/admin/login");
     }
   }, [admin, isUserLoading, router]);
+
+  // Load Global Settings
+  useEffect(() => {
+    if (!db) return;
+    const unsub = onSnapshot(doc(db, "globalSettings", "finance"), (snap) => {
+      if (snap.exists()) {
+        setGlobalBonus(snap.data().bonusPercentage?.toString() || "0");
+      }
+    });
+    return () => unsub();
+  }, [db]);
 
   useEffect(() => {
     if (!admin || !db) return;
@@ -65,11 +79,15 @@ export default function FundRequestsPage() {
 
       reqs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
       
-      // Initialize credit amounts state with original amounts for pending requests
+      // Initialize credit amounts state
       const initialAmounts: Record<string, string> = {};
+      const bonusPct = parseFloat(globalBonus) || 0;
+
       reqs.forEach(r => {
         if (r.status === 'Pending') {
-          initialAmounts[r.id] = r.amount.toString();
+          // If a global bonus exists, pre-calculate it for the input field
+          const calcAmount = r.amount + (r.amount * bonusPct / 100);
+          initialAmounts[r.id] = calcAmount.toString();
         }
       });
       setCreditAmounts(prev => ({ ...initialAmounts, ...prev }));
@@ -84,7 +102,24 @@ export default function FundRequestsPage() {
     });
     
     return () => unsubscribe();
-  }, [admin, db]);
+  }, [admin, db, globalBonus]);
+
+  const saveGlobalBonus = async () => {
+    if (!db) return;
+    setIsSavingSettings(true);
+    try {
+      await setDoc(doc(db, "globalSettings", "finance"), {
+        bonusPercentage: parseFloat(globalBonus) || 0,
+        updatedAt: serverTimestamp(),
+        updatedBy: admin?.email
+      }, { merge: true });
+      toast({ title: "Settings Saved", description: `Global bonus set to ${globalBonus}%` });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Save Failed" });
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
 
   const handleRequest = async (request: any, action: 'Approved' | 'Rejected') => {
     if (!db || !admin) return;
@@ -99,7 +134,6 @@ export default function FundRequestsPage() {
     
     const batch = writeBatch(db);
 
-    // 1. Update the request status
     const reqRef = doc(db, "fundRequests", request.id);
     batch.update(reqRef, { 
       status: action,
@@ -108,7 +142,6 @@ export default function FundRequestsPage() {
       processedAt: serverTimestamp()
     });
 
-    // 2. If approved, update user balance
     if (action === 'Approved') {
       const userRef = doc(db, "users", request.userId);
       batch.update(userRef, {
@@ -116,7 +149,6 @@ export default function FundRequestsPage() {
       });
     }
 
-    // 3. Create notification for user
     const notifRef = doc(collection(db, "users", request.userId, "notifications"));
     batch.set(notifRef, {
       title: action === 'Approved' ? '💰 Wallet Refilled!' : '❌ Fund Request Rejected',
@@ -159,13 +191,37 @@ export default function FundRequestsPage() {
   return (
     <div className="min-h-screen bg-slate-50 p-6 font-body">
       <div className="max-w-6xl mx-auto space-y-6">
-        <header className="flex items-center gap-4">
-          <button onClick={() => router.push("/admin")} className="p-3 bg-white rounded-2xl text-slate-400 hover:text-[#312ECB] shadow-sm transition-colors">
-            <ChevronLeft size={24} />
-          </button>
-          <div>
-            <h1 className="text-2xl font-black tracking-tight text-[#111B21]">FUND REQUESTS</h1>
-            <p className="text-[10px] font-black text-[#F59E0B] uppercase tracking-widest">Verify & Credit Wallet Funds</p>
+        <header className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button onClick={() => router.push("/admin")} className="p-3 bg-white rounded-2xl text-slate-400 hover:text-[#312ECB] shadow-sm transition-colors">
+              <ChevronLeft size={24} />
+            </button>
+            <div>
+              <h1 className="text-2xl font-black tracking-tight text-[#111B21]">FUND REQUESTS</h1>
+              <p className="text-[10px] font-black text-[#F59E0B] uppercase tracking-widest">Verify & Credit Wallet Funds</p>
+            </div>
+          </div>
+          
+          <div className="bg-white p-4 rounded-[2rem] border border-slate-100 flex items-center gap-4 shadow-sm">
+            <div className="flex flex-col">
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Global Bonus %</span>
+              <div className="flex items-center gap-2 mt-1">
+                <Zap className="text-emerald-500" size={16} />
+                <Input 
+                  type="number"
+                  value={globalBonus}
+                  onChange={(e) => setGlobalBonus(e.target.value)}
+                  className="w-20 h-10 bg-slate-50 border-none rounded-xl text-sm font-black text-[#111B21]"
+                />
+              </div>
+            </div>
+            <Button 
+              onClick={saveGlobalBonus} 
+              disabled={isSavingSettings}
+              className="bg-emerald-500 hover:bg-emerald-600 rounded-xl h-12 px-4 shadow-lg shadow-emerald-500/20"
+            >
+              <Save size={18} />
+            </Button>
           </div>
         </header>
 
