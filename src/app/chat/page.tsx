@@ -7,7 +7,6 @@ import {
   query, 
   orderBy, 
   serverTimestamp,
-  limit
 } from "firebase/firestore";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
@@ -38,16 +37,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
-import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
 
 type ChatState = 
   | 'idle' 
@@ -107,17 +96,6 @@ export default function ChatPage() {
 
   const { data: messagesData, isLoading: isMessagesLoading } = useCollection(messagesQuery);
 
-  const ordersQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return query(
-      collection(db, "users", user.uid, "orders"),
-      orderBy("createdAt", "desc"),
-      limit(20)
-    );
-  }, [db, user]);
-
-  const { data: ordersData } = useCollection(ordersQuery);
-  
   const messages = useMemo(() => {
     if (!messagesData) return [];
     return messagesData.filter((m: any) => {
@@ -356,44 +334,14 @@ export default function ChatPage() {
           Automated Assistant
         </span>
         
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="sm" className="text-[10px] font-black text-[#312ECB] dark:text-white uppercase tracking-widest gap-2 hover:bg-slate-50 dark:hover:bg-slate-800">
-              <History size={14} /> Recent Orders
-            </Button>
-          </SheetTrigger>
-          <SheetContent className="bg-white dark:bg-slate-950 border-gray-100 dark:border-slate-800">
-            <SheetHeader>
-              <SheetTitle className="text-xl font-black text-[#312ECB] dark:text-white">Your Recent Orders</SheetTitle>
-              <SheetDescription className="dark:text-slate-400">Track your active growth services.</SheetDescription>
-            </SheetHeader>
-            <div className="mt-8 space-y-4">
-              {ordersData?.map((order: any) => (
-                <div key={order.id} className="p-4 border border-gray-100 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-900/50">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="font-black text-[10px] uppercase text-[#312ECB] dark:text-blue-400">
-                      {order.platform} • {order.service}
-                    </span>
-                    <Badge variant="outline" className="text-[9px] font-black uppercase bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700">
-                      {order.status}
-                    </Badge>
-                  </div>
-                  <div className="text-[10px] text-slate-500 dark:text-slate-400 font-bold mb-1 truncate">{order.link}</div>
-                  <div className="flex justify-between items-center text-[10px] font-black text-slate-400 dark:text-slate-500 mt-2 pt-2 border-t border-gray-100 dark:border-slate-800">
-                    <span className="text-[#111B21] dark:text-slate-200">QTY: {order.quantity}</span>
-                    <span className="text-emerald-600 dark:text-emerald-400">${order.price?.toFixed(2)}</span>
-                    <span>{order.createdAt?.toDate ? format(order.createdAt.toDate(), 'MMM dd, HH:mm') : ''}</span>
-                  </div>
-                </div>
-              ))}
-              {(!ordersData || ordersData.length === 0) && (
-                <div className="text-center py-12 text-slate-400 font-bold text-sm">
-                  No orders yet.
-                </div>
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => router.push('/orders')}
+          className="text-[10px] font-black text-[#312ECB] dark:text-white uppercase tracking-widest gap-2 hover:bg-slate-50 dark:hover:bg-slate-800"
+        >
+          <History size={14} /> Recent Orders
+        </Button>
       </div>
 
       {/* 3. BOT BANNER (DEEP BLUE) */}
