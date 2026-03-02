@@ -31,10 +31,9 @@ export function SupportBot() {
     }
   }, [messages, isLoading]);
 
-  // Clear history when the bot is closed
   const toggleBot = () => {
     if (isOpen) {
-      // Clear history when closing
+      // Clear history when closing so next session starts fresh
       setMessages([{ role: 'bot', text: 'Hi! I am the SocialBoost Assistant. How can I help you today? 🚀' }]);
     }
     setIsOpen(!isOpen);
