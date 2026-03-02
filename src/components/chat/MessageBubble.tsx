@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { SendHorizonal, Rocket, Home, QrCode, Download, MessageCircle, Copy, CheckCircle } from "lucide-react";
+import { SendHorizonal, Rocket, Home, QrCode, Download, MessageCircle, Copy, CheckCircle, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,39 +45,40 @@ export function MessageBubble({
   const { toast } = useToast();
   const [link, setLink] = useState("");
   const [utr, setUtr] = useState("");
+  const [isDownloading, setIsDownloading] = useState(false);
   
   const price = paymentPrice || 0;
   const upiId = "smmxpressbot@slc";
   const upiLink = `upi://pay?pa=${upiId}&pn=SocialBoost&am=${price}&cu=INR`;
   
-  // Using QuickChart for high reliability and CORS support
-  const qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(upiLink)}&size=300&margin=2&ecLevel=M`;
+  // Using a very reliable QR provider
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(upiLink)}`;
 
   const handleDownloadQR = async () => {
+    setIsDownloading(true);
     try {
-      const response = await fetch(qrUrl, { mode: 'cors' });
-      if (!response.ok) throw new Error('Failed to fetch image');
-      
+      const response = await fetch(qrUrl);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.style.display = 'none';
       a.href = url;
-      a.download = `SocialBoost_Payment_₹${price}.png`;
+      // Use a simple filename for better compatibility
+      a.download = `SocialBoost_Payment_QR.png`;
       document.body.appendChild(a);
       a.click();
       
-      // Cleanup
-      setTimeout(() => {
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      }, 100);
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
       
       toast({ title: "Success", description: "QR Code saved to your device." });
     } catch (error) {
-      // Direct link fallback for mobile browsers that block fetch-based downloads
+      console.error('Download failed:', error);
+      // Fallback: open in new tab
       window.open(qrUrl, '_blank');
-      toast({ title: "Note", description: "Opening QR code in new tab. Long press to save." });
+      toast({ title: "Note", description: "Long press the QR code in the new tab to save it." });
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -192,9 +193,11 @@ export function MessageBubble({
               
               <Button 
                 onClick={handleDownloadQR}
+                disabled={isDownloading}
                 className="w-full h-12 bg-white dark:bg-slate-900 text-[#312ECB] hover:bg-slate-50 border-2 border-[#312ECB] rounded-xl text-[12px] font-black uppercase tracking-widest gap-2 shadow-sm"
               >
-                <Download size={18} /> Download QR Code
+                {isDownloading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+                {isDownloading ? "Starting..." : "Download QR Code"}
               </Button>
             </div>
 
