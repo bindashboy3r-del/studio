@@ -26,6 +26,5 @@ export const SERVICES: Record<Platform, SMMService[]> = {
     { id: 'likes', name: 'Likes', pricePer1000: 350.0 },
     { id: 'views', name: 'Views', pricePer1000: 280.0 },
     { id: 'comments', name: 'Comments', pricePer1000: 500.0 },
-    { id: 'shares', name: 'Shares', pricePer1000: 450.0 },
   ],
 };
