@@ -2,6 +2,7 @@ import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { FirebaseClientProvider } from '@/firebase/client-provider';
+import { SupportBot } from '@/components/SupportBot';
 
 export const metadata: Metadata = {
   title: 'SocialBoost - Professional SMM Services',
@@ -23,6 +24,7 @@ export default function RootLayout({
       <body className="font-body antialiased bg-background text-foreground">
         <FirebaseClientProvider>
           {children}
+          <SupportBot />
           <Toaster />
         </FirebaseClientProvider>
       </body>
