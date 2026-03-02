@@ -24,7 +24,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ChevronLeft, RefreshCw, Check, X as CloseIcon, Wallet, Zap, Save } from "lucide-react";
+import { ChevronLeft, RefreshCw, Check, X as CloseIcon, Wallet, Zap, Save, Trash2 } from "lucide-react";
 import { useFirestore, useUser } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { errorEmitter } from "@/firebase/error-emitter";
@@ -107,24 +107,54 @@ export default function FundRequestsPage() {
     if (!db) return;
     setIsSavingSettings(true);
     try {
+      const bonusVal = parseFloat(globalBonus) || 0;
       await setDoc(doc(db, "globalSettings", "finance"), {
-        bonusPercentage: parseFloat(globalBonus) || 0,
+        bonusPercentage: bonusVal,
         updatedAt: serverTimestamp(),
         updatedBy: admin?.email
       }, { merge: true });
       
-      const bonusPct = parseFloat(globalBonus) || 0;
       const updatedCredits = { ...creditAmounts };
       requests.forEach(r => {
         if (r.status === 'Pending') {
-          updatedCredits[r.id] = (r.amount + (r.amount * bonusPct / 100)).toFixed(0);
+          updatedCredits[r.id] = (r.amount + (r.amount * bonusVal / 100)).toFixed(0);
         }
       });
       setCreditAmounts(updatedCredits);
 
-      toast({ title: "Settings Saved", description: `Global bonus set to ${globalBonus}%` });
+      toast({ 
+        title: bonusVal > 0 ? "Offer Active!" : "Bonus Removed", 
+        description: bonusVal > 0 ? `Global bonus set to ${bonusVal}%` : "Users will no longer see bonus offers." 
+      });
     } catch (e) {
       toast({ variant: "destructive", title: "Save Failed" });
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
+  const stopGlobalBonus = async () => {
+    if (!db) return;
+    setIsSavingSettings(true);
+    try {
+      await setDoc(doc(db, "globalSettings", "finance"), {
+        bonusPercentage: 0,
+        updatedAt: serverTimestamp(),
+        updatedBy: admin?.email
+      }, { merge: true });
+      
+      setGlobalBonus("0");
+      const updatedCredits = { ...creditAmounts };
+      requests.forEach(r => {
+        if (r.status === 'Pending') {
+          updatedCredits[r.id] = r.amount.toString();
+        }
+      });
+      setCreditAmounts(updatedCredits);
+
+      toast({ title: "Offer Stopped", description: "Global bonus has been set to 0%." });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Operation Failed" });
     } finally {
       setIsSavingSettings(false);
     }
@@ -140,9 +170,7 @@ export default function FundRequestsPage() {
     setProcessingId(request.id);
     
     const finalCredit = action === 'Approved' ? parseFloat(creditAmounts[request.id]) : 0;
-    const bonusPct = parseFloat(globalBonus) || 0;
-    const fallbackAmount = request.amount + (request.amount * bonusPct / 100);
-    const validatedAmount = isNaN(finalCredit) ? fallbackAmount : finalCredit;
+    const validatedAmount = isNaN(finalCredit) ? request.amount : finalCredit;
 
     const batch = writeBatch(db);
 
@@ -194,7 +222,7 @@ export default function FundRequestsPage() {
       .then(() => {
         toast({ 
           title: `Request ${action}`, 
-          description: action === 'Approved' ? `₹${validatedAmount.toFixed(0)} credited (including bonus).` : `Request denied.` 
+          description: action === 'Approved' ? `₹${validatedAmount.toFixed(0)} credited.` : `Request denied.` 
         });
       })
       .catch((err) => {
@@ -237,7 +265,7 @@ export default function FundRequestsPage() {
             <div className="flex flex-col">
               <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Global Bonus %</span>
               <div className="flex items-center gap-2 mt-1">
-                <Zap className="text-emerald-500" size={16} />
+                <Zap className={parseFloat(globalBonus) > 0 ? "text-emerald-500 animate-pulse" : "text-slate-300"} size={16} />
                 <Input 
                   type="number"
                   value={globalBonus}
@@ -246,13 +274,25 @@ export default function FundRequestsPage() {
                 />
               </div>
             </div>
-            <Button 
-              onClick={saveGlobalBonus} 
-              disabled={isSavingSettings}
-              className="bg-emerald-500 hover:bg-emerald-600 rounded-xl h-12 px-4 shadow-lg shadow-emerald-500/20"
-            >
-              <Save size={18} />
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={saveGlobalBonus} 
+                disabled={isSavingSettings}
+                className="bg-[#312ECB] hover:bg-[#2825A6] rounded-xl h-12 px-4 shadow-lg shadow-blue-500/20 gap-2 text-[10px] font-black uppercase"
+              >
+                <Save size={18} /> Update
+              </Button>
+              {parseFloat(globalBonus) > 0 && (
+                <Button 
+                  variant="destructive"
+                  onClick={stopGlobalBonus} 
+                  disabled={isSavingSettings}
+                  className="rounded-xl h-12 px-4 shadow-lg shadow-red-500/20 gap-2 text-[10px] font-black uppercase"
+                >
+                  <Trash2 size={18} /> Stop Offer
+                </Button>
+              )}
+            </div>
           </div>
         </header>
 
