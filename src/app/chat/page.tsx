@@ -58,7 +58,8 @@ export default function ChatPage() {
     );
   }, [db, user]);
 
-  const { data: messages = [], isLoading: isMessagesLoading } = useCollection(messagesQuery);
+  const { data: messagesData, isLoading: isMessagesLoading } = useCollection(messagesQuery);
+  const messages = messagesData || [];
 
   useEffect(() => {
     if (!isUserLoading && !user) router.push("/");
