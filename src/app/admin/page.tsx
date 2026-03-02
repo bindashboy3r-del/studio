@@ -12,7 +12,8 @@ import {
   Moon, 
   Bell, 
   LogOut,
-  Zap
+  Zap,
+  Wallet
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -44,6 +45,13 @@ export default function AdminHub() {
       path: "/admin/tracker"
     },
     {
+      title: "FUND REQUESTS",
+      subtitle: "APPROVE WALLET TOP-UPS",
+      icon: <Wallet size={28} />,
+      color: "bg-[#F59E0B]", // Amber
+      path: "/admin/funds"
+    },
+    {
       title: "BROADCAST MSG",
       subtitle: "REAL-TIME ANNOUNCEMENTS",
       icon: <Megaphone size={28} />,
@@ -61,7 +69,6 @@ export default function AdminHub() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-body">
-      {/* Header matching screenshot */}
       <header className="bg-white px-6 py-4 flex items-center justify-between border-b border-slate-100 sticky top-0 z-50">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-[#312ECB] rounded-xl flex items-center justify-center text-white shadow-lg">
@@ -70,20 +77,13 @@ export default function AdminHub() {
           <h1 className="text-xl font-black italic tracking-tighter text-[#312ECB] uppercase">SOCIALBOOST</h1>
         </div>
         <div className="flex items-center gap-5">
-          <button className="text-slate-400 hover:text-[#312ECB] transition-colors">
-            <Moon size={20} />
-          </button>
-          <button className="text-slate-400 hover:text-[#312ECB] transition-colors relative">
-            <Bell size={20} />
-            <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
-          </button>
           <div className="w-10 h-10 rounded-full bg-[#312ECB] flex items-center justify-center text-white font-black text-sm shadow-md">
             {user.displayName?.[0] || 'A'}
           </div>
         </div>
       </header>
 
-      <main className="max-w-md mx-auto p-6 space-y-8 pt-12">
+      <main className="max-w-md mx-auto p-6 space-y-6 pt-12">
         <div className="space-y-1">
           <h2 className="text-[28px] font-black text-[#111B21] tracking-tight">ADMIN PANEL</h2>
           <p className="text-[11px] font-black text-[#312ECB] uppercase tracking-[0.3em]">Management Hub</p>
@@ -110,8 +110,6 @@ export default function AdminHub() {
               <div className="z-10 bg-white/10 p-2 rounded-full group-hover:translate-x-1 transition-transform">
                 <ChevronRight size={24} />
               </div>
-              {/* Subtle background decoration */}
-              <div className="absolute -right-4 -bottom-4 w-32 h-32 bg-white/5 rounded-full blur-2xl" />
             </button>
           ))}
         </div>
@@ -126,12 +124,6 @@ export default function AdminHub() {
           </Button>
         </div>
       </main>
-
-      <footer className="mt-auto py-10 text-center">
-        <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.6em]">
-          SOCIALBOOST CORE v3.0
-        </p>
-      </footer>
     </div>
   );
 }

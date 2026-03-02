@@ -5,135 +5,34 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "User",
       "type": "object",
-      "description": "Represents a user account in SocialBoost, authenticated via Email/Password.",
+      "description": "Represents a user account in SocialBoost.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the User entity."
-        },
-        "email": {
-          "type": "string",
-          "description": "The user's unique email address used for login."
-        },
-        "displayName": {
-          "type": "string",
-          "description": "The user's full name or preferred display name."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp indicating when the user account was created.",
-          "format": "date-time"
-        }
+        "id": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "balance": { "type": "number", "default": 0 },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": [
-        "id",
-        "email",
-        "createdAt"
-      ]
+      "required": ["id", "email", "createdAt"]
     },
-    "Notification": {
+    "FundRequest": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Notification",
+      "title": "FundRequest",
       "type": "object",
-      "description": "System notification sent to a user about their order status.",
+      "description": "A request by a user to add money to their wallet.",
       "properties": {
         "id": { "type": "string" },
         "userId": { "type": "string" },
-        "title": { "type": "string" },
-        "message": { "type": "string" },
-        "read": { "type": "boolean" },
+        "amount": { "type": "number" },
+        "utrId": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected"] },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "userId", "title", "message", "read", "createdAt"]
-    },
-    "Service": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Service",
-      "type": "object",
-      "description": "Defines an SMM service offered by SocialBoost.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Service entity."
-        },
-        "platform": {
-          "type": "string",
-          "description": "The social media platform (Instagram, YouTube)."
-        },
-        "name": {
-          "type": "string",
-          "description": "Service name (Followers, Likes, etc.)."
-        },
-        "description": {
-          "type": "string",
-          "description": "Detailed description of service."
-        },
-        "unitPrice": {
-          "type": "number",
-          "description": "Price per 1000 units."
-        }
-      },
-      "required": [
-        "id",
-        "platform",
-        "name",
-        "unitPrice"
-      ]
-    },
-    "Order": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Order",
-      "type": "object",
-      "description": "An SMM service order placed by a user.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Order."
-        },
-        "userId": {
-          "type": "string",
-          "description": "ID of the user who placed the order."
-        },
-        "serviceId": {
-          "type": "string",
-          "description": "ID of the service ordered."
-        },
-        "link": {
-          "type": "string",
-          "description": "Destination URL for the service."
-        },
-        "quantity": {
-          "type": "number",
-          "description": "Number of units ordered."
-        },
-        "totalPrice": {
-          "type": "number",
-          "description": "Calculated total price."
-        },
-        "status": {
-          "type": "string",
-          "description": "Pending, Processing, Completed, Cancelled."
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "userId",
-        "serviceId",
-        "link",
-        "quantity",
-        "status",
-        "createdAt"
-      ]
+      "required": ["id", "userId", "amount", "utrId", "status", "createdAt"]
     }
   },
   "auth": {
-    "providers": [
-      "password"
-    ]
+    "providers": ["password"]
   },
   "firestore": {
     "structure": [
@@ -141,30 +40,16 @@
         "path": "/users/{userId}",
         "definition": {
           "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "User profile data."
+          "schema": { "$ref": "#/backend/entities/User" },
+          "description": "User profile and balance."
         }
       },
       {
-        "path": "/users/{userId}/notifications/{notificationId}",
+        "path": "/fundRequests/{requestId}",
         "definition": {
-          "entityName": "Notification",
-          "schema": {
-            "$ref": "#/backend/entities/Notification"
-          },
-          "description": "Order updates for the user."
-        }
-      },
-      {
-        "path": "/orders/{orderId}",
-        "definition": {
-          "entityName": "Order",
-          "schema": {
-            "$ref": "#/backend/entities/Order"
-          },
-          "description": "Global order tracking."
+          "entityName": "FundRequest",
+          "schema": { "$ref": "#/backend/entities/FundRequest" },
+          "description": "Global fund addition requests."
         }
       }
     ]

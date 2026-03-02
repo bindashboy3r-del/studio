@@ -12,7 +12,9 @@ import {
   limit,
   onSnapshot,
   doc,
-  writeBatch
+  writeBatch,
+  increment,
+  updateDoc
 } from "firebase/firestore";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
@@ -31,11 +33,13 @@ import {
   Zap,
   Clock,
   Circle,
-  Instagram
+  Instagram,
+  Wallet,
+  PlusCircle
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PLATFORMS, SERVICES, Platform, SMMService } from "@/app/lib/constants";
-import { useAuth, useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
+import { useAuth, useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { useToast } from "@/hooks/use-toast";
@@ -54,9 +58,11 @@ type ChatState =
   | 'choosing_platform' 
   | 'choosing_service' 
   | 'entering_quantity' 
+  | 'choosing_payment_method'
   | 'confirming_price'
-  | 'awaiting_payment'
-  | 'confirming';
+  | 'awaiting_upi_payment'
+  | 'awaiting_fund_amount'
+  | 'awaiting_fund_payment';
 
 interface OrderInProgress {
   platform?: Platform;
@@ -64,6 +70,8 @@ interface OrderInProgress {
   link?: string;
   quantity?: number;
   utrId?: string;
+  paymentMethod?: 'wallet' | 'upi';
+  fundAmount?: number;
 }
 
 export default function ChatPage() {
@@ -83,6 +91,14 @@ export default function ChatPage() {
   const [sessionStartTime] = useState(() => Date.now());
   const hasInitialGreeted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // User Profile Listener for Balance
+  const userDocRef = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return doc(db, "users", user.uid);
+  }, [db, user]);
+  const { data: userData } = useDoc(userDocRef);
+  const walletBalance = userData?.balance || 0;
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
@@ -238,6 +254,7 @@ export default function ChatPage() {
     if (!link || !utr || !db || !user) return;
     const finalPrice = (currentOrder.quantity! / 1000) * currentOrder.service!.pricePer1000;
     const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}`;
+    
     const orderData = {
       userId: user.uid,
       orderId: orderId,
@@ -248,6 +265,7 @@ export default function ChatPage() {
       price: finalPrice,
       utrId: utr,
       status: 'Pending',
+      paymentMethod: 'UPI',
       createdAt: serverTimestamp()
     };
 
@@ -275,6 +293,79 @@ export default function ChatPage() {
     });
   };
 
+  const handleWalletPaymentSubmit = async (link: string) => {
+    if (!link || !db || !user || !currentOrder.service) return;
+    const finalPrice = (currentOrder.quantity! / 1000) * currentOrder.service.pricePer1000;
+    
+    if (walletBalance < finalPrice) {
+      botReply("❌ Insufficient balance! Please add funds to your wallet.");
+      return;
+    }
+
+    const orderId = `SB-W-${Math.floor(100000 + Math.random() * 900000)}`;
+    const batch = writeBatch(db);
+
+    // 1. Create the order
+    const orderRef = doc(collection(db, "users", user.uid, "orders"));
+    batch.set(orderRef, {
+      userId: user.uid,
+      orderId: orderId,
+      platform: PLATFORMS[currentOrder.platform!],
+      service: currentOrder.service.name,
+      link: link,
+      quantity: currentOrder.quantity,
+      price: finalPrice,
+      status: 'Pending',
+      paymentMethod: 'Wallet',
+      createdAt: serverTimestamp()
+    });
+
+    // 2. Deduct from balance
+    const userRef = doc(db, "users", user.uid);
+    batch.update(userRef, {
+      balance: increment(-finalPrice)
+    });
+
+    await batch.commit().then(() => {
+      setChatState('idle');
+      botReply("✅ Payment successful from Wallet!", [], {
+        isSuccessCard: true,
+        successDetails: {
+          orderId,
+          platform: PLATFORMS[currentOrder.platform!],
+          service: currentOrder.service?.name,
+          quantity: currentOrder.quantity,
+          price: finalPrice,
+          link: link,
+          utrId: 'WALLET-PAYMENT'
+        }
+      });
+    }).catch(err => {
+      toast({ variant: "destructive", title: "Wallet Error", description: "Failed to process wallet payment." });
+    });
+  };
+
+  const handleFundSubmit = async (amount: number, utr: string) => {
+    if (!amount || !utr || !db || !user) return;
+    
+    const fundData = {
+      userId: user.uid,
+      userEmail: user.email,
+      displayName: user.displayName,
+      amount,
+      utrId: utr,
+      status: 'Pending',
+      createdAt: serverTimestamp()
+    };
+
+    await addDoc(collection(db, "fundRequests"), fundData).then(() => {
+      botReply(`✅ Fund request submitted for ₹${amount}!\n\nAdmin will verify your UTR ID: ${utr} and update your balance soon.`);
+      setChatState('idle');
+    }).catch(err => {
+      toast({ variant: "destructive", title: "Error", description: "Failed to submit fund request." });
+    });
+  };
+
   const handleSend = async (manualText?: string) => {
     const text = manualText || inputValue.trim();
     if (!text || !db || !user) return;
@@ -282,13 +373,20 @@ export default function ChatPage() {
     await addMessage('user', text);
     const cleanText = text.toLowerCase();
 
+    // Global Commands
     if (cleanText === 'hi' || cleanText.includes("main menu") || cleanText.includes("start")) {
       setChatState('choosing_platform');
       setCurrentOrder({});
       botReply(
-        "👋 Welcome to SocialBoost Bot!\n\nNiche di gayi list mein se koi bhi platform select karein:",
-        ["1. INSTAGRAM SERVICES", "2. YOUTUBE SERVICES"]
+        "👋 Welcome to SocialBoost Bot!\n\nSelect a platform to begin:",
+        ["1. INSTAGRAM SERVICES", "2. YOUTUBE SERVICES", "💰 ADD FUNDS", "📜 ORDER HISTORY"]
       );
+      return;
+    }
+
+    if (cleanText.includes("add funds")) {
+      setChatState('awaiting_fund_amount');
+      botReply("💰 Kitna amount add karna chahte hain? (Minimum ₹10)");
       return;
     }
 
@@ -297,6 +395,7 @@ export default function ChatPage() {
       return;
     }
 
+    // Platform Selection
     if (cleanText.includes("instagram services")) {
       setCurrentOrder({ platform: 'instagram' });
       setChatState('choosing_service');
@@ -324,17 +423,30 @@ export default function ChatPage() {
     }
 
     switch (chatState) {
+      case 'awaiting_fund_amount':
+        const fundAmt = parseFloat(text);
+        if (isNaN(fundAmt) || fundAmt < 10) {
+          botReply("Please enter a valid amount (Minimum ₹10).");
+        } else {
+          setCurrentOrder({ fundAmount: fundAmt });
+          setChatState('awaiting_fund_payment');
+          botReply(`📸 Scan QR to pay ₹${fundAmt.toFixed(0)} to add funds:`, [], {
+            isFundPaymentCard: true,
+            fundPrice: fundAmt
+          });
+        }
+        break;
       case 'choosing_platform':
         if (cleanText.includes("1") || cleanText.includes("instagram")) {
           setCurrentOrder({ platform: 'instagram' });
           setChatState('choosing_service');
           const options = SERVICES.instagram.map((s, i) => `${i + 1}. INSTAGRAM ${s.name.toUpperCase()}`);
-          botReply("Perfect. Niche di gayi Instagram service select karein:", options);
+          botReply("Perfect. Select an Instagram service:", options);
         } else if (cleanText.includes("2") || cleanText.includes("youtube")) {
           setCurrentOrder({ platform: 'youtube' });
           setChatState('choosing_service');
           const options = SERVICES.youtube.map((s, i) => `${i + 1}. YOUTUBE ${s.name.toUpperCase()}`);
-          botReply("Perfect. Niche di gayi YouTube service select karein:", options);
+          botReply("Perfect. Select a YouTube service:", options);
         } else {
           botReply("Please select from the options provided.");
         }
@@ -347,7 +459,7 @@ export default function ChatPage() {
         if (sService) {
           setCurrentOrder({ ...currentOrder, service: sService });
           setChatState('entering_quantity');
-          botReply(`📊 Aapne ${PLATFORMS[sPlatform]} ${sService.name} select kiye hain.\n\nKitni quantity chahiye? (Minimum 100)`);
+          botReply(`📊 You've selected ${PLATFORMS[sPlatform]} ${sService.name}.\n\nHow many do you want? (Minimum 100)`);
         } else {
           botReply("Invalid selection. Please choose from the list.");
         }
@@ -359,25 +471,37 @@ export default function ChatPage() {
         } else {
           const price = (qty / 1000) * currentOrder.service!.pricePer1000;
           setCurrentOrder({ ...currentOrder, quantity: qty });
-          setChatState('confirming_price');
+          setChatState('choosing_payment_method');
           botReply(
-            `✅ Aapne ${qty} ${PLATFORMS[currentOrder.platform!]} ${currentOrder.service!.name} select kiye hain.\n💰 Total price: ₹${price.toFixed(0)}\n\nKya aap aage badhna chahte hain?`,
-            ["✅ YES, PROCEED", "🏠 MAIN MENU"]
+            `✅ Order: ${qty} ${PLATFORMS[currentOrder.platform!]} ${currentOrder.service!.name}\n💰 Price: ₹${price.toFixed(0)}\n💳 Your Balance: ₹${walletBalance.toFixed(0)}\n\nChoose payment method:`,
+            ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR", "🏠 MAIN MENU"]
           );
         }
         break;
-      case 'confirming_price':
-        if (cleanText.includes("yes") || cleanText.includes("proceed")) {
-          setChatState('awaiting_payment');
-          const finalPrice = (currentOrder.quantity! / 1000) * currentOrder.service!.pricePer1000;
-          botReply(`📸 Payment instructions for ₹${finalPrice.toFixed(0)}`, [], {
+      case 'choosing_payment_method':
+        const price = (currentOrder.quantity! / 1000) * currentOrder.service!.pricePer1000;
+        if (cleanText.includes("wallet")) {
+          if (walletBalance < price) {
+            botReply(`❌ Insufficient balance! (Needs ₹${price.toFixed(0)}, have ₹${walletBalance.toFixed(0)}).\n\nNiche di gayi list mein se select karein:`, ["📲 PAY VIA UPI QR", "💰 ADD FUNDS", "🏠 MAIN MENU"]);
+          } else {
+            setCurrentOrder({ ...currentOrder, paymentMethod: 'wallet' });
+            setChatState('confirming_price');
+            botReply(`💰 Paying ₹${price.toFixed(0)} from your wallet.\n\nEnter the target link (Instagram/YouTube URL) to complete order:`);
+          }
+        } else if (cleanText.includes("upi")) {
+          setCurrentOrder({ ...currentOrder, paymentMethod: 'upi' });
+          setChatState('awaiting_upi_payment');
+          botReply(`📸 Scan QR to pay ₹${price.toFixed(0)}:`, [], {
             isPaymentCard: true,
-            paymentPrice: finalPrice
+            paymentPrice: price
           });
         } else {
-          setChatState('initial');
-          setCurrentOrder({});
-          botReply("Order cancelled. Send 'Hi' to start create order");
+          botReply("Please select a payment method.");
+        }
+        break;
+      case 'confirming_price':
+        if (currentOrder.paymentMethod === 'wallet') {
+          handleWalletPaymentSubmit(text);
         }
         break;
       default:
@@ -446,7 +570,18 @@ export default function ChatPage() {
 
       {/* Sub-Header */}
       <div className="bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 px-6 py-3 flex items-center justify-between z-40">
-        <h2 className="text-[11px] font-black italic uppercase tracking-[0.2em] text-[#312ECB]">AUTOMATED ASSISTANT</h2>
+        <div className="flex items-center gap-2">
+          <div className="bg-emerald-500/10 text-emerald-600 px-3 py-1 rounded-full flex items-center gap-1.5 border border-emerald-100">
+            <Wallet size={14} />
+            <span className="text-[11px] font-black tracking-tight">₹{walletBalance.toFixed(0)}</span>
+          </div>
+          <button 
+            onClick={() => handleSend("Add Funds")}
+            className="p-1 text-[#312ECB] hover:scale-110 transition-transform"
+          >
+            <PlusCircle size={18} />
+          </button>
+        </div>
         <button 
           onClick={() => router.push('/orders')}
           className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-[#312ECB] hover:opacity-70 transition-opacity"
@@ -526,6 +661,9 @@ export default function ChatPage() {
             onPaymentSubmit={handlePaymentSubmit}
             isSuccessCard={m.isSuccessCard}
             successDetails={m.successDetails}
+            isFundPaymentCard={m.isFundPaymentCard}
+            fundPrice={m.fundPrice}
+            onFundSubmit={handleFundSubmit}
             onOptionClick={(option) => handleSend(option)}
             timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} 
           />

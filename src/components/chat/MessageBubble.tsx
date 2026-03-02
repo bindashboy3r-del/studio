@@ -1,7 +1,7 @@
 
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { SendHorizonal, Rocket, Home, QrCode, Download, MessageCircle, Copy, CheckCircle, Loader2, History } from "lucide-react";
+import { SendHorizonal, Rocket, Home, QrCode, Download, MessageCircle, Copy, CheckCircle, Loader2, History, Wallet } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,9 @@ interface MessageBubbleProps {
   onPaymentSubmit?: (link: string, utr: string) => void;
   isSuccessCard?: boolean;
   successDetails?: SuccessDetails;
+  isFundPaymentCard?: boolean;
+  fundPrice?: number;
+  onFundSubmit?: (amount: number, utr: string) => void;
 }
 
 export function MessageBubble({ 
@@ -41,7 +44,10 @@ export function MessageBubble({
   paymentPrice,
   onPaymentSubmit,
   isSuccessCard,
-  successDetails
+  successDetails,
+  isFundPaymentCard,
+  fundPrice,
+  onFundSubmit
 }: MessageBubbleProps) {
   const isUser = sender === 'user';
   const { toast } = useToast();
@@ -50,13 +56,10 @@ export function MessageBubble({
   const [utr, setUtr] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
   
-  const price = paymentPrice || 0;
+  const price = paymentPrice || fundPrice || 0;
   const upiId = "smmxpressbot@slc";
   
-  // Construct UPI link for QR generation
   const upiLink = `upi://pay?pa=${upiId}&pn=SocialBoost&am=${price.toFixed(2)}&cu=INR`;
-  
-  // Using QuickChart - a very stable and CORS-friendly generator
   const qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(upiLink)}&size=400&margin=1&format=png`;
 
   const handleDownloadQR = async () => {
@@ -66,25 +69,18 @@ export function MessageBubble({
       if (!response.ok) throw new Error('Failed to fetch image');
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      
       const a = document.createElement('a');
       a.style.display = 'none';
       a.href = url;
       a.download = `SocialBoost_Payment_QR.png`;
       document.body.appendChild(a);
       a.click();
-      
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      
       toast({ title: "Success", description: "QR Code download started." });
     } catch (error) {
-      console.error('Download failed:', error);
       window.open(qrUrl, '_blank');
-      toast({ 
-        title: "Download Help", 
-        description: "QR Code opened in a new tab. Long-press the image to save it to your gallery." 
-      });
+      toast({ title: "Download Help", description: "Long-press image to save." });
     } finally {
       setIsDownloading(false);
     }
@@ -95,14 +91,7 @@ export function MessageBubble({
     toast({ title: "Copied!", description: "UPI ID copied to clipboard." });
   };
 
-  const handleWhatsAppSend = () => {
-    if (!successDetails) return;
-    const msg = `*New Order Confirmation*\n\n- *Link:* ${successDetails.link}\n- *Service:* ${successDetails.service}\n- *UTR ID:* ${successDetails.utrId}\n- *Quantity:* ${successDetails.quantity}\n- *Amount:* ₹${successDetails.price.toFixed(0)}`;
-    const waUrl = `https://wa.me/919116399517?text=${encodeURIComponent(msg)}`;
-    window.open(waUrl, '_blank');
-  };
-
-  const isFormValid = link.trim() !== "" && utr.length === 12;
+  const isFormValid = isFundPaymentCard ? utr.length === 12 : (link.trim() !== "" && utr.length === 12);
 
   return (
     <div className={cn("flex w-full mb-4", isUser ? "justify-end" : "justify-start")}>
@@ -136,45 +125,31 @@ export function MessageBubble({
               </div>
             </div>
 
-            <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-700">
-              <div className="text-center">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 leading-relaxed">
-                  Important: Please send these details to Admin via WhatsApp to confirm your order.
-                </p>
-                <Button 
-                  onClick={handleWhatsAppSend}
-                  className="w-full h-14 bg-[#25D366] hover:bg-[#20bd5b] text-white font-black text-[12px] uppercase tracking-widest rounded-2xl shadow-xl gap-3"
-                >
-                  <MessageCircle size={20} /> SEND VIA WHATSAPP
-                </Button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 mt-4">
-                <Button 
-                  variant="outline" 
-                  onClick={() => router.push('/orders')}
-                  className="h-12 border-slate-200 dark:border-slate-700 text-[#312ECB] dark:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest gap-2"
-                >
-                  <History size={14} /> My History
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => onOptionClick?.("Main Menu")}
-                  className="h-12 border-slate-200 dark:border-slate-700 text-[#111B21] dark:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest gap-2"
-                >
-                  <Home size={14} /> Main Menu
-                </Button>
-              </div>
+            <div className="grid grid-cols-2 gap-3 mt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => router.push('/orders')}
+                className="h-12 border-slate-200 dark:border-slate-700 text-[#312ECB] dark:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest gap-2"
+              >
+                <History size={14} /> My History
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => onOptionClick?.("Main Menu")}
+                className="h-12 border-slate-200 dark:border-slate-700 text-[#111B21] dark:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest gap-2"
+              >
+                <Home size={14} /> Main Menu
+              </Button>
             </div>
           </div>
-        ) : isPaymentCard ? (
+        ) : (isPaymentCard || isFundPaymentCard) ? (
           <div className="space-y-6">
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-[12px] font-black text-[#111B21] dark:text-white uppercase tracking-tight">
-                <QrCode size={16} className="text-[#312ECB]" /> Secure Payment Gateway
+                <QrCode size={16} className="text-[#312ECB]" /> {isFundPaymentCard ? 'Add Funds' : 'Secure Payment'}
               </div>
               <p className="text-[13px] font-bold text-slate-700 dark:text-slate-300">
-                Kripya QR code scan karein ya UPI ID copy karke <span className="text-[#312ECB] font-black">₹{price.toFixed(0)}</span> ka payment karein.
+                Please scan QR or copy UPI ID to pay <span className="text-[#312ECB] font-black">₹{price.toFixed(0)}</span>.
               </p>
             </div>
 
@@ -188,51 +163,33 @@ export function MessageBubble({
                   <Copy size={16} />
                 </Button>
               </div>
-              <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center">
-                <span className="text-[10px] font-black text-slate-400 uppercase">Amount to pay</span>
-                <span className="text-[16px] font-black text-[#25D366]">₹{price.toFixed(0)}</span>
-              </div>
             </div>
 
             <div className="flex flex-col items-center gap-4 py-2">
               <div className="bg-white p-3 rounded-[2rem] shadow-inner border border-slate-100 flex items-center justify-center min-h-[220px] min-w-[220px]">
-                <img 
-                  src={qrUrl} 
-                  alt="Payment QR" 
-                  className="w-48 h-48 block rounded-xl" 
-                  crossOrigin="anonymous"
-                  loading="eager"
-                  onError={(e) => {
-                    console.error('QR load error');
-                    toast({ variant: "destructive", title: "Error", description: "QR failed to load. Use UPI ID instead." });
-                  }}
-                />
+                <img src={qrUrl} alt="Payment QR" className="w-48 h-48 block rounded-xl" crossOrigin="anonymous" />
               </div>
-
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center px-4">
-                Agar download na ho to screenshot leke payment kre
-              </p>
-              
               <Button 
                 onClick={handleDownloadQR}
                 disabled={isDownloading}
                 className="w-full h-12 bg-white dark:bg-slate-900 text-[#312ECB] hover:bg-slate-50 border-2 border-[#312ECB] rounded-xl text-[12px] font-black uppercase tracking-widest gap-2 shadow-sm"
               >
-                {isDownloading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-                {isDownloading ? "Downloading..." : "Download QR Code"}
+                <Download size={18} /> Download QR
               </Button>
             </div>
 
             <div className="space-y-3 pt-2">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Target Link</label>
-                <Input 
-                  placeholder="Paste Instagram/YouTube link here"
-                  value={link}
-                  onChange={(e) => setLink(e.target.value)}
-                  className="h-12 bg-slate-50 dark:bg-slate-900 border-none rounded-2xl px-5 text-sm font-bold shadow-inner"
-                />
-              </div>
+              {!isFundPaymentCard && (
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Target Link</label>
+                  <Input 
+                    placeholder="Paste Link here"
+                    value={link}
+                    onChange={(e) => setLink(e.target.value)}
+                    className="h-12 bg-slate-50 dark:bg-slate-900 border-none rounded-2xl px-5 text-sm font-bold shadow-inner"
+                  />
+                </div>
+              )}
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">12-Digit UTR ID</label>
                 <Input 
@@ -244,26 +201,11 @@ export function MessageBubble({
                 />
               </div>
               <Button 
-                onClick={() => onPaymentSubmit?.(link, utr)}
+                onClick={() => isFundPaymentCard ? onFundSubmit?.(price, utr) : onPaymentSubmit?.(link, utr)}
                 disabled={!isFormValid}
-                className="w-full h-14 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[12px] uppercase tracking-widest rounded-2xl shadow-xl gap-3 disabled:opacity-50 disabled:grayscale transition-all transform active:scale-95"
+                className="w-full h-14 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[12px] uppercase tracking-widest rounded-2xl shadow-xl gap-3 transition-all transform active:scale-95"
               >
-                🚀 Submit Order Now
-              </Button>
-              {!isFormValid && utr.length > 0 && utr.length < 12 && (
-                <p className="text-[10px] font-bold text-red-500 text-center uppercase tracking-tighter animate-pulse">
-                  UTR ID must be exactly 12 digits
-                </p>
-              )}
-            </div>
-
-            <div className="flex justify-center border-t border-slate-50 dark:border-slate-700 pt-4">
-              <Button 
-                variant="ghost" 
-                onClick={() => onOptionClick?.("Main Menu")}
-                className="text-[11px] font-black uppercase text-[#312ECB] dark:text-white tracking-[0.2em] gap-2"
-              >
-                <Home size={14} /> Main Menu
+                🚀 {isFundPaymentCard ? 'Submit Fund Request' : 'Submit Order Now'}
               </Button>
             </div>
           </div>
@@ -273,7 +215,7 @@ export function MessageBubble({
           </p>
         )}
 
-        {options && options.length > 0 && !isPaymentCard && !isSuccessCard && (
+        {options && options.length > 0 && !isPaymentCard && !isSuccessCard && !isFundPaymentCard && (
           <div className="mt-4 space-y-2">
             {options.map((option, idx) => (
               <button
