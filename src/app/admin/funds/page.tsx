@@ -84,7 +84,6 @@ export default function FundRequestsPage() {
 
       reqs.forEach(r => {
         if (r.status === 'Pending' && !newCreditAmounts[r.id]) {
-          // Calculate: Principal + Bonus
           const bonusAmount = (r.amount * bonusPct) / 100;
           const totalWithBonus = r.amount + bonusAmount;
           newCreditAmounts[r.id] = totalWithBonus.toFixed(0);
@@ -114,7 +113,6 @@ export default function FundRequestsPage() {
         updatedBy: admin?.email
       }, { merge: true });
       
-      // Force recalculate all pending amounts based on new bonus
       const bonusPct = parseFloat(globalBonus) || 0;
       const updatedCredits = { ...creditAmounts };
       requests.forEach(r => {
@@ -141,10 +139,7 @@ export default function FundRequestsPage() {
 
     setProcessingId(request.id);
     
-    // Crucial: Use the amount from the input field (which includes bonus)
     const finalCredit = action === 'Approved' ? parseFloat(creditAmounts[request.id]) : 0;
-    
-    // Safety check: if parsing fails, fallback to amount + global bonus
     const bonusPct = parseFloat(globalBonus) || 0;
     const fallbackAmount = request.amount + (request.amount * bonusPct / 100);
     const validatedAmount = isNaN(finalCredit) ? fallbackAmount : finalCredit;
@@ -164,23 +159,42 @@ export default function FundRequestsPage() {
       batch.update(userRef, {
         balance: increment(validatedAmount)
       });
-    }
 
-    const notifRef = doc(collection(db, "users", request.userId, "notifications"));
-    batch.set(notifRef, {
-      title: action === 'Approved' ? '💰 Wallet Refilled!' : '❌ Fund Request Rejected',
-      message: action === 'Approved' 
-        ? `₹${validatedAmount.toFixed(0)} has been credited to your wallet (Amount + Bonus).`
-        : `Your fund request for ₹${request.amount} was rejected. Please contact support.`,
-      read: false,
-      createdAt: serverTimestamp()
-    });
+      // Notification 1: Main Amount
+      const notifRef = doc(collection(db, "users", request.userId, "notifications"));
+      batch.set(notifRef, {
+        title: '💰 Wallet Refilled!',
+        message: `₹${request.amount} has been successfully credited to your wallet.`,
+        read: false,
+        createdAt: serverTimestamp()
+      });
+
+      // Notification 2: Separate Bonus Notification (If applicable)
+      const bonusAmount = validatedAmount - request.amount;
+      if (bonusAmount > 0) {
+        const bonusNotifRef = doc(collection(db, "users", request.userId, "notifications"));
+        batch.set(bonusNotifRef, {
+          title: '🎉 Bonus Credited!',
+          message: `Congratulations! Your bonus of ₹${bonusAmount.toFixed(0)} has been added to your wallet.`,
+          read: false,
+          createdAt: serverTimestamp()
+        });
+      }
+    } else {
+      const notifRef = doc(collection(db, "users", request.userId, "notifications"));
+      batch.set(notifRef, {
+        title: '❌ Fund Request Rejected',
+        message: `Your fund request for ₹${request.amount} was rejected. Please contact support.`,
+        read: false,
+        createdAt: serverTimestamp()
+      });
+    }
 
     batch.commit()
       .then(() => {
         toast({ 
           title: `Request ${action}`, 
-          description: action === 'Approved' ? `₹${validatedAmount.toFixed(0)} credited to user.` : `Request denied.` 
+          description: action === 'Approved' ? `₹${validatedAmount.toFixed(0)} credited (including bonus).` : `Request denied.` 
         });
       })
       .catch((err) => {
