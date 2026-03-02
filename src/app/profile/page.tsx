@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { updatePassword, signOut } from "firebase/auth";
+import { updatePassword, signOut, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useAuth, useUser } from "@/firebase";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,8 @@ import {
   CheckCircle2,
   MessageCircle,
   Instagram,
-  X
+  X,
+  KeyRound
 } from "lucide-react";
 import {
   Dialog,
@@ -35,13 +36,15 @@ export default function ProfilePage() {
   const router = useRouter();
   const { toast } = useToast();
 
+  const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!auth?.currentUser) return;
+    if (!auth?.currentUser || !user?.email) return;
+    
     if (newPassword !== confirmPassword) {
       toast({ variant: "destructive", title: "Passwords Mismatch", description: "New password and confirmation do not match." });
       return;
@@ -49,15 +52,30 @@ export default function ProfilePage() {
 
     setIsUpdating(true);
     try {
+      // Re-authenticate first as required by Firebase for sensitive operations
+      const credential = EmailAuthProvider.credential(user.email, oldPassword);
+      await reauthenticateWithCredential(auth.currentUser, credential);
+      
+      // Update the password
       await updatePassword(auth.currentUser, newPassword);
+      
       toast({ title: "Success", description: "Your password has been updated successfully." });
+      setOldPassword("");
       setNewPassword("");
       setConfirmPassword("");
     } catch (error: any) {
+      console.error(error);
+      let message = error.message || "Failed to update password.";
+      if (error.code === 'auth/wrong-password') {
+        message = "Incorrect old password. Please try again.";
+      } else if (error.code === 'auth/requires-recent-login') {
+        message = "For security, please logout and login again to change password.";
+      }
+      
       toast({ 
         variant: "destructive", 
         title: "Update Failed", 
-        description: error.message || "Failed to update password. You may need to login again for security." 
+        description: message
       });
     } finally {
       setIsUpdating(false);
@@ -114,33 +132,50 @@ export default function ProfilePage() {
           <Card className="border-none shadow-[0_10px_40px_rgba(0,0,0,0.03)] rounded-[2.5rem] p-8">
             <form onSubmit={handlePasswordChange} className="space-y-6">
               <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase text-[#111B21] tracking-widest ml-1">Current Password</Label>
+                <div className="relative">
+                  <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                  <Input 
+                    type="password" 
+                    value={oldPassword}
+                    onChange={(e) => setOldPassword(e.target.value)}
+                    className="h-12 bg-slate-50 border-none rounded-2xl pl-12 pr-5 text-sm font-bold shadow-none focus-visible:ring-1 focus-visible:ring-[#312ECB]/20"
+                    placeholder="Enter old password"
+                    required
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase text-[#111B21] tracking-widest ml-1">New Password</Label>
                 <Input 
                   type="password" 
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="h-12 bg-slate-50 border-none rounded-2xl px-5 text-sm font-bold shadow-none"
-                  placeholder="••••••••"
+                  className="h-12 bg-slate-50 border-none rounded-2xl px-5 text-sm font-bold shadow-none focus-visible:ring-1 focus-visible:ring-[#312ECB]/20"
+                  placeholder="Minimum 6 characters"
                   required
                 />
               </div>
+              
               <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase text-[#111B21] tracking-widest ml-1">Confirm New Password</Label>
                 <Input 
                   type="password" 
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="h-12 bg-slate-50 border-none rounded-2xl px-5 text-sm font-bold shadow-none"
-                  placeholder="••••••••"
+                  className="h-12 bg-slate-50 border-none rounded-2xl px-5 text-sm font-bold shadow-none focus-visible:ring-1 focus-visible:ring-[#312ECB]/20"
+                  placeholder="Re-type new password"
                   required
                 />
               </div>
+
               <Button 
                 type="submit" 
                 disabled={isUpdating}
-                className="w-full h-14 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[11px] uppercase tracking-widest rounded-2xl shadow-[0_12px_24px_rgba(49,46,203,0.15)]"
+                className="w-full h-14 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[11px] uppercase tracking-widest rounded-2xl shadow-[0_12px_24px_rgba(49,46,203,0.15)] transition-all active:scale-95"
               >
-                {isUpdating ? "Processing..." : "Update Security"}
+                {isUpdating ? "Verifying & Updating..." : "Update Security"}
               </Button>
             </form>
           </Card>
