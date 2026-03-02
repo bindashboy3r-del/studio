@@ -18,6 +18,7 @@ import {
   LogOut, 
   Bell, 
   Moon, 
+  Sun,
   Rocket,
   History,
   Bot,
@@ -74,10 +75,27 @@ export default function ChatPage() {
   const [isTyping, setIsTyping] = useState(false);
   const [chatState, setChatState] = useState<ChatState>('idle');
   const [currentOrder, setCurrentOrder] = useState<OrderInProgress>({});
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
   
   const [sessionStartTime] = useState(() => Date.now());
   const hasInitialGreeted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Theme Toggle Logic
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
+    if (savedTheme) {
+      setTheme(savedTheme);
+      document.documentElement.classList.toggle('dark', savedTheme === 'dark');
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+    document.documentElement.classList.toggle('dark', newTheme === 'dark');
+  };
 
   const messagesQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
@@ -94,7 +112,7 @@ export default function ChatPage() {
     return query(
       collection(db, "users", user.uid, "orders"),
       orderBy("createdAt", "desc"),
-      limit(10)
+      limit(20)
     );
   }, [db, user]);
 
@@ -255,8 +273,8 @@ export default function ChatPage() {
         if (text.toLowerCase() === 'confirm') {
           const orderData = {
             userId: user.uid,
-            platform: currentOrder.platform,
-            service: currentOrder.service?.id,
+            platform: PLATFORMS[currentOrder.platform!],
+            service: currentOrder.service?.name,
             link: currentOrder.link,
             quantity: currentOrder.quantity,
             price: (currentOrder.quantity! / 1000) * currentOrder.service!.pricePer1000,
@@ -294,37 +312,37 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen max-w-lg mx-auto overflow-hidden relative shadow-2xl bg-white font-body">
+    <div className="flex flex-col h-screen max-w-lg mx-auto overflow-hidden relative shadow-2xl bg-white dark:bg-slate-950 font-body">
       {/* 1. TOP BAR (WHITE) */}
-      <div className="bg-white px-4 py-3 flex items-center justify-between border-b border-gray-100 z-40">
+      <div className="bg-white dark:bg-slate-900 px-4 py-3 flex items-center justify-between border-b border-gray-100 dark:border-slate-800 z-40">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-[#312ECB] flex items-center justify-center text-white shadow-md">
             <Rocket size={24} className="fill-current" />
           </div>
-          <h1 className="text-xl font-black italic tracking-tighter text-[#312ECB]">SOCIALBOOST</h1>
+          <h1 className="text-xl font-black italic tracking-tighter text-[#312ECB] dark:text-white">SOCIALBOOST</h1>
         </div>
 
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-slate-400">
-            <Moon size={18} />
+          <Button variant="ghost" size="icon" onClick={toggleTheme} className="w-8 h-8 rounded-full text-slate-400 hover:text-[#312ECB]">
+            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
           </Button>
           <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-slate-400">
             <Bell size={18} />
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="w-10 h-10 rounded-full bg-[#312ECB] text-white font-bold text-xs">
+              <Button variant="ghost" size="icon" className="w-10 h-10 rounded-full bg-[#312ECB] text-white font-bold text-xs shadow-lg">
                 {user?.displayName?.[0] || 'U'}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>Account Settings</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => router.push('/profile')}>
+            <DropdownMenuContent align="end" className="w-56 bg-white dark:bg-slate-900 border-gray-100 dark:border-slate-800">
+              <DropdownMenuLabel className="dark:text-white">Account Settings</DropdownMenuLabel>
+              <DropdownMenuSeparator className="dark:bg-slate-800" />
+              <DropdownMenuItem onClick={() => router.push('/profile')} className="dark:text-slate-300 dark:hover:bg-slate-800">
                 <UserIcon size={16} className="mr-2" /> View Profile
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => auth?.signOut()} className="text-red-600 font-bold">
+              <DropdownMenuSeparator className="dark:bg-slate-800" />
+              <DropdownMenuItem onClick={() => auth?.signOut()} className="text-red-600 font-bold hover:bg-red-50 dark:hover:bg-red-950/30">
                 <LogOut size={16} className="mr-2" /> Log Out
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -333,32 +351,37 @@ export default function ChatPage() {
       </div>
 
       {/* 2. SUB-HEADER BAR (WHITE) */}
-      <div className="bg-white px-5 py-2 flex items-center justify-between border-b border-gray-100 z-30">
-        <span className="text-[10px] font-black italic text-[#312ECB]/40 tracking-widest uppercase">
+      <div className="bg-white dark:bg-slate-900 px-5 py-2 flex items-center justify-between border-b border-gray-100 dark:border-slate-800 z-30">
+        <span className="text-[10px] font-black italic text-[#312ECB]/40 dark:text-white/40 tracking-widest uppercase">
           Automated Assistant
         </span>
         
         <Sheet>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="sm" className="text-[10px] font-black text-[#312ECB] uppercase tracking-widest gap-2">
+            <Button variant="ghost" size="sm" className="text-[10px] font-black text-[#312ECB] dark:text-white uppercase tracking-widest gap-2 hover:bg-slate-50 dark:hover:bg-slate-800">
               <History size={14} /> Recent Orders
             </Button>
           </SheetTrigger>
-          <SheetContent className="bg-white">
+          <SheetContent className="bg-white dark:bg-slate-950 border-gray-100 dark:border-slate-800">
             <SheetHeader>
-              <SheetTitle className="text-xl font-black text-[#312ECB]">Your Recent Orders</SheetTitle>
-              <SheetDescription>Track your active growth services.</SheetDescription>
+              <SheetTitle className="text-xl font-black text-[#312ECB] dark:text-white">Your Recent Orders</SheetTitle>
+              <SheetDescription className="dark:text-slate-400">Track your active growth services.</SheetDescription>
             </SheetHeader>
             <div className="mt-8 space-y-4">
               {ordersData?.map((order: any) => (
-                <div key={order.id} className="p-4 border border-gray-100 rounded-xl bg-slate-50/50">
+                <div key={order.id} className="p-4 border border-gray-100 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-900/50">
                   <div className="flex justify-between items-start mb-2">
-                    <span className="font-black text-xs uppercase text-[#312ECB]">{order.platform} - {order.service}</span>
-                    <Badge variant="outline" className="text-[10px] font-black uppercase">{order.status}</Badge>
+                    <span className="font-black text-[10px] uppercase text-[#312ECB] dark:text-blue-400">
+                      {order.platform} • {order.service}
+                    </span>
+                    <Badge variant="outline" className="text-[9px] font-black uppercase bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700">
+                      {order.status}
+                    </Badge>
                   </div>
-                  <div className="text-[10px] text-slate-500 font-bold mb-1 truncate">{order.link}</div>
-                  <div className="flex justify-between items-center text-[10px] font-black text-slate-400">
-                    <span>QTY: {order.quantity}</span>
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400 font-bold mb-1 truncate">{order.link}</div>
+                  <div className="flex justify-between items-center text-[10px] font-black text-slate-400 dark:text-slate-500 mt-2 pt-2 border-t border-gray-100 dark:border-slate-800">
+                    <span className="text-[#111B21] dark:text-slate-200">QTY: {order.quantity}</span>
+                    <span className="text-emerald-600 dark:text-emerald-400">${order.price?.toFixed(2)}</span>
                     <span>{order.createdAt?.toDate ? format(order.createdAt.toDate(), 'MMM dd, HH:mm') : ''}</span>
                   </div>
                 </div>
@@ -402,15 +425,15 @@ export default function ChatPage() {
       </main>
 
       {/* INPUT BAR */}
-      <footer className="p-3 bg-white border-t border-gray-100">
+      <footer className="p-3 bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800">
         <div className="flex items-center gap-3">
-          <div className="flex-1 bg-[#F0F2F5] rounded-full flex items-center px-5 py-1">
+          <div className="flex-1 bg-[#F0F2F5] dark:bg-slate-800 rounded-full flex items-center px-5 py-1">
             <Input 
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               placeholder="Type a message"
-              className="border-none bg-transparent focus-visible:ring-0 shadow-none text-[15px] h-10 p-0 text-black font-semibold placeholder:text-gray-400"
+              className="border-none bg-transparent focus-visible:ring-0 shadow-none text-[15px] h-10 p-0 text-black dark:text-white font-semibold placeholder:text-gray-400"
             />
           </div>
           <Button 

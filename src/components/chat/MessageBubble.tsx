@@ -1,4 +1,3 @@
-
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -17,11 +16,11 @@ export function MessageBubble({ sender, text, timestamp }: MessageBubbleProps) {
         "max-w-[85%] px-4 py-3 relative shadow-sm",
         isUser ? "bubble-user rounded-[20px] rounded-tr-none" : "bubble-bot rounded-[20px] rounded-tl-none"
       )}>
-        <p className="text-[14px] leading-relaxed text-black font-semibold whitespace-pre-wrap">
+        <p className="text-[14px] leading-relaxed font-bold whitespace-pre-wrap">
           {text}
         </p>
-        <div className="flex justify-end mt-1">
-          <span className="text-[9px] text-gray-500 font-black uppercase tracking-tighter">
+        <div className="flex justify-end mt-1 opacity-60">
+          <span className="text-[8px] font-black uppercase tracking-tighter">
             {format(timestamp, 'HH:mm')}
           </span>
         </div>
