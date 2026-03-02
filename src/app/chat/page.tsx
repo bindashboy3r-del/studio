@@ -11,10 +11,8 @@ import {
   where,
   limit,
   onSnapshot,
-  updateDoc,
   doc,
-  writeBatch,
-  deleteDoc
+  writeBatch
 } from "firebase/firestore";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
@@ -30,9 +28,9 @@ import {
   History,
   Bot,
   User as UserIcon,
-  CheckCircle2,
   X,
-  Megaphone
+  Megaphone,
+  Zap
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PLATFORMS, SERVICES, Platform, SMMService } from "@/app/lib/constants";
@@ -200,7 +198,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isTyping]);
+  }, [messages, isTyping, activeBroadcast]);
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
@@ -210,7 +208,6 @@ export default function ChatPage() {
 
   const addMessage = async (sender: 'user' | 'bot', text: string, options?: string[], extraData?: any) => {
     if (!user || !db) return;
-    const path = `users/${user.uid}/chatMessages`;
     const data = {
       userId: user.uid,
       sender,
@@ -223,7 +220,7 @@ export default function ChatPage() {
     addDoc(collection(db, "users", user.uid, "chatMessages"), data)
       .catch(async (error) => {
         const permissionError = new FirestorePermissionError({
-          path,
+          path: `users/${user.uid}/chatMessages`,
           operation: 'create',
           requestResourceData: data,
         });
@@ -251,7 +248,7 @@ export default function ChatPage() {
     if (!link || !utr || !db || !user) return;
     
     const finalPrice = (currentOrder.quantity! / 1000) * currentOrder.service!.pricePer1000;
-    const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}-${Date.now().toString().slice(-4)}`;
+    const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}`;
     
     const orderData = {
       userId: user.uid,
@@ -307,26 +304,6 @@ export default function ChatPage() {
         "👋 Welcome to SocialBoost Bot!\n\nNiche di gayi list mein se koi bhi platform select karein:",
         ["1. INSTAGRAM SERVICES", "2. YOUTUBE SERVICES"]
       );
-      return;
-    }
-
-    const instaServices = SERVICES.instagram;
-    const youtubeServices = SERVICES.youtube;
-
-    const matchedInstaService = instaServices.find(s => cleanText.includes(s.name.toLowerCase()) && cleanText.includes("instagram"));
-    const matchedYoutubeService = youtubeServices.find(s => cleanText.includes(s.name.toLowerCase()) && cleanText.includes("youtube"));
-
-    if (matchedInstaService) {
-      setCurrentOrder({ platform: 'instagram', service: matchedInstaService });
-      setChatState('entering_quantity');
-      botReply(`📊 Aapne Instagram ${matchedInstaService.name} select kiya hai.\n\nKitni quantity chahiye? (Minimum 100)`);
-      return;
-    }
-
-    if (matchedYoutubeService) {
-      setCurrentOrder({ platform: 'youtube', service: matchedYoutubeService });
-      setChatState('entering_quantity');
-      botReply(`📊 Aapne YouTube ${matchedYoutubeService.name} select kiya hai.\n\nKitni quantity chahiye? (Minimum 100)`);
       return;
     }
 
@@ -396,33 +373,14 @@ export default function ChatPage() {
         break;
 
       default:
-        if (chatState === 'initial') {
-           botReply("Send 'Hi' to start create order");
-        } else {
-           botReply("I didn't understand that. Send 'Hi' to go to Main Menu.");
-        }
+        botReply("Send 'Hi' to start create order");
         break;
     }
   };
 
   return (
     <div className="flex flex-col h-screen max-w-lg mx-auto overflow-hidden relative shadow-2xl bg-white dark:bg-slate-950 font-body">
-      {/* Broadcast Banner */}
-      {activeBroadcast && (
-        <div className="bg-[#312ECB] text-white px-6 py-3 flex items-start gap-4 animate-in slide-in-from-top duration-500 z-[60] shadow-xl">
-          <div className="mt-1 bg-white/20 p-2 rounded-xl">
-            <Megaphone size={16} />
-          </div>
-          <div className="flex-1">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-1">Official Announcement</p>
-            <p className="text-[12px] font-bold leading-relaxed whitespace-pre-wrap">{activeBroadcast.text}</p>
-          </div>
-          <button onClick={() => setActiveBroadcast(null)} className="mt-1 opacity-40 hover:opacity-100">
-            <X size={16} />
-          </button>
-        </div>
-      )}
-
+      {/* Header matching screenshot */}
       <div className="bg-white dark:bg-slate-900 px-4 py-3 flex items-center justify-between border-b border-gray-100 dark:border-slate-800 z-40">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-[#312ECB] flex items-center justify-center text-white shadow-md">
@@ -448,34 +406,24 @@ export default function ChatPage() {
             <DropdownMenuContent align="end" className="w-[300px] bg-white dark:bg-slate-900 border-gray-100 dark:border-slate-800 p-0 rounded-3xl overflow-hidden shadow-2xl">
               <div className="p-4 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between">
                 <span className="text-[10px] font-black uppercase tracking-widest text-[#111B21] dark:text-white">Notifications</span>
-                {unreadCount > 0 && (
-                  <span className="bg-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full">{unreadCount} NEW</span>
-                )}
               </div>
               <ScrollArea className="h-[300px]">
                 {notificationsData && notificationsData.length > 0 ? (
                   <div className="divide-y divide-gray-100 dark:divide-slate-800">
-                    {notificationsData.map((notif) => {
-                       const notifDate = notif.createdAt?.toDate ? notif.createdAt.toDate() : new Date(notif.createdAt);
-                       return (
-                        <div key={notif.id} className={`p-4 transition-colors ${notif.read ? 'opacity-60' : 'bg-blue-50/30 dark:bg-blue-900/10'}`}>
-                          <div className="flex justify-between items-start mb-1">
-                            <h4 className="text-[11px] font-black uppercase text-[#312ECB]">{notif.title}</h4>
-                            <span className="text-[9px] font-bold text-slate-400">
-                              {isValid(notifDate) ? format(notifDate, 'HH:mm') : ''}
-                            </span>
-                          </div>
-                          <p className="text-[12px] font-semibold text-slate-600 dark:text-slate-300 leading-snug">
-                            {notif.message}
-                          </p>
+                    {notificationsData.map((notif) => (
+                      <div key={notif.id} className={`p-4 transition-colors ${notif.read ? 'opacity-60' : 'bg-blue-50/30 dark:bg-blue-900/10'}`}>
+                        <div className="flex justify-between items-start mb-1">
+                          <h4 className="text-[11px] font-black uppercase text-[#312ECB]">{notif.title}</h4>
                         </div>
-                      );
-                    })}
+                        <p className="text-[12px] font-semibold text-slate-600 dark:text-slate-300 leading-snug">
+                          {notif.message}
+                        </p>
+                      </div>
+                    ))}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-full py-20 text-slate-400 space-y-2">
-                    <Bell size={32} className="opacity-20" />
-                    <p className="text-[10px] font-black uppercase tracking-widest">No Alerts Yet</p>
+                  <div className="flex flex-col items-center justify-center h-full py-20 text-slate-400">
+                    <p className="text-[10px] font-black uppercase tracking-widest">No Alerts</p>
                   </div>
                 )}
               </ScrollArea>
@@ -489,56 +437,40 @@ export default function ChatPage() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="w-10 h-10 rounded-full bg-[#312ECB] text-white font-bold text-xs shadow-lg">
-                {user?.displayName?.[0] || 'U'}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 bg-white dark:bg-slate-900 border-gray-100 dark:border-slate-800">
-              <DropdownMenuLabel className="dark:text-white">Account Settings</DropdownMenuLabel>
-              <DropdownMenuSeparator className="dark:bg-slate-800" />
-              <DropdownMenuItem onClick={() => router.push('/profile')} className="dark:text-slate-300 dark:hover:bg-slate-800">
-                <UserIcon size={16} className="mr-2" /> View Profile
-              </DropdownMenuItem>
-              <DropdownMenuSeparator className="dark:bg-slate-800" />
-              <DropdownMenuItem onClick={() => auth?.signOut()} className="text-red-600 font-bold hover:bg-red-50 dark:hover:bg-red-950/30">
-                <LogOut size={16} className="mr-2" /> Log Out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button variant="ghost" size="icon" onClick={() => router.push('/profile')} className="w-10 h-10 rounded-full bg-[#312ECB] text-white font-bold text-xs shadow-lg">
+            {user?.displayName?.[0] || 'U'}
+          </Button>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 px-5 py-2 flex items-center justify-between border-b border-gray-100 dark:border-slate-800 z-30">
-        <span className="text-[10px] font-black italic text-[#312ECB]/40 dark:text-white/40 tracking-widest uppercase">
-          Automated Assistant
-        </span>
-        
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={() => router.push('/orders')}
-          className="text-[10px] font-black text-[#312ECB] dark:text-white uppercase tracking-widest gap-2 hover:bg-slate-50 dark:hover:bg-slate-800"
-        >
-          <History size={14} /> Recent Orders
-        </Button>
-      </div>
+      <main className="flex-1 overflow-y-auto p-4 flex flex-col whatsapp-bg scroll-smooth relative">
+        {/* Stylish Broadcast Card - Centered Glassmorphism */}
+        {activeBroadcast && (
+          <div className="sticky top-4 self-center w-full max-w-[90%] z-50 mb-8 animate-in zoom-in-95 duration-500">
+            <div className="backdrop-blur-xl bg-white/20 dark:bg-[#312ECB]/20 border border-white/30 dark:border-white/10 rounded-[2.5rem] p-6 shadow-[0_20px_40px_rgba(0,0,0,0.1)] flex flex-col items-center text-center space-y-3 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-[#312ECB]/20 blur-3xl rounded-full -mr-10 -mt-10" />
+              
+              <div className="w-12 h-12 rounded-2xl bg-[#312ECB] flex items-center justify-center text-white shadow-lg">
+                <Megaphone size={24} className="fill-current" />
+              </div>
+              
+              <div>
+                <span className="text-[10px] font-black text-[#312ECB] dark:text-white/40 uppercase tracking-[0.3em] mb-1 block">Important Announcement</span>
+                <p className="text-[15px] font-black text-[#111B21] dark:text-white leading-relaxed whitespace-pre-wrap">
+                  {activeBroadcast.text}
+                </p>
+              </div>
 
-      <div className="bg-[#312ECB] px-5 py-4 flex items-center gap-4 z-20 shadow-md">
-        <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
-          <Bot size={28} className="text-white/80" />
-        </div>
-        <div>
-          <h2 className="text-white font-black uppercase text-sm tracking-widest">SOCIALBOOST BOT</h2>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="w-2 h-2 rounded-full bg-[#25D366] animate-pulse" />
-            <span className="text-[10px] text-white/50 font-black uppercase tracking-widest">Active Server</span>
+              <button 
+                onClick={() => setActiveBroadcast(null)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-[#312ECB] transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
           </div>
-        </div>
-      </div>
+        )}
 
-      <main className="flex-1 overflow-y-auto p-4 flex flex-col whatsapp-bg scroll-smooth">
         {messages.map((m: any) => (
           <MessageBubble 
             key={m.id} 
