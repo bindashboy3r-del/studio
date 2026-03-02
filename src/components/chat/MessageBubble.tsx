@@ -49,12 +49,15 @@ export function MessageBubble({
   const price = paymentPrice || 0;
   const upiId = "smmxpressbot@slc";
   const upiLink = `upi://pay?pa=${upiId}&pn=SocialBoost&am=${price}&cu=INR`;
-  // Using api.qrserver.com for better reliability and CORS support
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(upiLink)}&margin=10`;
+  
+  // Using QuickChart for high reliability and CORS support
+  const qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(upiLink)}&size=300&margin=2&ecLevel=M`;
 
   const handleDownloadQR = async () => {
     try {
-      const response = await fetch(qrUrl);
+      const response = await fetch(qrUrl, { mode: 'cors' });
+      if (!response.ok) throw new Error('Failed to fetch image');
+      
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -63,13 +66,18 @@ export function MessageBubble({
       a.download = `SocialBoost_Payment_₹${price}.png`;
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      toast({ title: "Success", description: "QR Code downloaded to your gallery." });
+      
+      // Cleanup
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }, 100);
+      
+      toast({ title: "Success", description: "QR Code saved to your device." });
     } catch (error) {
-      // Fallback: Open in new tab if download fails
+      // Direct link fallback for mobile browsers that block fetch-based downloads
       window.open(qrUrl, '_blank');
-      toast({ title: "Note", description: "Opening QR code in a new tab for download." });
+      toast({ title: "Note", description: "Opening QR code in new tab. Long press to save." });
     }
   };
 
