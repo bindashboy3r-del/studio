@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -59,5 +58,28 @@ export async function getApiBalance(apiUrl: string, apiKey: string) {
     return { success: true, balance: data.balance, currency: data.currency };
   } catch (error: any) {
     return { success: false, error: error.message || 'Failed to fetch balance' };
+  }
+}
+
+/**
+ * Fetches multiple order statuses from an external SMM Panel.
+ */
+export async function getApiOrdersStatus(apiUrl: string, apiKey: string, apiOrderIds: string) {
+  try {
+    const url = new URL(apiUrl);
+    url.searchParams.append('key', apiKey);
+    url.searchParams.append('action', 'status');
+    url.searchParams.append('orders', apiOrderIds); // Comma separated IDs
+
+    const response = await fetch(url.toString(), { method: 'POST' });
+    const data = await response.json();
+
+    if (data.error) {
+      return { success: false, error: data.error };
+    }
+
+    return { success: true, statuses: data };
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Failed to fetch statuses' };
   }
 }

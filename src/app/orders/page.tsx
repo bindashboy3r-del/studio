@@ -1,14 +1,15 @@
 "use client";
 
-import { useMemo } from "react";
-import { query, collection } from "firebase/firestore";
+import { useMemo, useEffect } from "react";
+import { query, collection, doc, updateDoc, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { History, X, Clock, Copy } from "lucide-react";
+import { History, X, Clock, Copy, RefreshCw } from "lucide-react";
 import { format, isValid, isAfter } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { getApiOrdersStatus } from "@/app/actions/smm-api";
 
 export default function OrdersHistoryPage() {
   const { user } = useUser();
@@ -49,9 +50,62 @@ export default function OrdersHistoryPage() {
       return { ...order, createdAt, effectiveStatus };
     });
 
-    // Client side sort since index is missing for combined query
     return processed.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }, [rawOrdersData]);
+
+  // Real-time Status Sync Logic
+  useEffect(() => {
+    if (!db || !user || !orders.length) return;
+
+    const syncApiOrders = async () => {
+      // Find orders that need status checking
+      const needsSync = orders.filter(o => 
+        (o.status === 'Pending' || o.status === 'Processing') && 
+        o.apiOrderId && 
+        o.providerId
+      );
+
+      if (needsSync.length === 0) return;
+
+      // Group orders by provider
+      const byProvider: Record<string, string[]> = {};
+      needsSync.forEach(o => {
+        if (!byProvider[o.providerId]) byProvider[o.providerId] = [];
+        byProvider[o.providerId].push(o.apiOrderId);
+      });
+
+      const apiSettingsSnap = await getDoc(doc(db, "globalSettings", "api"));
+      if (!apiSettingsSnap.exists()) return;
+      const apiSettings = apiSettingsSnap.data();
+
+      for (const providerId in byProvider) {
+        const provider = apiSettings.providers?.find((p: any) => p.id === providerId);
+        if (!provider) continue;
+
+        const idsStr = byProvider[providerId].join(',');
+        const result = await getApiOrdersStatus(provider.url, provider.key, idsStr);
+
+        if (result.success && result.statuses) {
+          // Update Firestore for each order
+          for (const apiId in result.statuses) {
+            const apiStatus = result.statuses[apiId].status; // e.g., 'Completed', 'Processing'
+            const matchingOrder = needsSync.find(o => o.apiOrderId === apiId);
+            
+            if (matchingOrder && apiStatus && apiStatus !== matchingOrder.status) {
+              const orderRef = doc(db, "users", user.uid, "orders", matchingOrder.id);
+              updateDoc(orderRef, { 
+                status: apiStatus,
+                apiStatusLastChecked: new Date().toISOString()
+              });
+            }
+          }
+        }
+      }
+    };
+
+    // Run sync occasionally or once on load
+    syncApiOrders();
+  }, [db, user, orders]);
 
   const copyOrderId = (id: string) => {
     navigator.clipboard.writeText(id);
@@ -115,12 +169,12 @@ export default function OrdersHistoryPage() {
                     </span>
                     <span className="text-slate-200 dark:text-slate-700">•</span>
                     <Badge variant="outline" className={`text-[9px] h-5 font-black px-2 border-none rounded-lg ${
-                      order.effectiveStatus === 'Processing' ? 'bg-blue-50 text-blue-600' :
+                      order.effectiveStatus === 'Processing' || order.effectiveStatus === 'In progress' ? 'bg-blue-50 text-blue-600' :
                       order.effectiveStatus === 'Completed' ? 'bg-emerald-50 text-emerald-600' :
-                      order.effectiveStatus === 'Cancelled' ? 'bg-red-50 text-red-600' :
+                      order.effectiveStatus === 'Cancelled' || order.effectiveStatus === 'Canceled' || order.effectiveStatus === 'Refunded' ? 'bg-red-50 text-red-600' :
                       'bg-slate-100 text-slate-400'
                     }`}>
-                      {order.effectiveStatus === 'Processing' && <Clock size={10} className="mr-1 inline animate-spin" />}
+                      {(order.effectiveStatus === 'Processing' || order.effectiveStatus === 'In progress') && <Clock size={10} className="mr-1 inline animate-spin" />}
                       {order.effectiveStatus}
                     </Badge>
                   </div>

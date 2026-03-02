@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -326,7 +325,7 @@ export default function ChatPage() {
     const totalPrice = calculateTotalPrice();
     
     if (walletBalance < totalPrice) {
-      botReply("❌ Insufficient balance! Please add funds.", ["➕ ADD FUNDS", "🏠 MAIN MENU"]);
+      botReply("❌ Insufficient balance! Please add funds.", ["💳 ADD FUNDS", "🏠 MAIN MENU"]);
       return;
     }
 
@@ -348,12 +347,12 @@ export default function ChatPage() {
         
         let finalStatus = 'Pending';
         let apiOrderId = null;
+        let providerId = null;
         let apiError = null;
 
         if (apiData) {
-          // Multi-Provider Routing logic
           const mapping = apiData.mappings?.[item.service.id];
-          const providerId = mapping?.providerId;
+          providerId = mapping?.providerId;
           const remoteServiceId = mapping?.remoteServiceId;
           
           const provider = apiData.providers?.find((p: any) => p.id === providerId);
@@ -390,6 +389,7 @@ export default function ChatPage() {
           status: finalStatus,
           paymentMethod: 'Wallet',
           apiOrderId,
+          providerId,
           apiError,
           createdAt: serverTimestamp()
         });
@@ -545,7 +545,7 @@ export default function ChatPage() {
         if (cleanText.includes("wallet")) {
           const total = calculateTotalPrice();
           if (walletBalance < total) {
-            botReply("❌ Insufficient balance! Please add funds.", ["➕ ADD FUNDS", "🏠 MAIN MENU"]);
+            botReply("❌ Insufficient balance! Please add funds.", ["💳 ADD FUNDS", "🏠 MAIN MENU"]);
             return;
           }
           if (currentOrder.type === 'single') {
