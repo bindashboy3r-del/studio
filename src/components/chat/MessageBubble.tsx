@@ -313,6 +313,9 @@ export function MessageBubble({
               )}
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">12-Digit UTR ID</label>
+                <p className="text-[9px] font-bold text-red-500 uppercase tracking-tight ml-1 mb-1">
+                  ⚠️ Yaha sahi 12-digit UTR ID bharein. Galat ID se payment verify nahi hoga.
+                </p>
                 <Input 
                   placeholder="Enter 12-Digit Transaction ID"
                   value={utr}

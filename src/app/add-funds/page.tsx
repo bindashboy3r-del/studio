@@ -175,6 +175,9 @@ export default function AddFundsPage() {
 
               <div className="space-y-4">
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Step 3: Submit 12-Digit UTR ID</label>
+                <p className="text-[9px] font-bold text-red-500 uppercase tracking-tight ml-1 mb-1">
+                  ⚠️ Yaha sahi 12-digit UTR ID bharein. Galat ID dalne par payment verify nahi hoga.
+                </p>
                 <Input 
                   placeholder="Enter Transaction ID" 
                   value={utr}
