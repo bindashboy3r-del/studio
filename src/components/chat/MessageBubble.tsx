@@ -74,6 +74,8 @@ export function MessageBubble({
     window.open(waUrl, '_blank');
   };
 
+  const isFormValid = link.trim() !== "" && utr.length === 12;
+
   return (
     <div className={cn("flex w-full mb-4", isUser ? "justify-end" : "justify-start")}>
       <div className={cn(
@@ -169,15 +171,22 @@ export function MessageBubble({
               <Input 
                 placeholder="12-Digit Payment UTR ID"
                 value={utr}
-                onChange={(e) => setUtr(e.target.value)}
+                maxLength={12}
+                onChange={(e) => setUtr(e.target.value.replace(/[^0-9]/g, ''))}
                 className="h-12 bg-slate-50 dark:bg-slate-900 border-none rounded-2xl px-5 text-sm font-bold shadow-inner"
               />
               <Button 
                 onClick={() => onPaymentSubmit?.(link, utr)}
-                className="w-full h-14 bg-[#4FD1C5] hover:bg-[#38b2ac] text-white font-black text-[12px] uppercase tracking-widest rounded-2xl shadow-xl gap-3"
+                disabled={!isFormValid}
+                className="w-full h-14 bg-[#4FD1C5] hover:bg-[#38b2ac] text-white font-black text-[12px] uppercase tracking-widest rounded-2xl shadow-xl gap-3 disabled:opacity-50 disabled:grayscale cursor-pointer"
               >
                 🚀 Submit Order Now
               </Button>
+              {!isFormValid && utr.length > 0 && utr.length < 12 && (
+                <p className="text-[10px] font-bold text-red-500 text-center uppercase tracking-tighter">
+                  UTR ID must be exactly 12 digits
+                </p>
+              )}
             </div>
 
             <div className="flex justify-center border-t border-slate-50 dark:border-slate-700 pt-4">
