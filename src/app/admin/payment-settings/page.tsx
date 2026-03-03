@@ -10,7 +10,9 @@ import {
   CreditCard, 
   User, 
   Link as LinkIcon,
-  ShieldCheck
+  ShieldCheck,
+  Zap,
+  Lock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +29,8 @@ export default function PaymentSettingsPage() {
   const [upiId, setUpiId] = useState("");
   const [merchantName, setMerchantName] = useState("");
   const [qrImageUrl, setQrImageUrl] = useState("");
+  const [paytmMid, setPaytmMid] = useState("");
+  const [paytmKey, setPaytmKey] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   const ADMIN_EMAIL = "chetanmadhav4@gmail.com";
@@ -45,6 +49,8 @@ export default function PaymentSettingsPage() {
         setUpiId(data.upiId || "");
         setMerchantName(data.merchantName || "");
         setQrImageUrl(data.qrImageUrl || "");
+        setPaytmMid(data.paytmMid || "");
+        setPaytmKey(data.paytmKey || "");
       }
     });
     return () => unsub();
@@ -58,10 +64,12 @@ export default function PaymentSettingsPage() {
         upiId,
         merchantName,
         qrImageUrl,
+        paytmMid,
+        paytmKey,
         updatedAt: serverTimestamp(),
         updatedBy: user.email
       }, { merge: true });
-      toast({ title: "Payment Settings Saved", description: "Users will now see updated QR and UPI details." });
+      toast({ title: "Settings Saved", description: "Paytm Automation & QR details updated." });
     } catch (e) {
       toast({ variant: "destructive", title: "Save Failed", description: "Database error." });
     } finally {
@@ -76,7 +84,7 @@ export default function PaymentSettingsPage() {
           <button onClick={() => router.push("/admin")} className="p-2 hover:bg-slate-50 rounded-lg text-slate-400">
             <ChevronLeft size={20} />
           </button>
-          <h1 className="text-lg font-black tracking-tight text-[#111B21]">Payment Gateways</h1>
+          <h1 className="text-lg font-black tracking-tight text-[#111B21]">Gateway Config</h1>
         </div>
         <Button 
           onClick={handleSave} 
@@ -88,14 +96,14 @@ export default function PaymentSettingsPage() {
       </header>
 
       <main className="max-w-md mx-auto p-6 space-y-6 mt-4">
-        <div className="bg-[#EC4899] rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden">
+        <div className="bg-[#312ECB] rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden">
           <div className="relative z-10 flex items-center gap-4">
             <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center">
-              <QrCode size={28} />
+              <Zap size={28} />
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">UPI / QR Configuration</p>
-              <h2 className="text-2xl font-black uppercase tracking-tight">Merchant Settings</h2>
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Auto-Verification</p>
+              <h2 className="text-2xl font-black uppercase tracking-tight">Paytm Automation</h2>
             </div>
           </div>
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10 blur-3xl" />
@@ -103,69 +111,75 @@ export default function PaymentSettingsPage() {
 
         <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-slate-100 space-y-6">
           <div className="space-y-4">
+            <h3 className="text-[11px] font-black uppercase text-blue-600 tracking-widest border-b pb-2">Automation Credentials</h3>
+            
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Business UPI ID</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Paytm MID (Merchant ID)</label>
               <div className="relative">
                 <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                 <Input 
-                  placeholder="e.g. paytmqr2810@paytm" 
-                  value={upiId}
-                  onChange={(e) => setUpiId(e.target.value)}
+                  placeholder="Enter Paytm MID" 
+                  value={paytmMid}
+                  onChange={(e) => setPaytmMid(e.target.value)}
                   className="h-14 bg-slate-50 border-none rounded-2xl pl-12 pr-5 text-sm font-bold shadow-inner"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Merchant Key (Secret)</label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                <Input 
+                  type="password"
+                  placeholder="Enter Merchant Key" 
+                  value={paytmKey}
+                  onChange={(e) => setPaytmKey(e.target.value)}
+                  className="h-14 bg-slate-50 border-none rounded-2xl pl-12 pr-5 text-sm font-bold shadow-inner"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4 pt-4">
+            <h3 className="text-[11px] font-black uppercase text-pink-600 tracking-widest border-b pb-2">Public QR Display</h3>
+            
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Business UPI ID</label>
+              <Input 
+                placeholder="e.g. paytmqr2810@paytm" 
+                value={upiId}
+                onChange={(e) => setUpiId(e.target.value)}
+                className="h-14 bg-slate-50 border-none rounded-2xl px-5 text-sm font-bold shadow-inner"
+              />
             </div>
 
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Merchant Name</label>
-              <div className="relative">
-                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                <Input 
-                  placeholder="e.g. SocialBoost Official" 
-                  value={merchantName}
-                  onChange={(e) => setMerchantName(e.target.value)}
-                  className="h-14 bg-slate-50 border-none rounded-2xl pl-12 pr-5 text-sm font-bold shadow-inner"
-                />
-              </div>
+              <Input 
+                placeholder="e.g. SocialBoost Official" 
+                value={merchantName}
+                onChange={(e) => setMerchantName(e.target.value)}
+                className="h-14 bg-slate-50 border-none rounded-2xl px-5 text-sm font-bold shadow-inner"
+              />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Custom QR URL (Optional)</label>
-              <div className="relative">
-                <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                <Input 
-                  placeholder="Link to hosted QR image" 
-                  value={qrImageUrl}
-                  onChange={(e) => setQrImageUrl(e.target.value)}
-                  className="h-14 bg-slate-50 border-none rounded-2xl pl-12 pr-5 text-sm font-bold shadow-inner"
-                />
-              </div>
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight ml-1">
-                Leave empty to auto-generate QR from UPI ID.
-              </p>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">QR URL (Optional)</label>
+              <Input 
+                placeholder="Direct Link to QR Image" 
+                value={qrImageUrl}
+                onChange={(e) => setQrImageUrl(e.target.value)}
+                className="h-14 bg-slate-50 border-none rounded-2xl px-5 text-sm font-bold shadow-inner"
+              />
             </div>
           </div>
 
-          <div className="bg-pink-50 p-5 rounded-3xl border border-pink-100 flex items-start gap-4">
-            <ShieldCheck className="text-pink-600 shrink-0" size={20} />
-            <p className="text-[10px] font-bold text-pink-700 leading-relaxed uppercase">
-              Important: Users will scan this QR to send money to your account. Please double-check all details.
+          <div className="bg-blue-50 p-5 rounded-3xl border border-blue-100 flex items-start gap-4">
+            <ShieldCheck className="text-blue-600 shrink-0" size={20} />
+            <p className="text-[10px] font-bold text-blue-700 leading-relaxed uppercase">
+              Important: Paytm MID automation uses the Transaction ID provided by users. Ensure your Paytm MID is active for 'Order Status Query' API.
             </p>
-          </div>
-
-          <div className="pt-4 flex flex-col items-center gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100 border-dashed">
-             <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Live Preview</span>
-             <div className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100">
-                <img 
-                  src={qrImageUrl || `https://quickchart.io/qr?text=${encodeURIComponent(`upi://pay?pa=${upiId || 'test@upi'}&pn=${merchantName || 'SocialBoost'}`)}&size=300`} 
-                  alt="QR Preview" 
-                  className="w-32 h-32"
-                />
-              </div>
-              <div className="text-center">
-                <p className="text-[11px] font-black text-slate-800">{merchantName || 'Merchant Name'}</p>
-                <p className="text-[9px] font-bold text-slate-400">{upiId || 'upi-id@bank'}</p>
-              </div>
           </div>
         </div>
       </main>
