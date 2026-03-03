@@ -16,7 +16,8 @@ import {
   Wallet,
   Settings2,
   QrCode,
-  Layers
+  Layers,
+  Percent
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -54,6 +55,13 @@ export default function AdminHub() {
       icon: <Layers size={28} />,
       color: "bg-[#3B82F6]", 
       path: "/admin/services"
+    },
+    {
+      title: "DISCOUNT MANAGER",
+      subtitle: "SET SINGLE, COMBO & BULK %",
+      icon: <Percent size={28} />,
+      color: "bg-[#6366F1]", 
+      path: "/admin/discounts"
     },
     {
       title: "FUND REQUESTS",
