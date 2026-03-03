@@ -27,15 +27,16 @@ export default function DiscountSettingsPage() {
 
   const [discounts, setDiscounts] = useState({
     single: 0,
-    combo: 5,
+    combo: 0,
     bulk: 0
   });
   const [isSaving, setIsSaving] = useState(false);
 
   const ADMIN_EMAIL = "chetanmadhav4@gmail.com";
+  const ADMIN_ID = "s55uL0f8PmcypR75usVYOLwVs7O2";
 
   useEffect(() => {
-    if (!isUserLoading && (!user || user.email !== ADMIN_EMAIL)) {
+    if (!isUserLoading && (!user || (user.email !== ADMIN_EMAIL && user.uid !== ADMIN_ID))) {
       router.push("/admin/login");
     }
   }, [user, isUserLoading, router]);
@@ -46,9 +47,9 @@ export default function DiscountSettingsPage() {
       if (snap.exists()) {
         const data = snap.data();
         setDiscounts({
-          single: data.single || 0,
-          combo: data.combo || 0,
-          bulk: data.bulk || 0
+          single: Number(data.single) || 0,
+          combo: Number(data.combo) || 0,
+          bulk: Number(data.bulk) || 0
         });
       }
     });
@@ -60,11 +61,13 @@ export default function DiscountSettingsPage() {
     setIsSaving(true);
     try {
       await setDoc(doc(db, "globalSettings", "discounts"), {
-        ...discounts,
+        single: Number(discounts.single),
+        combo: Number(discounts.combo),
+        bulk: Number(discounts.bulk),
         updatedAt: serverTimestamp(),
         updatedBy: user.email
       }, { merge: true });
-      toast({ title: "Discounts Updated", description: "All order discounts are now live." });
+      toast({ title: "Discounts Updated", description: "All order discounts are now live for all users." });
     } catch (e) {
       toast({ variant: "destructive", title: "Save Failed", description: "Database error." });
     } finally {
@@ -115,7 +118,7 @@ export default function DiscountSettingsPage() {
               <Input 
                 type="number" 
                 value={discounts.single}
-                onChange={(e) => setDiscounts({...discounts, single: parseFloat(e.target.value) || 0})}
+                onChange={(e) => setDiscounts({...discounts, single: Number(e.target.value)})}
                 className="h-14 bg-slate-50 border-none rounded-2xl px-6 text-lg font-black shadow-inner"
               />
             </div>
@@ -132,7 +135,7 @@ export default function DiscountSettingsPage() {
               <Input 
                 type="number" 
                 value={discounts.combo}
-                onChange={(e) => setDiscounts({...discounts, combo: parseFloat(e.target.value) || 0})}
+                onChange={(e) => setDiscounts({...discounts, combo: Number(e.target.value)})}
                 className="h-14 bg-slate-50 border-none rounded-2xl px-6 text-lg font-black shadow-inner"
               />
             </div>
@@ -149,7 +152,7 @@ export default function DiscountSettingsPage() {
               <Input 
                 type="number" 
                 value={discounts.bulk}
-                onChange={(e) => setDiscounts({...discounts, bulk: parseFloat(e.target.value) || 0})}
+                onChange={(e) => setDiscounts({...discounts, bulk: Number(e.target.value)})}
                 className="h-14 bg-slate-50 border-none rounded-2xl px-6 text-lg font-black shadow-inner"
               />
             </div>

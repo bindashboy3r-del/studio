@@ -89,7 +89,7 @@ export default function ChatPage() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [activeBroadcast, setActiveBroadcast] = useState<any>(null);
   const [globalBonus, setGlobalBonus] = useState(0);
-  const [globalDiscounts, setGlobalDiscounts] = useState({ single: 0, combo: 5, bulk: 0 });
+  const [globalDiscounts, setGlobalDiscounts] = useState({ single: 0, combo: 0, bulk: 0 });
   
   const [sessionStartTime] = useState(() => Date.now());
   const hasInitialGreeted = useRef(false);
@@ -154,39 +154,6 @@ export default function ChatPage() {
     });
   }, [db]);
 
-  const notificationsQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return query(collection(db, "users", user.uid, "notifications"), limit(20));
-  }, [db, user]);
-
-  const { data: rawNotifications } = useCollection(notificationsQuery);
-  const notificationsData = useMemo(() => {
-    if (!rawNotifications) return [];
-    return [...rawNotifications].sort((a: any, b: any) => {
-      const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt).getTime();
-      const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt).getTime();
-      return dateB - dateA;
-    });
-  }, [rawNotifications]);
-
-  const unreadCount = useMemo(() => notificationsData?.filter(n => !n.read).length || 0, [notificationsData]);
-
-  const markAllAsRead = async () => {
-    if (!db || !user || !notificationsData) return;
-    const unread = notificationsData.filter(n => !n.read);
-    if (unread.length === 0) return;
-    const batch = writeBatch(db);
-    unread.forEach(n => batch.update(doc(db, "users", user.uid, "notifications", n.id), { read: true }));
-    await batch.commit().catch(() => {});
-  };
-
-  const clearAllNotifications = async () => {
-    if (!db || !user || !notificationsData || notificationsData.length === 0) return;
-    const batch = writeBatch(db);
-    notificationsData.forEach(n => batch.delete(doc(db, "users", user.uid, "notifications", n.id)));
-    await batch.commit().catch(() => {});
-  };
-
   const messagesQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
     return query(collection(db, "users", user.uid, "chatMessages"), orderBy("timestamp", "asc"));
@@ -246,7 +213,6 @@ export default function ChatPage() {
       return total + (item.quantity / 1000) * (item.service?.pricePer1000 || 0) * multiplier;
     }, 0);
 
-    // Apply Dynamic Discount
     const discPct = currentOrder.type === 'combo' ? globalDiscounts.combo : 
                     currentOrder.type === 'bulk' ? globalDiscounts.bulk : 
                     globalDiscounts.single;
@@ -295,7 +261,7 @@ export default function ChatPage() {
     botReply(`✅ Order submitted! Verification in progress.`, [], {
       isSuccessCard: true,
       successDetails: {
-        orderId: orderResults[0].orderId, platform: 'Instagram', service: currentOrder.type === 'combo' ? 'Combo' : currentOrder.items[0]?.service?.name,
+        orderId: orderResults[0].orderId, platform: 'Instagram', service: currentOrder.type === 'combo' ? 'Combo Order' : currentOrder.items[0]?.service?.name,
         quantity: currentOrder.items.reduce((a, b) => a + b.quantity, 0) * (currentOrder.bulkLinks?.length || 1),
         price: totalPrice, link: targets[0], utrId: utr
       }
@@ -369,7 +335,7 @@ export default function ChatPage() {
 
     const serviceMatch = dynamicServices.find((s, i) => cleanText === (i + 1).toString() || cleanText.includes(s.name.toLowerCase()));
 
-    if (serviceMatch && chatState !== 'idle') {
+    if (serviceMatch) {
       setCurrentOrder(prev => ({ ...prev, items: [{ service: serviceMatch, quantity: 0, link: '' }] }));
       setChatState('entering_quantity');
       botReply(`📊 Quantity for ${serviceMatch.name}? (Min ${serviceMatch.minQuantity})`);
@@ -378,7 +344,9 @@ export default function ChatPage() {
 
     if (cleanText === 'hi' || cleanText.includes("menu")) {
       setChatState('choosing_order_type');
-      botReply("👋 Welcome! Choose your ordering method:", ["1. SINGLE ORDER", `2. COMBO ORDER (${globalDiscounts.combo}% OFF! 🎁)`, "3. BULK ORDER"]);
+      const comboLabel = globalDiscounts.combo > 0 ? `2. COMBO ORDER (${globalDiscounts.combo}% OFF! 🎁)` : "2. COMBO ORDER";
+      const bulkLabel = globalDiscounts.bulk > 0 ? `3. BULK ORDER (${globalDiscounts.bulk}% OFF!)` : "3. BULK ORDER";
+      botReply("👋 Welcome! Choose your ordering method:", ["1. SINGLE ORDER", comboLabel, bulkLabel]);
       return;
     }
 
@@ -403,6 +371,8 @@ export default function ChatPage() {
           setChatState('choosing_payment_method');
           const total = calculateTotalPrice();
           botReply(`✅ Total: ₹${total.toFixed(2)}\n💳 Wallet: ₹${walletBalance.toFixed(2)}`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]);
+        } else if (s) {
+          botReply(`⚠️ Minimum quantity for ${s.name} is ${s.minQuantity}. Kripya fir se enter karein.`);
         }
         break;
       case 'choosing_payment_method':
@@ -442,7 +412,7 @@ export default function ChatPage() {
           <div className="fixed inset-0 flex items-center justify-center z-[100] p-6 bg-black/40 backdrop-blur-sm">
             <div className="w-full max-w-[350px] bg-white rounded-[3rem] p-8 items-center text-center space-y-4">
               <Megaphone size={32} className="text-[#312ECB] mx-auto" />
-              <p className="text-[15px] font-black">{activeBroadcast.text}</p>
+              <p className="text-[15px] font-black text-slate-800">{activeBroadcast.text}</p>
               <Button onClick={() => setActiveBroadcast(null)} className="rounded-full bg-[#312ECB] w-full uppercase font-black">Close</Button>
             </div>
           </div>
@@ -451,7 +421,7 @@ export default function ChatPage() {
         {messages.map((m: any) => (
           <MessageBubble key={m.id} sender={m.sender} text={m.text} options={m.options} onOptionClick={handleSend}
             isPaymentCard={m.isPaymentCard} paymentPrice={m.paymentPrice} onPaymentSubmit={(link, utr) => handleBundlePaymentSubmit(utr, link)}
-            isSuccessCard={m.isSuccessCard} successDetails={m.successDetails} isBulkLinkCard={m.isBulkLinkCard} onBulkLinksSubmit={(l) => { setCurrentOrder(p => ({ ...p, bulkLinks: l })); setChatState('choosing_service'); botReply("Select Service:", dynamicServices.map((s, i) => `${i + 1}. ${s.name}`)); }}
+            isSuccessCard={m.isSuccessCard} successDetails={m.successDetails} isBulkLinkCard={m.isBulkLinkCard} onBulkLinksSubmit={(l) => { setCurrentOrder(p => ({ ...p, type: 'bulk', bulkLinks: l })); setChatState('choosing_service'); botReply("Select Service:", dynamicServices.map((s, i) => `${i + 1}. ${s.name}`)); }}
             isComboCard={m.isComboCard} onComboSubmit={(items, link) => { setCurrentOrder(p => ({ ...p, type: 'combo', items: items.map(it => ({ service: dynamicServices.find(s => s.id === it.serviceId)!, quantity: it.quantity, link })) })); setChatState('choosing_payment_method'); botReply(`🎁 Combo Total: ₹${calculateTotalPrice().toFixed(2)}`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]); }}
             isWalletCard={m.isWalletCard} onWalletSubmit={handleBundleWalletSubmit} timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} dynamicServices={dynamicServices} discountPct={globalDiscounts.combo}
           />
