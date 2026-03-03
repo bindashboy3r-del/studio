@@ -47,14 +47,16 @@ export default function TrackerPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const router = useRouter();
 
+  const ADMIN_EMAIL = "chetanmadhav4@gmail.com";
+
   useEffect(() => {
-    if (!isUserLoading && (!user || user.email !== "chetanmadhav4@gmail.com")) {
+    if (!isUserLoading && (!user || user.email !== ADMIN_EMAIL)) {
       router.push("/admin/login");
     }
   }, [user, isUserLoading, router]);
 
   useEffect(() => {
-    if (!user || !db || user.email !== "chetanmadhav4@gmail.com") return;
+    if (!user || !db || user.email !== ADMIN_EMAIL) return;
 
     const q = collectionGroup(db, "orders");
     
@@ -72,8 +74,12 @@ export default function TrackerPage() {
           }
         }
 
+        // Status normalization for Admin
         let effectiveStatus = data.status || 'Pending';
-        if (data.status === 'Processing' && data.autoCompleteAt) {
+        const normalized = effectiveStatus.charAt(0).toUpperCase() + effectiveStatus.slice(1).toLowerCase();
+        effectiveStatus = (normalized === 'In progress' || normalized === 'In-progress') ? 'Processing' : normalized;
+
+        if (effectiveStatus === 'Processing' && data.autoCompleteAt) {
           const completeTime = data.autoCompleteAt.toDate ? data.autoCompleteAt.toDate() : new Date(data.autoCompleteAt);
           if (isAfter(new Date(), completeTime)) {
             effectiveStatus = 'Completed';
@@ -107,8 +113,9 @@ export default function TrackerPage() {
     if (!db) return;
     setIsSyncing(true);
     
+    const activeStatuses = ['pending', 'processing', 'in progress', 'inprogress'];
     const needsSync = orders.filter(o => 
-      (o.status === 'Pending' || o.status === 'Processing' || o.status === 'In progress') && 
+      activeStatuses.includes((o.status || 'pending').toLowerCase()) && 
       o.apiOrderId && 
       o.providerId
     );
@@ -121,7 +128,11 @@ export default function TrackerPage() {
 
     try {
       const apiSettingsSnap = await getDoc(doc(db, "globalSettings", "api"));
-      if (!apiSettingsSnap.exists()) return;
+      if (!apiSettingsSnap.exists()) {
+        toast({ variant: "destructive", title: "API Config Missing" });
+        setIsSyncing(false);
+        return;
+      }
       const apiSettings = apiSettingsSnap.data();
 
       const byProvider: Record<string, string[]> = {};
@@ -132,14 +143,15 @@ export default function TrackerPage() {
 
       for (const providerId in byProvider) {
         const provider = apiSettings.providers?.find((p: any) => p.id === providerId);
-        if (!provider) continue;
+        if (!provider || !provider.url || !provider.key) continue;
 
         const result = await getApiOrdersStatus(provider.url, provider.key, byProvider[providerId].join(','));
         if (result.success && result.statuses) {
           for (const apiId in result.statuses) {
             const apiStatus = result.statuses[apiId].status;
             const matchingOrder = needsSync.find(o => o.apiOrderId === apiId);
-            if (matchingOrder && apiStatus && apiStatus !== matchingOrder.status) {
+            
+            if (matchingOrder && apiStatus && apiStatus.toLowerCase() !== (matchingOrder.status || '').toLowerCase()) {
               await updateDoc(doc(db, matchingOrder.path), { 
                 status: apiStatus,
                 apiStatusLastChecked: serverTimestamp()
@@ -179,8 +191,9 @@ export default function TrackerPage() {
     toast({ title: "Copied", description: `${label} copied to clipboard.` });
   };
 
-  const activeOrders = orders.filter(o => o.effectiveStatus === 'Pending' || o.effectiveStatus === 'Processing' || o.effectiveStatus === 'In progress');
-  const historyOrders = orders.filter(o => o.effectiveStatus === 'Completed' || o.effectiveStatus === 'Cancelled' || o.effectiveStatus === 'Canceled' || o.effectiveStatus === 'Refunded');
+  const activeStatuses = ['Pending', 'Processing', 'In progress', 'In-progress', 'In Progress'];
+  const activeOrders = orders.filter(o => activeStatuses.includes(o.effectiveStatus));
+  const historyOrders = orders.filter(o => !activeStatuses.includes(o.effectiveStatus));
 
   const OrderTable = ({ data }: { data: any[] }) => (
     <div className="overflow-x-auto">

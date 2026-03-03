@@ -41,8 +41,15 @@ export default function OrdersHistoryPage() {
       }
 
       // Calculate Effective Status for User History
+      // Priority 1: Real Status from DB (Updated by API)
+      // Priority 2: Auto-completion for manual/timeout orders
       let effectiveStatus = order.status || 'Pending';
-      if (order.status === 'Processing' && order.autoCompleteAt) {
+      
+      // Capitalize status for uniform display
+      const normalized = effectiveStatus.charAt(0).toUpperCase() + effectiveStatus.slice(1).toLowerCase();
+      effectiveStatus = normalized === 'In progress' ? 'Processing' : normalized;
+
+      if (effectiveStatus === 'Processing' && order.autoCompleteAt) {
         const completeTime = order.autoCompleteAt.toDate ? order.autoCompleteAt.toDate() : new Date(order.autoCompleteAt);
         if (isAfter(new Date(), completeTime)) {
           effectiveStatus = 'Completed';
@@ -62,13 +69,8 @@ export default function OrdersHistoryPage() {
     const checkRefunds = async () => {
       const thirtyMinsAgo = subMinutes(new Date(), 30);
       
-      // Orders eligible for refund:
-      // 1. Status is 'Pending'
-      // 2. Created > 30 mins ago
-      // 3. Paid via Wallet
-      // 4. API failed (no apiOrderId OR apiError exists)
       const eligibleForRefund = orders.filter(o => 
-        o.status === 'Pending' && 
+        (o.status === 'Pending' || !o.status) && 
         o.paymentMethod === 'Wallet' &&
         isAfter(thirtyMinsAgo, o.createdAt) &&
         (!o.apiOrderId || o.apiError)
@@ -84,19 +86,16 @@ export default function OrdersHistoryPage() {
         const userRef = doc(db, "users", user.uid);
         const notifRef = doc(collection(db, "users", user.uid, "notifications"));
 
-        // 1. Mark Order as Refunded
         batch.update(orderRef, { 
           status: 'Refunded', 
           refundedAt: serverTimestamp(),
           refundReason: order.apiError || 'API Timeout / Manual Failure'
         });
 
-        // 2. Add Balance back
         batch.update(userRef, {
           balance: increment(order.price || 0)
         });
 
-        // 3. Send Notification
         batch.set(notifRef, {
           title: '💸 Auto-Refund Processed',
           message: `Your order #${order.orderId || order.id.slice(0,8)} failed to start. ₹${order.price?.toFixed(2)} has been refunded to your wallet.`,
@@ -119,15 +118,16 @@ export default function OrdersHistoryPage() {
     };
 
     checkRefunds();
-  }, [db, user, orders, isSyncing]);
+  }, [db, user, orders, isSyncing, toast]);
 
   // Real-time API Status Sync Logic
   useEffect(() => {
     if (!db || !user || !orders.length || isSyncing) return;
 
     const syncApiOrders = async () => {
+      const activeStatuses = ['pending', 'processing', 'in progress', 'inprogress', 'processing'];
       const needsSync = orders.filter(o => 
-        (o.status === 'Pending' || o.status === 'Processing' || o.status === 'In progress') && 
+        activeStatuses.includes((o.status || 'pending').toLowerCase()) && 
         o.apiOrderId && 
         o.providerId
       );
@@ -146,7 +146,7 @@ export default function OrdersHistoryPage() {
 
       for (const providerId in byProvider) {
         const provider = apiSettings.providers?.find((p: any) => p.id === providerId);
-        if (!provider) continue;
+        if (!provider || !provider.url || !provider.key) continue;
 
         const idsStr = byProvider[providerId].join(',');
         const result = await getApiOrdersStatus(provider.url, provider.key, idsStr);
@@ -156,9 +156,9 @@ export default function OrdersHistoryPage() {
             const apiStatus = result.statuses[apiId].status;
             const matchingOrder = needsSync.find(o => o.apiOrderId === apiId);
             
-            if (matchingOrder && apiStatus && apiStatus !== matchingOrder.status) {
+            if (matchingOrder && apiStatus && apiStatus.toLowerCase() !== (matchingOrder.status || '').toLowerCase()) {
               const orderRef = doc(db, "users", user.uid, "orders", matchingOrder.id);
-              updateDoc(orderRef, { 
+              await updateDoc(orderRef, { 
                 status: apiStatus,
                 apiStatusLastChecked: serverTimestamp()
               }).catch(e => console.error("Update status failed", e));
@@ -236,7 +236,7 @@ export default function OrdersHistoryPage() {
                       order.effectiveStatus === 'Processing' || order.effectiveStatus === 'In progress' ? 'bg-blue-50 text-blue-600' :
                       order.effectiveStatus === 'Completed' ? 'bg-emerald-50 text-emerald-600' :
                       order.effectiveStatus === 'Refunded' ? 'bg-amber-100 text-amber-700' :
-                      order.effectiveStatus === 'Cancelled' || order.effectiveStatus === 'Canceled' ? 'bg-red-50 text-red-600' :
+                      (order.effectiveStatus === 'Cancelled' || order.effectiveStatus === 'Canceled') ? 'bg-red-50 text-red-600' :
                       'bg-slate-100 text-slate-400'
                     }`}>
                       {(order.effectiveStatus === 'Processing' || order.effectiveStatus === 'In progress') && <Clock size={10} className="mr-1 inline animate-spin" />}
