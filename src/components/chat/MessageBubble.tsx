@@ -98,12 +98,18 @@ export function MessageBubble({
   const [link, setLink] = useState("");
   const [utr, setUtr] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
+  const [mounted, setMounted] = useState(false);
   
   const [bulkLinks, setBulkLinks] = useState<string[]>([]);
   const [currentBulkLink, setCurrentBulkLink] = useState("");
 
   const [comboItems, setComboItems] = useState<{ serviceId: string, quantity: number }[]>([]);
   const [comboLink, setComboLink] = useState("");
+
+  // Fix hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Initialize combo items when dynamic services load
   useEffect(() => {
@@ -588,7 +594,7 @@ export function MessageBubble({
 
         <div className="flex justify-end mt-2 opacity-30">
           <span className="text-[9px] font-black uppercase tracking-tighter text-black dark:text-white">
-            {format(timestamp, 'HH:mm')}
+            {mounted ? format(timestamp, 'HH:mm') : '--:--'}
           </span>
         </div>
       </div>

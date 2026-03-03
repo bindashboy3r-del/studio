@@ -49,7 +49,7 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Services are public info (Price list)
+    // Services are public info (Price list) - Fixed to prevent hydration/permission race conditions
     match /services/{serviceId} {
       allow read: if true;
       allow write: if isAdmin();

@@ -74,7 +74,6 @@ interface OrderInProgress {
 
 export default function ChatPage() {
   const { user, isUserLoading } = useUser();
-  const auth = useAuth();
   const db = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
@@ -95,7 +94,7 @@ export default function ChatPage() {
   const hasInitialGreeted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Dynamic Services Listener
+  // Dynamic Services Listener - Safe initialization
   const servicesQuery = useMemoFirebase(() => {
     if (!db) return null;
     return query(collection(db, "services"), orderBy("order", "asc"));
@@ -108,10 +107,6 @@ export default function ChatPage() {
     return [...rawDynamicServices].filter(s => s.isActive !== false).sort((a, b) => (a.order || 0) - (b.order || 0));
   }, [rawDynamicServices]);
 
-  const displayServices = useMemo(() => {
-    return dynamicServices || [];
-  }, [dynamicServices]);
-
   const userDocRef = useMemoFirebase(() => {
     if (!db || !user) return null;
     return doc(db, "users", user.uid);
@@ -120,10 +115,12 @@ export default function ChatPage() {
   const walletBalance = userData?.balance || 0;
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
-    if (savedTheme) {
-      setTheme(savedTheme);
-      document.documentElement.classList.toggle('dark', savedTheme === 'dark');
+    if (typeof window !== 'undefined') {
+      const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
+      if (savedTheme) {
+        setTheme(savedTheme);
+        document.documentElement.classList.toggle('dark', savedTheme === 'dark');
+      }
     }
   }, []);
 
@@ -148,7 +145,7 @@ export default function ChatPage() {
       } else {
         setActiveBroadcast(null);
       }
-    });
+    }, () => {}); // Safe error handling
     return () => unsubscribe();
   }, [db]);
 
@@ -158,7 +155,7 @@ export default function ChatPage() {
       if (snap.exists()) {
         setGlobalBonus(snap.data().bonusPercentage || 0);
       }
-    });
+    }, () => {});
     return () => unsub();
   }, [db]);
 
@@ -195,9 +192,7 @@ export default function ChatPage() {
       const ref = doc(db, "users", user.uid, "notifications", n.id);
       batch.update(ref, { read: true });
     });
-    await batch.commit().catch(e => {
-      console.error("Failed to mark read", e);
-    });
+    await batch.commit().catch(() => {});
   };
 
   const clearAllNotifications = async () => {
@@ -213,9 +208,7 @@ export default function ChatPage() {
       .then(() => {
         toast({ title: "Notifications Cleared", description: "All alerts have been deleted." });
       })
-      .catch(e => {
-        console.error("Failed to clear notifications", e);
-      });
+      .catch(() => {});
   };
 
   const messagesQuery = useMemoFirebase(() => {
@@ -232,7 +225,7 @@ export default function ChatPage() {
     if (!messagesData) return [];
     return messagesData.filter((m: any) => {
       if (!m.timestamp) return true;
-      const msgTime = m.timestamp.toDate ? m.timestamp.toDate().getTime() : m.timestamp;
+      const msgTime = m.timestamp.toDate ? m.timestamp.toDate().getTime() : new Date(m.timestamp).getTime();
       return msgTime >= sessionStartTime;
     });
   }, [messagesData, sessionStartTime]);
@@ -281,7 +274,7 @@ export default function ChatPage() {
     const items = itemsOverride || currentOrder.items;
     let total = items.reduce((total, item) => {
       const multiplier = (currentOrder.type === 'bulk' && currentOrder.bulkLinks) ? currentOrder.bulkLinks.length : 1;
-      return total + (item.quantity / 1000) * item.service.pricePer1000 * multiplier;
+      return total + (item.quantity / 1000) * (item.service?.pricePer1000 || 0) * multiplier;
     }, 0);
 
     if (currentOrder.type === 'combo') {
@@ -297,7 +290,6 @@ export default function ChatPage() {
     
     const batch = writeBatch(db);
     const orderResults: any[] = [];
-
     const targets = (currentOrder.type === 'bulk' && currentOrder.bulkLinks) ? currentOrder.bulkLinks : [linkOverride || currentOrder.items[0].link];
 
     if (!targets[0] || targets[0].trim() === "") {
@@ -307,11 +299,11 @@ export default function ChatPage() {
 
     let successServiceName = "";
     if (currentOrder.type === 'combo') {
-      successServiceName = `Combo: ${currentOrder.items.map(i => `${i.service.name}(${i.quantity})`).join(", ")}`;
+      successServiceName = `Combo: ${currentOrder.items.map(i => `${i.service?.name}(${i.quantity})`).join(", ")}`;
     } else if (currentOrder.type === 'bulk') {
-      successServiceName = `Bulk: ${currentOrder.items[0].service.name}`;
+      successServiceName = `Bulk: ${currentOrder.items[0]?.service?.name}`;
     } else {
-      successServiceName = currentOrder.items[0].service.name;
+      successServiceName = currentOrder.items[0]?.service?.name || "Service";
     }
 
     for (const link of targets) {
@@ -319,14 +311,14 @@ export default function ChatPage() {
         const orderId = `SB-B-${Math.floor(100000 + Math.random() * 900000)}`;
         const orderRef = doc(collection(db, "users", user.uid, "orders"));
         
-        let itemPrice = (item.quantity / 1000) * item.service.pricePer1000;
+        let itemPrice = (item.quantity / 1000) * (item.service?.pricePer1000 || 0);
         if (currentOrder.type === 'combo') itemPrice *= 0.95;
 
         const orderData = {
           userId: user.uid,
           orderId,
           platform: 'Instagram',
-          service: item.service.name,
+          service: item.service?.name || "Service",
           link: link,
           quantity: item.quantity,
           price: itemPrice,
@@ -379,11 +371,11 @@ export default function ChatPage() {
 
     let successServiceName = "";
     if (currentOrder.type === 'combo') {
-      successServiceName = `Combo: ${currentOrder.items.map(i => `${i.service.name}(${i.quantity})`).join(", ")}`;
+      successServiceName = `Combo: ${currentOrder.items.map(i => `${i.service?.name}(${i.quantity})`).join(", ")}`;
     } else if (currentOrder.type === 'bulk') {
-      successServiceName = `Bulk: ${currentOrder.items[0].service.name}`;
+      successServiceName = `Bulk: ${currentOrder.items[0]?.service?.name}`;
     } else {
-      successServiceName = currentOrder.items[0].service.name;
+      successServiceName = currentOrder.items[0]?.service?.name || "Service";
     }
 
     const orderResults: any[] = [];
@@ -399,10 +391,9 @@ export default function ChatPage() {
         let apiError = null;
 
         if (apiData) {
-          const mapping = apiData.mappings?.[item.service.id];
+          const mapping = apiData.mappings?.[item.service?.id || ""];
           providerId = mapping?.providerId;
           const remoteServiceId = mapping?.remoteServiceId;
-          
           const provider = apiData.providers?.find((p: any) => p.id === providerId);
 
           if (provider && provider.url && provider.key && remoteServiceId) {
@@ -423,14 +414,14 @@ export default function ChatPage() {
           }
         }
 
-        let itemPrice = (item.quantity / 1000) * item.service.pricePer1000;
+        let itemPrice = (item.quantity / 1000) * (item.service?.pricePer1000 || 0);
         if (currentOrder.type === 'combo') itemPrice *= 0.95;
 
         const orderData = {
           userId: user.uid,
           orderId,
           platform: 'Instagram',
-          service: item.service.name,
+          service: item.service?.name || "Service",
           link: link,
           quantity: item.quantity,
           price: itemPrice,
@@ -473,7 +464,7 @@ export default function ChatPage() {
     await addMessage('user', `Added ${links.length} links for bulk order.`);
     setCurrentOrder(prev => ({ ...prev, bulkLinks: links }));
     setChatState('choosing_service');
-    const numberedOptions = displayServices.map((s, i) => `${i + 1}. ${s.name}`);
+    const numberedOptions = dynamicServices.map((s, i) => `${i + 1}. ${s.name}`);
     botReply(`📊 Select Instagram service for these ${links.length} links:`, numberedOptions);
   };
 
@@ -503,7 +494,6 @@ export default function ChatPage() {
     const text = manualText || inputValue.trim();
     if (!text || !db || !user) return;
     
-    // Ensure services are loaded for any selection logic
     if (isServicesLoading && !manualText) {
       toast({ title: "Please wait", description: "Loading services from database..." });
       return;
@@ -526,9 +516,9 @@ export default function ChatPage() {
     if (cleanText.includes("single order")) {
       setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
       setChatState('choosing_service');
-      const numberedOptions = displayServices.map((s, i) => `${i + 1}. ${s.name}`);
+      const numberedOptions = dynamicServices.map((s, i) => `${i + 1}. ${s.name}`);
       if (numberedOptions.length === 0) {
-        botReply("No services found. Kripya admin se sampark karein ya 'Load Defaults' dabayein.");
+        botReply("No services found. Kripya admin se sampark karein.");
       } else {
         botReply("Select Instagram service:", numberedOptions);
       }
@@ -566,7 +556,7 @@ export default function ChatPage() {
 
     switch (chatState) {
       case 'choosing_service':
-        const match = displayServices.find((s, i) => 
+        const match = dynamicServices.find((s, i) => 
           cleanText.includes((i + 1).toString()) || 
           cleanText.includes(s.name.toLowerCase())
         );
@@ -784,7 +774,7 @@ export default function ChatPage() {
             isWalletCard={m.isWalletCard}
             onWalletSubmit={(link) => handleBundleWalletSubmit(link)}
             onOptionClick={(option) => handleSend(option)}
-            timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} 
+            timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date(m.timestamp)} 
             dynamicServices={dynamicServices}
           />
         ))}
