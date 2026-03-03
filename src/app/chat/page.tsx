@@ -505,6 +505,21 @@ export default function ChatPage() {
       return;
     }
 
+    // PRIORITY CHECK: Always allow switching service if user clicks a service option button from any state
+    const serviceMatch = dynamicServices.find((s, i) => 
+      cleanText === (i + 1).toString() || 
+      cleanText === `${i + 1}. ${s.name.toLowerCase()}` ||
+      cleanText === s.name.toLowerCase()
+    );
+
+    if (serviceMatch && chatState !== 'idle') {
+      const updatedItems = [{ service: serviceMatch, quantity: 0, link: '' }];
+      setCurrentOrder(prev => ({ ...prev, items: updatedItems }));
+      setChatState('entering_quantity');
+      botReply(`📊 Quantity for ${serviceMatch.name}? (Min ${serviceMatch.minQuantity})`);
+      return;
+    }
+
     if (cleanText.includes("single order")) {
       setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
       setChatState('choosing_service');
