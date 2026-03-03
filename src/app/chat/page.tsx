@@ -42,7 +42,7 @@ import {
   Trash2
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { PLATFORMS, SERVICES, Platform, SMMService } from "@/app/lib/constants";
+import { SMMService, Platform } from "@/app/lib/constants";
 import { useAuth, useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
@@ -104,6 +104,13 @@ export default function ChatPage() {
   const [sessionStartTime] = useState(() => Date.now());
   const hasInitialGreeted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Dynamic Services Listener
+  const servicesQuery = useMemoFirebase(() => {
+    if (!db) return null;
+    return query(collection(db, "services"), where("isActive", "==", true));
+  }, [db]);
+  const { data: dynamicServices } = useCollection<SMMService>(servicesQuery);
 
   const userDocRef = useMemoFirebase(() => {
     if (!db || !user) return null;
@@ -298,7 +305,6 @@ export default function ChatPage() {
         return;
     }
 
-    // Determine the descriptive service name for Success Card
     let successServiceName = "";
     if (currentOrder.type === 'combo') {
       successServiceName = `Combo: ${currentOrder.items.map(i => `${i.service.name}(${i.quantity})`).join(", ")}`;
@@ -371,7 +377,6 @@ export default function ChatPage() {
         return;
     }
 
-    // Determine the descriptive service name for Success Card
     let successServiceName = "";
     if (currentOrder.type === 'combo') {
       successServiceName = `Combo: ${currentOrder.items.map(i => `${i.service.name}(${i.quantity})`).join(", ")}`;
@@ -473,10 +478,10 @@ export default function ChatPage() {
   };
 
   const handleComboFromCard = async (items: { serviceId: string, quantity: number }[], link: string) => {
-    if (items.length === 0 || !link) return;
+    if (items.length === 0 || !link || !dynamicServices) return;
     
     const formattedItems = items.map(item => ({
-      service: SERVICES.instagram.find(s => s.id === item.serviceId)!,
+      service: dynamicServices.find(s => s.id === item.serviceId)!,
       quantity: item.quantity,
       link: link
     }));
@@ -496,7 +501,7 @@ export default function ChatPage() {
 
   const handleSend = async (manualText?: string) => {
     const text = manualText || inputValue.trim();
-    if (!text || !db || !user) return;
+    if (!text || !db || !user || !dynamicServices) return;
     if (!manualText) setInputValue("");
     await addMessage('user', text);
     const cleanText = text.toLowerCase();
@@ -511,7 +516,7 @@ export default function ChatPage() {
       return;
     }
 
-    const selectedService = SERVICES.instagram.find(s => cleanText.includes(s.name.toLowerCase()));
+    const selectedService = dynamicServices.find(s => cleanText.includes(s.name.toLowerCase()));
     if (selectedService) {
       if (currentOrder.type === 'bulk') {
         setCurrentOrder(prev => ({ ...prev, items: [{ service: selectedService, quantity: 0, link: '' }] }));
@@ -528,17 +533,17 @@ export default function ChatPage() {
     if (cleanText.includes("single order")) {
       setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
       setChatState('choosing_service');
-      botReply("Select Instagram service:", SERVICES.instagram.map(s => s.name));
+      botReply("Select Instagram service:", dynamicServices.map(s => s.name));
       return;
     } else if (cleanText.includes("combo order")) {
       setCurrentOrder({ type: 'combo', platform: 'instagram', items: [] });
       setChatState('choosing_combo_services');
-      botReply("🎁 Configure your Combo Order (Get 5% OFF!):", [], { isComboCard: true });
+      botReply("🎁 Configure your Combo Order (Get 5% OFF!):", [], { isComboCard: true, dynamicServices });
       return;
     } else if (cleanText.includes("bulk order")) {
       setCurrentOrder({ type: 'bulk', platform: 'instagram', items: [] });
       setChatState('choosing_service');
-      botReply("Select Instagram service for bulk:", SERVICES.instagram.map(s => s.name));
+      botReply("Select Instagram service for bulk:", dynamicServices.map(s => s.name));
       return;
     }
 
@@ -769,6 +774,7 @@ export default function ChatPage() {
             onWalletSubmit={(link) => handleBundleWalletSubmit(link)}
             onOptionClick={(option) => handleSend(option)}
             timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} 
+            dynamicServices={dynamicServices}
           />
         ))}
         {isTyping && <TypingIndicator />}

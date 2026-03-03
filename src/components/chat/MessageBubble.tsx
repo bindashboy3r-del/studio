@@ -1,4 +1,6 @@
 
+"use client";
+
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { 
@@ -27,7 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { SERVICES } from "@/app/lib/constants";
+import { SMMService } from "@/app/lib/constants";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,6 +67,7 @@ interface MessageBubbleProps {
   onComboSubmit?: (items: { serviceId: string, quantity: number }[], link: string) => void;
   isWalletCard?: boolean;
   onWalletSubmit?: (link: string) => void;
+  dynamicServices?: SMMService[] | null;
 }
 
 export function MessageBubble({ 
@@ -86,7 +89,8 @@ export function MessageBubble({
   isComboCard,
   onComboSubmit,
   isWalletCard,
-  onWalletSubmit
+  onWalletSubmit,
+  dynamicServices
 }: MessageBubbleProps) {
   const isUser = sender === 'user';
   const { toast } = useToast();
@@ -169,9 +173,10 @@ export function MessageBubble({
   };
 
   const availableServices = useMemo(() => {
+    if (!dynamicServices) return [];
     const selectedIds = comboItems.map(i => i.serviceId);
-    return SERVICES.instagram.filter(s => !selectedIds.includes(s.id));
-  }, [comboItems]);
+    return dynamicServices.filter(s => !selectedIds.includes(s.id));
+  }, [comboItems, dynamicServices]);
 
   const addComboService = (serviceId: string) => {
     setComboItems([...comboItems, { serviceId, quantity: 0 }]);
@@ -189,18 +194,17 @@ export function MessageBubble({
 
   const comboTotal = useMemo(() => {
     const raw = comboItems.reduce((sum, item) => {
-      const s = SERVICES.instagram.find(sv => sv.id === item.serviceId);
+      const s = dynamicServices?.find(sv => sv.id === item.serviceId);
       return sum + (item.quantity / 1000) * (s?.pricePer1000 || 0);
     }, 0);
     return { raw, discounted: raw * 0.95 };
-  }, [comboItems]);
+  }, [comboItems, dynamicServices]);
 
   const isComboValid = comboItems.length >= 1 && comboItems.every(item => {
-    const s = SERVICES.instagram.find(sv => sv.id === item.serviceId);
+    const s = dynamicServices?.find(sv => sv.id === item.serviceId);
     return item.quantity >= (s?.minQuantity || 50);
   }) && comboLink.trim() !== "";
 
-  // Check if the success card is for a Wallet order
   const isWalletPayment = successDetails?.utrId === 'WALLET-PAYMENT';
 
   return (
@@ -243,7 +247,6 @@ export function MessageBubble({
             </div>
 
             <div className="space-y-3 mt-4">
-              {/* Only show WhatsApp button if NOT a wallet payment */}
               {!isWalletPayment && (
                 <div className="text-center">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
@@ -425,7 +428,7 @@ export function MessageBubble({
               <ScrollArea className="max-h-[450px] pr-2">
                 <div className="space-y-3">
                   {comboItems.map((item, idx) => {
-                    const s = SERVICES.instagram.find(sv => sv.id === item.serviceId);
+                    const s = dynamicServices?.find(sv => sv.id === item.serviceId);
                     const min = s?.minQuantity || 50;
                     return (
                       <div key={idx} className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 animate-in slide-in-from-bottom-2 duration-300">

@@ -49,6 +49,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /services/{serviceId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     match /{path=**}/orders/{orderId} {
       allow read: if isAdmin();
     }

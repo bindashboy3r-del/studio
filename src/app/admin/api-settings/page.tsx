@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -18,11 +19,11 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useUser, useFirestore } from "@/firebase";
+import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
-import { doc, setDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, onSnapshot, serverTimestamp, collection, query, orderBy } from "firebase/firestore";
 import { getApiBalance } from "@/app/actions/smm-api";
-import { SERVICES } from "@/app/lib/constants";
+import { SMMService } from "@/app/lib/constants";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
@@ -56,6 +57,13 @@ export default function ApiSettingsPage() {
   const [apiBalances, setApiBalances] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState<Record<string, boolean>>({});
+
+  // Dynamic Services
+  const servicesQuery = useMemoFirebase(() => {
+    if (!db) return null;
+    return query(collection(db, "services"), orderBy("name", "asc"));
+  }, [db]);
+  const { data: services } = useCollection<SMMService>(servicesQuery);
 
   useEffect(() => {
     const ADMIN_EMAIL = "chetanmadhav4@gmail.com";
@@ -119,7 +127,6 @@ export default function ApiSettingsPage() {
 
   const removeProvider = (id: string) => {
     setProviders(providers.filter(p => p.id !== id));
-    // Also cleanup mappings
     const newMappings = { ...mappings };
     Object.keys(newMappings).forEach(key => {
       if (newMappings[key].providerId === id) delete newMappings[key];
@@ -153,7 +160,6 @@ export default function ApiSettingsPage() {
       </header>
 
       <main className="max-w-3xl mx-auto p-6 space-y-8">
-        {/* Manage Providers Section */}
         <section className="space-y-4">
           <div className="flex items-center justify-between px-2">
             <div>
@@ -231,16 +237,9 @@ export default function ApiSettingsPage() {
                 </CardContent>
               </Card>
             ))}
-            {providers.length === 0 && (
-              <div className="bg-white rounded-[2rem] p-12 flex flex-col items-center justify-center border border-dashed border-slate-200 text-slate-400">
-                < Globe size={40} className="mb-4 opacity-20" />
-                <p className="font-black uppercase text-[10px] tracking-widest">No API Panels Connected</p>
-              </div>
-            )}
           </div>
         </section>
 
-        {/* Service Routing Section */}
         <section className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-slate-100 space-y-6">
           <div className="flex items-center gap-4 mb-2">
             <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center">
@@ -248,7 +247,7 @@ export default function ApiSettingsPage() {
             </div>
             <div>
               <h2 className="text-xl font-black uppercase tracking-tight">Service Routing</h2>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Assign panels to services</p>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Assign panels to dynamic services</p>
             </div>
           </div>
 
@@ -257,7 +256,7 @@ export default function ApiSettingsPage() {
               <div className="space-y-4">
                 <h3 className="text-[11px] font-black uppercase text-slate-800 tracking-[0.2em] border-b pb-2">Instagram Hub</h3>
                 <div className="grid gap-3">
-                  {SERVICES.instagram.map(s => (
+                  {services?.map(s => (
                     <div key={s.id} className="bg-slate-50 p-5 rounded-3xl border border-slate-100 flex flex-col md:flex-row md:items-center gap-4">
                       <div className="flex-1">
                         <p className="text-[13px] font-black text-slate-800">{s.name}</p>
@@ -296,13 +295,6 @@ export default function ApiSettingsPage() {
             </div>
           </ScrollArea>
         </section>
-
-        <div className="bg-yellow-50 p-6 rounded-[2rem] border border-yellow-100 flex items-start gap-4">
-          <Zap className="text-yellow-600 shrink-0" size={20} />
-          <p className="text-[10px] font-bold text-yellow-700 leading-relaxed uppercase">
-            Order Routing: Multi-API system is active. Wallet orders will be routed to the specific provider assigned to each service. Ensure all assigned providers have sufficient balance.
-          </p>
-        </div>
       </main>
     </div>
   );

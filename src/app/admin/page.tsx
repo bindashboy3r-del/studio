@@ -15,7 +15,8 @@ import {
   Zap,
   Wallet,
   Settings2,
-  QrCode
+  QrCode,
+  Layers
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -46,6 +47,13 @@ export default function AdminHub() {
       icon: <LayoutGrid size={28} />,
       color: "bg-[#10B981]", 
       path: "/admin/tracker"
+    },
+    {
+      title: "SERVICE MANAGER",
+      subtitle: "EDIT PRICES & ADD SERVICES",
+      icon: <Layers size={28} />,
+      color: "bg-[#3B82F6]", 
+      path: "/admin/services"
     },
     {
       title: "FUND REQUESTS",
