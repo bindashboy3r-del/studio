@@ -14,7 +14,8 @@ import {
   doc,
   writeBatch,
   increment,
-  getDoc
+  getDoc,
+  deleteDoc
 } from "firebase/firestore";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
@@ -37,7 +38,8 @@ import {
   PlusCircle,
   Layers,
   Link as LinkIcon,
-  Percent
+  Percent,
+  Trash2
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PLATFORMS, SERVICES, Platform, SMMService } from "@/app/lib/constants";
@@ -157,7 +159,7 @@ export default function ChatPage() {
     if (!db || !user) return null;
     return query(
       collection(db, "users", user.uid, "notifications"),
-      limit(20)
+      limit(50)
     );
   }, [db, user]);
 
@@ -189,6 +191,24 @@ export default function ChatPage() {
     await batch.commit().catch(e => {
       console.error("Failed to mark read", e);
     });
+  };
+
+  const clearAllNotifications = async () => {
+    if (!db || !user || !notificationsData || notificationsData.length === 0) return;
+    
+    const batch = writeBatch(db);
+    notificationsData.forEach(n => {
+      const ref = doc(db, "users", user.uid, "notifications", n.id);
+      batch.delete(ref);
+    });
+    
+    await batch.commit()
+      .then(() => {
+        toast({ title: "Notifications Cleared", description: "All alerts have been deleted." });
+      })
+      .catch(e => {
+        console.error("Failed to clear notifications", e);
+      });
   };
 
   const messagesQuery = useMemoFirebase(() => {
@@ -600,8 +620,16 @@ export default function ChatPage() {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-[300px] bg-white dark:bg-slate-900 border-gray-100 dark:border-slate-800 p-0 rounded-3xl overflow-hidden shadow-2xl">
-              <div className="p-4 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between">
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between border-b border-gray-100 dark:border-slate-800">
                 <span className="text-[10px] font-black uppercase tracking-widest text-[#111B21] dark:text-white">Notifications</span>
+                {notificationsData.length > 0 && (
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); clearAllNotifications(); }}
+                    className="flex items-center gap-1.5 text-[9px] font-black text-red-500 hover:text-red-600 uppercase tracking-widest transition-colors"
+                  >
+                    <Trash2 size={12} /> CLEAR ALL
+                  </button>
+                )}
               </div>
               <ScrollArea className="h-[300px]">
                 {notificationsData.length > 0 ? (
