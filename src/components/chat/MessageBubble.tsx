@@ -27,7 +27,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { SMMService } from "@/app/lib/constants";
 import {
   DropdownMenu,
@@ -106,29 +105,25 @@ export function MessageBubble({
   const [comboItems, setComboItems] = useState<{ serviceId: string, quantity: number }[]>([]);
   const [comboLink, setComboLink] = useState("");
 
-  // Fix hydration mismatch
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Initialize combo items when dynamic services load
   useEffect(() => {
     if (isComboCard && dynamicServices && dynamicServices.length > 0 && comboItems.length === 0) {
-      // Look for specific default IDs: Likes, Views, Comments
-      // Our standard seed IDs are ig_likes, ig_views, ig_comments
-      const defaultIds = ['ig_likes', 'ig_views', 'ig_comments'];
+      const defaultKeywords = ['likes', 'views', 'comments'];
       
       const foundDefaults = dynamicServices
-        .filter(s => defaultIds.some(id => s.id.toLowerCase().includes(id.replace('ig_', ''))))
+        .filter(s => defaultKeywords.some(kw => s.name.toLowerCase().includes(kw)))
         .map(s => ({
           serviceId: s.id,
           quantity: s.minQuantity || 100
-        }));
+        }))
+        .slice(0, 3);
 
       if (foundDefaults.length > 0) {
         setComboItems(foundDefaults);
       } else {
-        // Fallback to first 3 if specific matches not found
         const fallback = dynamicServices.slice(0, 3).map(s => ({
           serviceId: s.id,
           quantity: s.minQuantity || 100
@@ -409,7 +404,7 @@ export function MessageBubble({
                 </Button>
               </div>
 
-              <ScrollArea className="h-[150px] bg-slate-50 dark:bg-slate-900 rounded-3xl p-4 border border-slate-100 dark:border-slate-800">
+              <div className="h-[150px] overflow-y-auto bg-slate-50 dark:bg-slate-900 rounded-3xl p-4 border border-slate-100 dark:border-slate-800 scrollbar-thin scrollbar-thumb-slate-200">
                 {bulkLinks.length > 0 ? (
                   <div className="space-y-2">
                     {bulkLinks.map((l, i) => (
@@ -422,7 +417,7 @@ export function MessageBubble({
                 ) : (
                   <div className="h-full flex items-center justify-center opacity-30 text-[10px] font-black uppercase">No links added</div>
                 )}
-              </ScrollArea>
+              </div>
 
               <Button 
                 onClick={() => onBulkLinksSubmit?.(bulkLinks)}
@@ -445,28 +440,28 @@ export function MessageBubble({
             </div>
 
             <div className="space-y-4">
-              <ScrollArea className="max-h-[300px] pr-2">
-                <div className="space-y-3">
-                  {comboItems.map((item, idx) => {
-                    const s = dynamicServices?.find(sv => sv.id === item.serviceId);
-                    return (
-                      <div key={`${idx}-${item.serviceId}`} className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[11px] font-black uppercase text-[#312ECB]">{s?.name || 'Loading...'}</span>
-                          <button onClick={() => removeComboService(idx)} className="text-red-400"><Trash2 size={14} /></button>
-                        </div>
-                        <Input 
-                          type="number"
-                          placeholder={`Min ${s?.minQuantity || 50}`}
-                          value={item.quantity || ""}
-                          onChange={(e) => updateComboQuantity(idx, parseInt(e.target.value) || 0)}
-                          className="h-10 bg-white dark:bg-slate-800 border-none rounded-xl px-4 text-xs font-bold"
-                        />
+              <div className="max-h-[320px] overflow-y-auto pr-2 space-y-3 scrollbar-thin scrollbar-thumb-slate-200">
+                {comboItems.map((item, idx) => {
+                  const s = dynamicServices?.find(sv => sv.id === item.serviceId);
+                  return (
+                    <div key={`${idx}-${item.serviceId}`} className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[11px] font-black uppercase text-[#312ECB]">{s?.name || 'Loading...'}</span>
+                        <button onClick={() => removeComboService(idx)} className="text-red-400 p-1 hover:bg-red-50 rounded-lg transition-colors">
+                          <Trash2 size={14} />
+                        </button>
                       </div>
-                    );
-                  })}
-                </div>
-              </ScrollArea>
+                      <Input 
+                        type="number"
+                        placeholder={`Min ${s?.minQuantity || 50}`}
+                        value={item.quantity || ""}
+                        onChange={(e) => updateComboQuantity(idx, parseInt(e.target.value) || 0)}
+                        className="h-10 bg-white dark:bg-slate-800 border-none rounded-xl px-4 text-xs font-bold shadow-inner"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
 
               {availableServices.length > 0 && (
                 <DropdownMenu>
@@ -475,7 +470,7 @@ export function MessageBubble({
                       <Plus size={14} /> Add Service <ChevronDown size={14} />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="center" className="w-[200px] bg-white dark:bg-slate-900 rounded-2xl border-gray-100 dark:border-slate-800 shadow-xl">
+                  <DropdownMenuContent align="center" className="w-[200px] bg-white dark:bg-slate-900 rounded-2xl border-gray-100 dark:border-slate-800 shadow-xl z-[150]">
                     {availableServices.map(s => (
                       <DropdownMenuItem key={s.id} onClick={() => addComboService(s.id)} className="text-[10px] font-black uppercase py-3">
                         {s.name} (Min {s.minQuantity})
@@ -491,7 +486,7 @@ export function MessageBubble({
                   placeholder="Instagram profile/post link"
                   value={comboLink}
                   onChange={(e) => setComboLink(e.target.value)}
-                  className="h-12 bg-slate-50 dark:bg-slate-900 border-none rounded-2xl px-5 text-sm font-bold"
+                  className="h-12 bg-slate-50 dark:bg-slate-900 border-none rounded-2xl px-5 text-sm font-bold shadow-inner"
                 />
               </div>
 
@@ -573,4 +568,3 @@ export function MessageBubble({
     </div>
   );
 }
-
