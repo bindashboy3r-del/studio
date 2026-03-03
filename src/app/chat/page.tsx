@@ -333,10 +333,14 @@ export default function ChatPage() {
     await addMessage('user', text);
     const cleanText = text.toLowerCase();
 
+    // Reset flow if a new service is detected from a previous message button
     const serviceMatch = dynamicServices.find((s, i) => cleanText === (i + 1).toString() || cleanText.includes(s.name.toLowerCase()));
+    
+    // Reset flow if user chooses a main menu option manually or via button
+    const isMainMenuTrigger = cleanText === 'hi' || cleanText.includes("menu") || cleanText.includes("single order") || cleanText.includes("combo order") || cleanText.includes("bulk order");
 
     if (serviceMatch) {
-      setCurrentOrder(prev => ({ ...prev, items: [{ service: serviceMatch, quantity: 0, link: '' }] }));
+      setCurrentOrder({ type: 'single', platform: 'instagram', items: [{ service: serviceMatch, quantity: 0, link: '' }] });
       setChatState('entering_quantity');
       botReply(`📊 Quantity for ${serviceMatch.name}? (Min ${serviceMatch.minQuantity})`);
       return;
@@ -344,25 +348,32 @@ export default function ChatPage() {
 
     if (cleanText === 'hi' || cleanText.includes("menu")) {
       setChatState('choosing_order_type');
-      const comboLabel = globalDiscounts.combo > 0 ? `2. COMBO ORDER (${globalDiscounts.combo}% OFF! 🎁)` : "2. COMBO ORDER";
-      const bulkLabel = globalDiscounts.bulk > 0 ? `3. BULK ORDER (${globalDiscounts.bulk}% OFF!)` : "3. BULK ORDER";
-      botReply("👋 Welcome! Choose your ordering method:", ["1. SINGLE ORDER", comboLabel, bulkLabel]);
+      const singleLabel = globalDiscounts.single > 0 ? `1. SINGLE ORDER (${globalDiscounts.single}% OFF)` : "1. SINGLE ORDER";
+      const comboLabel = globalDiscounts.combo > 0 ? `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)` : "2. COMBO ORDER";
+      const bulkLabel = globalDiscounts.bulk > 0 ? `3. BULK ORDER (${globalDiscounts.bulk}% OFF)` : "3. BULK ORDER";
+      botReply("👋 Welcome! Choose your ordering method:", [singleLabel, comboLabel, bulkLabel]);
+      return;
+    }
+
+    // Explicitly handle menu choices even if state is busy
+    if (cleanText.includes("single order")) {
+      setChatState('choosing_service');
+      setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
+      botReply("Select Instagram service:", dynamicServices.map((s, i) => `${i + 1}. ${s.name}`));
+      return;
+    } else if (cleanText.includes("combo order")) {
+      setChatState('choosing_combo_services');
+      setCurrentOrder({ type: 'combo', platform: 'instagram', items: [] });
+      botReply(`🎁 Configure Combo (${globalDiscounts.combo}% OFF):`, [], { isComboCard: true, dynamicServices, discountPct: globalDiscounts.combo });
+      return;
+    } else if (cleanText.includes("bulk order")) {
+      setChatState('entering_bulk_links');
+      setCurrentOrder({ type: 'bulk', platform: 'instagram', items: [] });
+      botReply("🔗 Add target links for Bulk Order:", [], { isBulkLinkCard: true });
       return;
     }
 
     switch (chatState) {
-      case 'choosing_order_type':
-        if (cleanText.includes("single")) {
-          setChatState('choosing_service');
-          botReply("Select Instagram service:", dynamicServices.map((s, i) => `${i + 1}. ${s.name}`));
-        } else if (cleanText.includes("combo")) {
-          setChatState('choosing_combo_services');
-          botReply(`🎁 Configure Combo (${globalDiscounts.combo}% OFF):`, [], { isComboCard: true, dynamicServices, discountPct: globalDiscounts.combo });
-        } else if (cleanText.includes("bulk")) {
-          setChatState('entering_bulk_links');
-          botReply("🔗 Add target links for Bulk Order:", [], { isBulkLinkCard: true });
-        }
-        break;
       case 'entering_quantity':
         const qty = parseInt(text);
         const s = currentOrder.items[0]?.service;
@@ -422,7 +433,21 @@ export default function ChatPage() {
           <MessageBubble key={m.id} sender={m.sender} text={m.text} options={m.options} onOptionClick={handleSend}
             isPaymentCard={m.isPaymentCard} paymentPrice={m.paymentPrice} onPaymentSubmit={(link, utr) => handleBundlePaymentSubmit(utr, link)}
             isSuccessCard={m.isSuccessCard} successDetails={m.successDetails} isBulkLinkCard={m.isBulkLinkCard} onBulkLinksSubmit={(l) => { setCurrentOrder(p => ({ ...p, type: 'bulk', bulkLinks: l })); setChatState('choosing_service'); botReply("Select Service:", dynamicServices.map((s, i) => `${i + 1}. ${s.name}`)); }}
-            isComboCard={m.isComboCard} onComboSubmit={(items, link) => { setCurrentOrder(p => ({ ...p, type: 'combo', items: items.map(it => ({ service: dynamicServices.find(s => s.id === it.serviceId)!, quantity: it.quantity, link })) })); setChatState('choosing_payment_method'); botReply(`🎁 Combo Total: ₹${calculateTotalPrice().toFixed(2)}`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]); }}
+            isComboCard={m.isComboCard} onComboSubmit={(items, link) => { 
+              // Validate min quantities
+              const invalid = items.find(it => {
+                const s = dynamicServices.find(ds => ds.id === it.serviceId);
+                return it.quantity < (s?.minQuantity || 0);
+              });
+              if (invalid) {
+                const s = dynamicServices.find(ds => ds.id === invalid.serviceId);
+                toast({ variant: "destructive", title: "Invalid Quantity", description: `Minimum for ${s?.name} is ${s?.minQuantity}.` });
+                return;
+              }
+              setCurrentOrder(p => ({ ...p, type: 'combo', items: items.map(it => ({ service: dynamicServices.find(s => s.id === it.serviceId)!, quantity: it.quantity, link })) })); 
+              setChatState('choosing_payment_method'); 
+              botReply(`🎁 Combo Total: ₹${calculateTotalPrice().toFixed(2)}`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]); 
+            }}
             isWalletCard={m.isWalletCard} onWalletSubmit={handleBundleWalletSubmit} timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} dynamicServices={dynamicServices} discountPct={globalDiscounts.combo}
           />
         ))}

@@ -167,10 +167,15 @@ export function MessageBubble({
               {comboItems.map((item, idx) => {
                 const s = dynamicServices?.find(sv => sv.id === item.serviceId);
                 return (
-                  <div key={idx} className="bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl flex items-center justify-between gap-2 border border-slate-100 dark:border-slate-700">
-                    <span className="text-[10px] font-black uppercase truncate flex-1 text-slate-800 dark:text-slate-100">{s?.name || 'Loading...'}</span>
-                    <Input type="number" value={item.quantity} onChange={(e) => setComboItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: parseInt(e.target.value) || 0 } : it))} className="h-8 w-16 text-[10px] bg-white text-slate-800" />
-                    <button onClick={() => setComboItems(prev => prev.filter((_, i) => i !== idx))} className="text-red-400 p-1 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={14}/></button>
+                  <div key={idx} className="bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl flex flex-col gap-2 border border-slate-100 dark:border-slate-700">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-black uppercase truncate flex-1 text-slate-800 dark:text-slate-100">{s?.name || 'Loading...'}</span>
+                      <button onClick={() => setComboItems(prev => prev.filter((_, i) => i !== idx))} className="text-red-400 p-1 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={14}/></button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Input type="number" value={item.quantity} onChange={(e) => setComboItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: parseInt(e.target.value) || 0 } : it))} className="h-8 flex-1 text-[10px] bg-white text-slate-800" placeholder={`Min ${s?.minQuantity}`} />
+                      <span className="text-[9px] font-bold text-slate-400">Min: {s?.minQuantity}</span>
+                    </div>
                   </div>
                 );
               })}
@@ -231,6 +236,9 @@ export function MessageBubble({
             ))}
           </div>
         )}
+      </div>
+      <div className={cn("text-[9px] mt-1 text-slate-400 px-1", isUser ? "text-right" : "text-left")}>
+        {format(timestamp, 'HH:mm')}
       </div>
     </div>
   );
