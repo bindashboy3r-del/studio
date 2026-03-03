@@ -14,7 +14,8 @@ import {
   LogOut,
   Zap,
   Wallet,
-  Settings2
+  Settings2,
+  QrCode
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -52,6 +53,13 @@ export default function AdminHub() {
       icon: <Wallet size={28} />,
       color: "bg-[#F59E0B]", 
       path: "/admin/funds"
+    },
+    {
+      title: "PAYMENT SETTINGS",
+      subtitle: "QR & MERCHANT CONFIG",
+      icon: <QrCode size={28} />,
+      color: "bg-[#EC4899]", 
+      path: "/admin/payment-settings"
     },
     {
       title: "API SETTINGS",

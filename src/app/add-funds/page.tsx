@@ -29,27 +29,52 @@ export default function AddFundsPage() {
   const [loading, setLoading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [globalBonus, setGlobalBonus] = useState(0);
+  
+  // Payment Config from Admin
+  const [paymentConfig, setPaymentConfig] = useState({
+    upiId: "smmxpressbot@slc",
+    merchantName: "SocialBoost",
+    qrImageUrl: ""
+  });
 
-  const upiId = "smmxpressbot@slc";
   const numAmount = parseFloat(amount) || 0;
   
-  const upiLink = `upi://pay?pa=${upiId}&pn=SocialBoost&am=${numAmount.toFixed(2)}&cu=INR`;
-  const qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(upiLink)}&size=400&margin=1&format=png`;
+  const upiLink = `upi://pay?pa=${paymentConfig.upiId}&pn=${encodeURIComponent(paymentConfig.merchantName)}&am=${numAmount.toFixed(2)}&cu=INR`;
+  const generatedQrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(upiLink)}&size=400&margin=1&format=png`;
+  const activeQrUrl = paymentConfig.qrImageUrl || generatedQrUrl;
 
   useEffect(() => {
     if (!db) return;
-    const unsub = onSnapshot(doc(db, "globalSettings", "finance"), (snap) => {
+    
+    // Load Bonus Settings
+    const unsubFinance = onSnapshot(doc(db, "globalSettings", "finance"), (snap) => {
       if (snap.exists()) {
         setGlobalBonus(snap.data().bonusPercentage || 0);
       }
     });
-    return () => unsub();
+
+    // Load Payment Settings
+    const unsubPayment = onSnapshot(doc(db, "globalSettings", "payment"), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setPaymentConfig({
+          upiId: data.upiId || "smmxpressbot@slc",
+          merchantName: data.merchantName || "SocialBoost",
+          qrImageUrl: data.qrImageUrl || ""
+        });
+      }
+    });
+
+    return () => {
+      unsubFinance();
+      unsubPayment();
+    };
   }, [db]);
 
   const handleDownloadQR = async () => {
     setIsDownloading(true);
     try {
-      const response = await fetch(qrUrl);
+      const response = await fetch(activeQrUrl);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -57,14 +82,14 @@ export default function AddFundsPage() {
       a.download = `SocialBoost_Pay_${numAmount}.png`;
       a.click();
     } catch (e) {
-      window.open(qrUrl, '_blank');
+      window.open(activeQrUrl, '_blank');
     } finally {
       setIsDownloading(false);
     }
   };
 
   const copyUPI = () => {
-    navigator.clipboard.writeText(upiId);
+    navigator.clipboard.writeText(paymentConfig.upiId);
     toast({ title: "Copied!", description: "UPI ID copied to clipboard." });
   };
 
@@ -160,7 +185,11 @@ export default function AddFundsPage() {
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Step 2: Scan & Pay</label>
                 <div className="bg-slate-50 rounded-3xl p-6 flex flex-col items-center gap-4 border border-slate-100">
                   <div className="bg-white p-3 rounded-[2rem] shadow-inner border border-slate-100">
-                    <img src={qrUrl} alt="Payment QR" className="w-48 h-48 block rounded-xl" />
+                    <img src={activeQrUrl} alt="Payment QR" className="w-48 h-48 block rounded-xl" />
+                  </div>
+                  <div className="text-center mb-2">
+                    <p className="text-[12px] font-black text-slate-800">{paymentConfig.merchantName}</p>
+                    <p className="text-[10px] font-bold text-slate-400">{paymentConfig.upiId}</p>
                   </div>
                   <div className="flex w-full gap-2">
                     <Button variant="outline" onClick={copyUPI} className="flex-1 h-12 rounded-2xl border-slate-200 text-[#312ECB] font-black text-[10px] uppercase gap-2">
@@ -190,7 +219,7 @@ export default function AddFundsPage() {
               <div className="bg-blue-50/50 p-4 rounded-2xl flex items-start gap-3 border border-blue-100/50">
                 <Info size={16} className="text-[#312ECB] mt-0.5" />
                 <p className="text-[10px] font-bold text-blue-600 uppercase leading-relaxed">
-                  Note: Funds are credited after verification. Check order status in history.
+                  Note: Funds are credited after verification. Check status in your profile history.
                 </p>
               </div>
 
