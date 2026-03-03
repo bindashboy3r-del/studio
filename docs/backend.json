@@ -41,6 +41,7 @@
         "platform": { "type": "string", "enum": ["instagram"] },
         "pricePer1000": { "type": "number" },
         "minQuantity": { "type": "number" },
+        "order": { "type": "number", "description": "The display order of the service." },
         "isActive": { "type": "boolean", "default": true }
       },
       "required": ["id", "name", "platform", "pricePer1000", "minQuantity"]

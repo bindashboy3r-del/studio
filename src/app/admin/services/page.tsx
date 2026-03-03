@@ -14,7 +14,8 @@ import {
   DollarSign, 
   Hash,
   AlertCircle,
-  Zap
+  Zap,
+  ArrowUpDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,7 +31,6 @@ import {
   orderBy,
   writeBatch
 } from "firebase/firestore";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -47,15 +47,17 @@ interface Service {
   platform: 'instagram';
   pricePer1000: number;
   minQuantity: number;
+  order: number;
   isActive: boolean;
 }
 
 const DEFAULT_SERVICES: Service[] = [
-  { id: 'ig_followers', name: 'Followers', platform: 'instagram', pricePer1000: 89, minQuantity: 100, isActive: true },
-  { id: 'ig_likes', name: 'Likes', platform: 'instagram', pricePer1000: 18, minQuantity: 100, isActive: true },
-  { id: 'ig_views', name: 'Views', platform: 'instagram', pricePer1000: 0.60, minQuantity: 500, isActive: true },
-  { id: 'ig_comments', name: 'Comments', platform: 'instagram', pricePer1000: 260, minQuantity: 50, isActive: true },
-  { id: 'ig_shares', name: 'Shares', platform: 'instagram', pricePer1000: 7, minQuantity: 100, isActive: true },
+  { id: 'ig_followers', name: 'Followers', platform: 'instagram', pricePer1000: 89, minQuantity: 100, order: 1, isActive: true },
+  { id: 'ig_likes', name: 'Likes', platform: 'instagram', pricePer1000: 18, minQuantity: 100, order: 2, isActive: true },
+  { id: 'ig_views', name: 'Views', platform: 'instagram', pricePer1000: 0.60, minQuantity: 500, order: 3, isActive: true },
+  { id: 'ig_comments', name: 'Comments', platform: 'instagram', pricePer1000: 260, minQuantity: 50, order: 4, isActive: true },
+  { id: 'ig_shares', name: 'Shares', platform: 'instagram', pricePer1000: 7, minQuantity: 100, order: 5, isActive: true },
+  { id: 'ig_profile_visit', name: 'Profile Visit', platform: 'instagram', pricePer1000: 25, minQuantity: 100, order: 6, isActive: true },
 ];
 
 export default function ServiceManagerPage() {
@@ -66,7 +68,7 @@ export default function ServiceManagerPage() {
 
   const servicesQuery = useMemoFirebase(() => {
     if (!db) return null;
-    return query(collection(db, "services"), orderBy("name", "asc"));
+    return query(collection(db, "services"), orderBy("order", "asc"));
   }, [db]);
 
   const { data: services, isLoading: isServicesLoading } = useCollection<Service>(servicesQuery);
@@ -79,7 +81,8 @@ export default function ServiceManagerPage() {
     platform: 'instagram',
     isActive: true,
     pricePer1000: 0,
-    minQuantity: 100
+    minQuantity: 100,
+    order: (services?.length || 0) + 1
   });
 
   useEffect(() => {
@@ -118,17 +121,18 @@ export default function ServiceManagerPage() {
       await setDoc(docRef, {
         ...newService,
         id: newService.id.toLowerCase().replace(/\s+/g, '_'),
+        order: Number(newService.order) || (services?.length || 0) + 1,
         updatedAt: serverTimestamp()
       });
       toast({ title: "Service Added", description: `${newService.name} is now available.` });
       setIsAdding(false);
-      setNewService({ id: "", name: "", platform: 'instagram', isActive: true, pricePer1000: 0, minQuantity: 100 });
+      setNewService({ id: "", name: "", platform: 'instagram', isActive: true, pricePer1000: 0, minQuantity: 100, order: (services?.length || 0) + 1 });
     } catch (e) {
       toast({ variant: "destructive", title: "Error", description: "Failed to add service." });
     }
   };
 
-  const handleUpdatePrice = async (service: Service, field: 'pricePer1000' | 'minQuantity', value: string) => {
+  const handleUpdateField = async (service: Service, field: keyof Service, value: string) => {
     if (!db) return;
     const numValue = parseFloat(value);
     if (isNaN(numValue)) return;
@@ -192,9 +196,15 @@ export default function ServiceManagerPage() {
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Unique ID</label>
-                  <Input placeholder="e.g. ig_followers_real" value={newService.id} onChange={e => setNewService({...newService, id: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Unique ID</label>
+                    <Input placeholder="ig_followers" value={newService.id} onChange={e => setNewService({...newService, id: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Order (Position)</label>
+                    <Input type="number" value={newService.order} onChange={e => setNewService({...newService, order: parseInt(e.target.value)})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Display Name</label>
@@ -228,7 +238,7 @@ export default function ServiceManagerPage() {
               </div>
               <div>
                 <h2 className="text-xl font-black uppercase tracking-tight">Services List</h2>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active services visible in Chat</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ordered by your preference</p>
               </div>
             </div>
             <Badge className="bg-blue-50 text-[#312ECB] border-none font-black text-[10px] uppercase">{services?.length || 0} Total</Badge>
@@ -237,6 +247,10 @@ export default function ServiceManagerPage() {
           <div className="space-y-4">
             {services?.map((service) => (
               <div key={service.id} className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 flex flex-col md:flex-row md:items-center gap-6 group transition-all hover:shadow-md">
+                <div className="flex items-center gap-4 min-w-[50px]">
+                   <span className="text-[12px] font-black text-slate-300">#{service.order}</span>
+                </div>
+                
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-[14px] font-black text-[#111B21]">{service.name}</span>
@@ -245,28 +259,40 @@ export default function ServiceManagerPage() {
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Instagram Hub</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 w-full md:w-auto">
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest ml-1">Price (1k)</label>
+                <div className="grid grid-cols-3 gap-3 w-full md:w-auto">
+                   <div className="space-y-1">
+                    <label className="text-[8px] font-black uppercase text-slate-400 tracking-widest ml-1">Pos</label>
                     <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500" size={14} />
+                      <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
                       <Input 
                         type="number" 
-                        defaultValue={service.pricePer1000} 
-                        onBlur={(e) => handleUpdatePrice(service, 'pricePer1000', e.target.value)}
-                        className="h-10 w-28 bg-white border-none rounded-xl pl-8 text-xs font-black text-emerald-700 shadow-sm" 
+                        defaultValue={service.order} 
+                        onBlur={(e) => handleUpdateField(service, 'order', e.target.value)}
+                        className="h-10 w-16 bg-white border-none rounded-xl pl-8 text-xs font-black text-slate-700 shadow-sm" 
                       />
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest ml-1">Min Qty</label>
+                    <label className="text-[8px] font-black uppercase text-slate-400 tracking-widest ml-1">Price</label>
                     <div className="relative">
-                      <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500" size={14} />
+                      <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 text-emerald-500" size={12} />
+                      <Input 
+                        type="number" 
+                        defaultValue={service.pricePer1000} 
+                        onBlur={(e) => handleUpdateField(service, 'pricePer1000', e.target.value)}
+                        className="h-10 w-20 bg-white border-none rounded-xl pl-6 text-xs font-black text-emerald-700 shadow-sm" 
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black uppercase text-slate-400 tracking-widest ml-1">Min</label>
+                    <div className="relative">
+                      <Hash className="absolute left-2 top-1/2 -translate-y-1/2 text-blue-500" size={12} />
                       <Input 
                         type="number" 
                         defaultValue={service.minQuantity} 
-                        onBlur={(e) => handleUpdatePrice(service, 'minQuantity', e.target.value)}
-                        className="h-10 w-28 bg-white border-none rounded-xl pl-8 text-xs font-black text-blue-700 shadow-sm" 
+                        onBlur={(e) => handleUpdateField(service, 'minQuantity', e.target.value)}
+                        className="h-10 w-20 bg-white border-none rounded-xl pl-6 text-xs font-black text-blue-700 shadow-sm" 
                       />
                     </div>
                   </div>
@@ -291,7 +317,7 @@ export default function ServiceManagerPage() {
         <div className="bg-blue-50 p-6 rounded-[2rem] border border-blue-100 flex items-start gap-4">
           <AlertCircle className="text-[#312ECB] shrink-0" size={20} />
           <p className="text-[10px] font-bold text-blue-700 leading-relaxed uppercase">
-            Live Pricing: Jo bhi price aap yahan badlenge, woh users ko turant chat interface mein dikhayi degi. Service ID ko small letters aur unique rakhein.
+            Order System: 'Order' number se aap services ki sequence badal sakte hain. Kam number pehle dikhayi dega. Nayi service add karte waqt use apne hisaab se order number dein.
           </p>
         </div>
       </main>

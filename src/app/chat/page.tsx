@@ -105,17 +105,23 @@ export default function ChatPage() {
   const hasInitialGreeted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Dynamic Services Listener
+  // Dynamic Services Listener - Now ordered by "order" field
   const servicesQuery = useMemoFirebase(() => {
     if (!db) return null;
-    return query(collection(db, "services"), where("isActive", "==", true));
+    return query(collection(db, "services"), where("isActive", "==", true), orderBy("order", "asc"));
   }, [db]);
   const { data: rawDynamicServices } = useCollection<SMMService>(servicesQuery);
 
-  // Sort services by name length descending to match most specific names first (e.g., "Premium Followers" before "Followers")
+  // Sorting for matching (most specific name first)
   const dynamicServices = useMemo(() => {
     if (!rawDynamicServices) return null;
     return [...rawDynamicServices].sort((a, b) => b.name.length - a.name.length);
+  }, [rawDynamicServices]);
+
+  // Services in original display order for numbering
+  const displayServices = useMemo(() => {
+    if (!rawDynamicServices) return [];
+    return [...rawDynamicServices];
   }, [rawDynamicServices]);
 
   const userDocRef = useMemoFirebase(() => {
@@ -540,7 +546,9 @@ export default function ChatPage() {
     if (cleanText.includes("single order")) {
       setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
       setChatState('choosing_service');
-      botReply("Select Instagram service:", dynamicServices.map(s => s.name));
+      // Numbers services in UI
+      const numberedOptions = displayServices.map((s, i) => `${i + 1}. ${s.name}`);
+      botReply("Select Instagram service:", numberedOptions);
       return;
     } else if (cleanText.includes("combo order")) {
       setCurrentOrder({ type: 'combo', platform: 'instagram', items: [] });
@@ -550,7 +558,8 @@ export default function ChatPage() {
     } else if (cleanText.includes("bulk order")) {
       setCurrentOrder({ type: 'bulk', platform: 'instagram', items: [] });
       setChatState('choosing_service');
-      botReply("Select Instagram service for bulk:", dynamicServices.map(s => s.name));
+      const numberedOptions = displayServices.map((s, i) => `${i + 1}. ${s.name}`);
+      botReply("Select Instagram service for bulk:", numberedOptions);
       return;
     }
 
