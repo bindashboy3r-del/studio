@@ -6,20 +6,17 @@ import { useRouter } from "next/navigation";
 import { 
   ChevronLeft, 
   Copy, 
-  Download, 
   Wallet, 
-  Info,
   Zap,
   Loader2,
-  CheckCircle2
+  CheckCircle2,
+  AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useUser, useFirestore } from "@/firebase";
-import { collection, addDoc, serverTimestamp, doc, onSnapshot, increment, writeBatch, getDoc, query, where, getDocs } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, onSnapshot, query, where, getDocs } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
-import { Badge } from "@/components/ui/badge";
-import { verifyPaytmTransaction } from "@/app/actions/paytm-automation";
 
 export default function AddFundsPage() {
   const { user } = useUser();
@@ -30,15 +27,12 @@ export default function AddFundsPage() {
   const [amount, setAmount] = useState("");
   const [utr, setUtr] = useState("");
   const [loading, setLoading] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
   const [globalBonus, setGlobalBonus] = useState(0);
   
   const [paymentConfig, setPaymentConfig] = useState({
     upiId: "smmxpressbot@slc",
     merchantName: "SocialBoost",
-    qrImageUrl: "",
-    paytmMid: "",
-    paytmKey: ""
+    qrImageUrl: ""
   });
 
   const numAmount = parseFloat(amount) || 0;
@@ -49,97 +43,67 @@ export default function AddFundsPage() {
   useEffect(() => {
     if (!db) return;
     
+    // Listen for global finance/bonus settings
     onSnapshot(doc(db, "globalSettings", "finance"), (snap) => {
       if (snap.exists()) setGlobalBonus(snap.data().bonusPercentage || 0);
     });
 
+    // Listen for payment info (UPI/QR)
     onSnapshot(doc(db, "globalSettings", "payment"), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         setPaymentConfig({
           upiId: data.upiId || "smmxpressbot@slc",
           merchantName: data.merchantName || "SocialBoost",
-          qrImageUrl: data.qrImageUrl || "",
-          paytmMid: data.paytmMid || "",
-          paytmKey: data.paytmKey || ""
+          qrImageUrl: data.qrImageUrl || ""
         });
       }
     });
   }, [db]);
 
   const handleSubmit = async () => {
-    if (!user || !db || numAmount < 10 || utr.length !== 12) {
-      toast({ variant: "destructive", title: "Invalid Data", description: "Minimum ₹10 and valid 12-digit UTR required." });
+    if (!user || !db) return;
+    
+    if (numAmount < 10) {
+      toast({ variant: "destructive", title: "Invalid Amount", description: "Minimum ₹10 is required." });
       return;
     }
+
+    if (utr.length !== 12) {
+      toast({ variant: "destructive", title: "Invalid UTR", description: "Please enter a valid 12-digit UTR ID." });
+      return;
+    }
+
     setLoading(true);
     
     try {
-      // 1. Check for Duplicate UTR in Database
+      // 1. Check for Duplicate UTR
       const q = query(collection(db, "fundRequests"), where("utrId", "==", utr));
       const snap = await getDocs(q);
       if (!snap.empty) {
-        toast({ variant: "destructive", title: "Duplicate ID", description: "This UTR has already been used." });
+        toast({ variant: "destructive", title: "Duplicate UTR", description: "This Transaction ID has already been submitted." });
         setLoading(false);
         return;
       }
 
-      // 2. Call Automated Paytm Verification
-      const verification = await verifyPaytmTransaction({
-        utrId: utr,
-        amount: numAmount,
-        mid: paymentConfig.paytmMid,
-        merchantKey: paymentConfig.paytmKey
-      });
-
-      if (!verification.success) {
-        toast({ variant: "destructive", title: "Verification Failed", description: verification.message });
-        setLoading(false);
-        return;
-      }
-
-      // 3. Automation Success -> Credit Wallet Instantly
-      const bonusAmount = (numAmount * globalBonus) / 100;
-      const totalCredit = numAmount + bonusAmount;
-
-      const batch = writeBatch(db);
-
-      // Record the request as Approved (since automated)
-      const reqRef = doc(collection(db, "fundRequests"));
-      batch.set(reqRef, {
+      // 2. Submit Manual Request for Admin Approval
+      await addDoc(collection(db, "fundRequests"), {
         userId: user.uid,
         userEmail: user.email,
         displayName: user.displayName,
         amount: numAmount,
         utrId: utr,
-        status: 'Approved',
-        finalCreditAmount: totalCredit,
-        verifiedBy: 'Paytm Automation',
-        createdAt: serverTimestamp(),
-        processedAt: serverTimestamp()
-      });
-
-      // Update User Balance
-      const userRef = doc(db, "users", user.uid);
-      batch.update(userRef, {
-        balance: increment(totalCredit)
-      });
-
-      // Send Notification
-      const notifRef = doc(collection(db, "users", user.uid, "notifications"));
-      batch.set(notifRef, {
-        title: '💰 Instant Wallet Credit!',
-        message: `Your payment of ₹${numAmount} was verified. ₹${totalCredit.toFixed(2)} added to wallet.`,
-        read: false,
+        status: 'Pending',
         createdAt: serverTimestamp()
       });
 
-      await batch.commit();
-      
-      toast({ title: "Success!", description: `₹${totalCredit.toFixed(2)} added to your wallet instantly!` });
+      toast({ 
+        title: "Request Submitted!", 
+        description: "Admin will verify and credit your wallet within 30-60 mins." 
+      });
       router.push("/chat");
     } catch (error) {
-      toast({ variant: "destructive", title: "System Error", description: "Automation failed. Please contact admin." });
+      toast({ variant: "destructive", title: "Error", description: "Failed to submit request. Try again." });
     } finally {
       setLoading(false);
     }
@@ -151,7 +115,7 @@ export default function AddFundsPage() {
         <button onClick={() => router.back()} className="flex items-center gap-2 text-[#312ECB] font-black uppercase text-xs tracking-widest">
           <ChevronLeft size={20} /> Back
         </button>
-        <h1 className="text-sm font-black uppercase tracking-[0.2em]">Automated Top-up</h1>
+        <h1 className="text-sm font-black uppercase tracking-[0.2em]">Add Funds</h1>
         <div className="w-12" />
       </header>
 
@@ -159,23 +123,23 @@ export default function AddFundsPage() {
         <div className="bg-[#312ECB] rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden">
           <div className="relative z-10 flex items-center gap-4">
             <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center">
-              <Zap size={28} className="fill-current" />
+              <Wallet size={28} />
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Instant Verification</p>
-              <h2 className="text-2xl font-black uppercase tracking-tight">Paytm Auto-Credit</h2>
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Manual Verification</p>
+              <h2 className="text-2xl font-black uppercase tracking-tight">Refill Wallet</h2>
             </div>
           </div>
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10 blur-3xl" />
         </div>
 
         {globalBonus > 0 && (
-          <div className="bg-emerald-500 rounded-3xl p-5 text-white flex items-center justify-between shadow-lg animate-pulse">
+          <div className="bg-emerald-500 rounded-3xl p-5 text-white flex items-center justify-between shadow-lg">
             <div className="flex items-center gap-3">
               <Zap className="fill-current" size={20} />
               <div>
-                <p className="text-[10px] font-black uppercase tracking-widest">System Bonus</p>
-                <h3 className="text-lg font-black uppercase">Get {globalBonus}% Extra!</h3>
+                <p className="text-[10px] font-black uppercase tracking-widest">Deposit Offer</p>
+                <h3 className="text-lg font-black uppercase">Get {globalBonus}% Bonus!</h3>
               </div>
             </div>
           </div>
@@ -199,7 +163,7 @@ export default function AddFundsPage() {
           {numAmount >= 10 && (
             <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
               <div className="space-y-4">
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">2. Scan & Pay Any App</label>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">2. Scan QR & Pay</label>
                 <div className="bg-slate-50 rounded-3xl p-6 flex flex-col items-center gap-4 border border-slate-100">
                   <div className="bg-white p-3 rounded-[2rem] shadow-inner border border-slate-100">
                     <img src={activeQrUrl} alt="Payment QR" className="w-48 h-48 block rounded-xl" />
@@ -218,7 +182,7 @@ export default function AddFundsPage() {
               </div>
 
               <div className="space-y-4">
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">3. Automated UTR Verification</label>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">3. Enter UTR ID</label>
                 <Input 
                   placeholder="Paste 12-Digit Transaction ID" 
                   value={utr}
@@ -229,9 +193,9 @@ export default function AddFundsPage() {
               </div>
 
               <div className="bg-blue-50/50 p-4 rounded-2xl flex items-start gap-3 border border-blue-100/50">
-                <CheckCircle2 size={16} className="text-emerald-500 mt-0.5" />
+                <AlertCircle size={16} className="text-[#312ECB] mt-0.5" />
                 <p className="text-[10px] font-bold text-blue-600 uppercase leading-relaxed">
-                  Note: Balance will be added instantly after Paytm MID verification. No manual wait.
+                  Admin will verify your payment manually. Balance is usually added within 1 hour.
                 </p>
               </div>
 
@@ -240,7 +204,7 @@ export default function AddFundsPage() {
                 disabled={loading || utr.length !== 12}
                 className="w-full h-16 bg-[#312ECB] hover:bg-[#2825A6] text-white rounded-[1.5rem] font-black text-[13px] uppercase tracking-widest shadow-2xl"
               >
-                {loading ? <><Loader2 className="animate-spin mr-2" /> Verifying via Paytm...</> : "Verify & Credit Now"}
+                {loading ? <><Loader2 className="animate-spin mr-2" /> Submitting...</> : "Submit Request"}
               </Button>
             </div>
           )}
