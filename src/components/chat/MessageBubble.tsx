@@ -114,12 +114,27 @@ export function MessageBubble({
   // Initialize combo items when dynamic services load
   useEffect(() => {
     if (isComboCard && dynamicServices && dynamicServices.length > 0 && comboItems.length === 0) {
-      // Pick first 2 services as defaults
-      const defaults = dynamicServices.slice(0, 2).map(s => ({
-        serviceId: s.id,
-        quantity: s.minQuantity || 100
-      }));
-      setComboItems(defaults);
+      // Look for specific default IDs: Likes, Views, Comments
+      // Our standard seed IDs are ig_likes, ig_views, ig_comments
+      const defaultIds = ['ig_likes', 'ig_views', 'ig_comments'];
+      
+      const foundDefaults = dynamicServices
+        .filter(s => defaultIds.some(id => s.id.toLowerCase().includes(id.replace('ig_', ''))))
+        .map(s => ({
+          serviceId: s.id,
+          quantity: s.minQuantity || 100
+        }));
+
+      if (foundDefaults.length > 0) {
+        setComboItems(foundDefaults);
+      } else {
+        // Fallback to first 3 if specific matches not found
+        const fallback = dynamicServices.slice(0, 3).map(s => ({
+          serviceId: s.id,
+          quantity: s.minQuantity || 100
+        }));
+        setComboItems(fallback);
+      }
     }
   }, [isComboCard, dynamicServices, comboItems.length]);
 
@@ -134,7 +149,8 @@ export function MessageBubble({
     try {
       const response = await fetch(qrUrl);
       if (!response.ok) throw new Error('Failed to fetch image');
-      const blob = window.URL.createObjectURL(await response.blob());
+      const blobData = await response.blob();
+      const blob = window.URL.createObjectURL(blobData);
       const a = document.createElement('a');
       a.href = blob;
       a.download = `SocialBoost_Payment_QR.png`;
@@ -192,18 +208,20 @@ export function MessageBubble({
   const addComboService = (serviceId: string) => {
     const s = dynamicServices?.find(sv => sv.id === serviceId);
     if (s) {
-      setComboItems([...comboItems, { serviceId, quantity: s.minQuantity || 100 }]);
+      setComboItems(prev => [...prev, { serviceId, quantity: s.minQuantity || 100 }]);
     }
   };
 
   const removeComboService = (index: number) => {
-    setComboItems(comboItems.filter((_, i) => i !== index));
+    setComboItems(prev => prev.filter((_, i) => i !== index));
   };
 
   const updateComboQuantity = (index: number, qty: number) => {
-    const updated = [...comboItems];
-    updated[index].quantity = qty;
-    setComboItems(updated);
+    setComboItems(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], quantity: qty };
+      return updated;
+    });
   };
 
   const comboTotal = useMemo(() => {
@@ -432,7 +450,7 @@ export function MessageBubble({
                   {comboItems.map((item, idx) => {
                     const s = dynamicServices?.find(sv => sv.id === item.serviceId);
                     return (
-                      <div key={idx} className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                      <div key={`${idx}-${item.serviceId}`} className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-[11px] font-black uppercase text-[#312ECB]">{s?.name || 'Loading...'}</span>
                           <button onClick={() => removeComboService(idx)} className="text-red-400"><Trash2 size={14} /></button>
@@ -555,3 +573,4 @@ export function MessageBubble({
     </div>
   );
 }
+
