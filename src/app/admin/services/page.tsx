@@ -70,7 +70,7 @@ export default function ServiceManagerPage() {
   const isActuallyAdmin = user?.email === ADMIN_EMAIL || user?.uid === "s55uL0f8PmcypR75usVYOLwVs7O2";
 
   const servicesQuery = useMemoFirebase(() => {
-    // Only query if user is definitely admin to avoid permission errors
+    // Only query if user is definitely confirmed as admin
     if (!db || !isActuallyAdmin) return null;
     return query(collection(db, "services"), orderBy("order", "asc"));
   }, [db, isActuallyAdmin]);
@@ -167,7 +167,7 @@ export default function ServiceManagerPage() {
     }
   };
 
-  if (isUserLoading || !isActuallyAdmin) {
+  if (isUserLoading || (!user && !isUserLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <RefreshCw className="animate-spin text-blue-600" />

@@ -105,24 +105,23 @@ export default function ChatPage() {
   const hasInitialGreeted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Dynamic Services Listener - Now public read allowed in rules, but still guard on db
+  // Dynamic Services Listener - Now using public read from Firestore Rules
   const servicesQuery = useMemoFirebase(() => {
     if (!db) return null;
-    return query(collection(db, "services"), where("isActive", "==", true), orderBy("order", "asc"));
+    return query(collection(db, "services"), orderBy("order", "asc"));
   }, [db]);
-  const { data: rawDynamicServices } = useCollection<SMMService>(servicesQuery);
+  const { data: rawDynamicServices, isLoading: isServicesLoading } = useCollection<SMMService>(servicesQuery);
 
-  // Sorting for matching (most specific name first)
+  // Filtering for active services
   const dynamicServices = useMemo(() => {
     if (!rawDynamicServices) return null;
-    return [...rawDynamicServices].sort((a, b) => b.name.length - a.name.length);
+    return [...rawDynamicServices].filter(s => s.isActive !== false).sort((a, b) => (a.order || 0) - (b.order || 0));
   }, [rawDynamicServices]);
 
-  // Services in original display order for numbering
+  // Original list for numbering
   const displayServices = useMemo(() => {
-    if (!rawDynamicServices) return [];
-    return [...rawDynamicServices];
-  }, [rawDynamicServices]);
+    return dynamicServices || [];
+  }, [dynamicServices]);
 
   const userDocRef = useMemoFirebase(() => {
     if (!db || !user) return null;

@@ -48,16 +48,20 @@ export default function TrackerPage() {
   const router = useRouter();
 
   const ADMIN_EMAIL = "chetanmadhav4@gmail.com";
-  const isActuallyAdmin = user?.email === ADMIN_EMAIL || user?.uid === "s55uL0f8PmcypR75usVYOLwVs7O2";
+  const ADMIN_ID = "s55uL0f8PmcypR75usVYOLwVs7O2";
+  const isActuallyAdmin = user?.email === ADMIN_EMAIL || user?.uid === ADMIN_ID;
 
   useEffect(() => {
-    if (!isUserLoading && (!user || user.email !== ADMIN_EMAIL)) {
+    if (!isUserLoading && (!user || !isActuallyAdmin)) {
       router.push("/admin/login");
     }
-  }, [user, isUserLoading, router]);
+  }, [user, isUserLoading, isActuallyAdmin, router]);
 
   useEffect(() => {
-    if (!user || !db || !isActuallyAdmin) return;
+    if (!user || !db || !isActuallyAdmin) {
+      if (!isUserLoading && !isActuallyAdmin) setLoading(false);
+      return;
+    }
 
     const q = collectionGroup(db, "orders");
     
@@ -108,10 +112,10 @@ export default function TrackerPage() {
     });
     
     return () => unsubscribe();
-  }, [user, db, isActuallyAdmin]);
+  }, [user, db, isActuallyAdmin, isUserLoading]);
 
   const syncAllWithApi = async () => {
-    if (!db) return;
+    if (!db || !isActuallyAdmin) return;
     setIsSyncing(true);
     
     const activeStatuses = ['pending', 'processing', 'in progress', 'inprogress'];
@@ -170,7 +174,7 @@ export default function TrackerPage() {
   };
 
   const updateStatus = async (order: any, newStatus: string) => {
-    if (!db) return;
+    if (!db || !isActuallyAdmin) return;
     const orderRef = doc(db, order.path);
     const updateData: any = { status: newStatus };
     
@@ -286,7 +290,7 @@ export default function TrackerPage() {
     </div>
   );
 
-  if (loading || !isActuallyAdmin) return (
+  if (loading || (!user && !isUserLoading)) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
       <RefreshCw className="animate-spin text-blue-600" />
     </div>

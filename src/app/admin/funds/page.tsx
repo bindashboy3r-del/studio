@@ -44,26 +44,27 @@ export default function FundRequestsPage() {
 
   const ADMIN_EMAIL = "chetanmadhav4@gmail.com";
   const ADMIN_ID = "s55uL0f8PmcypR75usVYOLwVs7O2";
+  const isActuallyAdmin = admin?.email === ADMIN_EMAIL || admin?.uid === ADMIN_ID;
 
   useEffect(() => {
-    if (!isUserLoading && (!admin || (admin.email !== ADMIN_EMAIL && admin.uid !== ADMIN_ID))) {
+    if (!isUserLoading && (!admin || !isActuallyAdmin)) {
       router.push("/admin/login");
     }
-  }, [admin, isUserLoading, router]);
+  }, [admin, isUserLoading, isActuallyAdmin, router]);
 
   // Load Global Settings
   useEffect(() => {
-    if (!db) return;
+    if (!db || !isActuallyAdmin) return;
     const unsub = onSnapshot(doc(db, "globalSettings", "finance"), (snap) => {
       if (snap.exists()) {
         setGlobalBonus(snap.data().bonusPercentage?.toString() || "0");
       }
     });
     return () => unsub();
-  }, [db]);
+  }, [db, isActuallyAdmin]);
 
   useEffect(() => {
-    if (!admin || !db) return;
+    if (!admin || !db || !isActuallyAdmin) return;
 
     const q = query(collection(db, "fundRequests"));
     
@@ -101,10 +102,10 @@ export default function FundRequestsPage() {
     });
     
     return () => unsubscribe();
-  }, [admin, db, globalBonus]);
+  }, [admin, db, globalBonus, isActuallyAdmin]);
 
   const saveGlobalBonus = async () => {
-    if (!db) return;
+    if (!db || !isActuallyAdmin) return;
     setIsSavingSettings(true);
     try {
       const bonusVal = parseFloat(globalBonus) || 0;
@@ -126,7 +127,7 @@ export default function FundRequestsPage() {
   };
 
   const handleRequest = async (request: any, action: 'Approved' | 'Rejected') => {
-    if (!db || !admin) return;
+    if (!db || !admin || !isActuallyAdmin) return;
     if (!request.userId) {
       toast({ variant: "destructive", title: "Error", description: "User ID missing in request." });
       return;
@@ -181,7 +182,7 @@ export default function FundRequestsPage() {
       });
   };
 
-  if (loading) return (
+  if (loading || (!admin && !isUserLoading)) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
       <RefreshCw className="animate-spin text-blue-600" />
     </div>
