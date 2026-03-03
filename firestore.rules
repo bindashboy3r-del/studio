@@ -49,8 +49,9 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Services are public info (Price list)
     match /services/{serviceId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if isAdmin();
     }
 

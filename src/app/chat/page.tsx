@@ -105,7 +105,7 @@ export default function ChatPage() {
   const hasInitialGreeted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Dynamic Services Listener - Ordered by "order" field
+  // Dynamic Services Listener - Now public read allowed in rules, but still guard on db
   const servicesQuery = useMemoFirebase(() => {
     if (!db) return null;
     return query(collection(db, "services"), where("isActive", "==", true), orderBy("order", "asc"));
@@ -147,7 +147,7 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
-    if (!db || !user) return;
+    if (!db) return;
     const broadcastQuery = query(
       collection(db, "globalAnnouncements"),
       where("active", "==", true),
@@ -162,17 +162,17 @@ export default function ChatPage() {
       }
     });
     return () => unsubscribe();
-  }, [db, user]);
+  }, [db]);
 
   useEffect(() => {
-    if (!db || !user) return;
+    if (!db) return;
     const unsub = onSnapshot(doc(db, "globalSettings", "finance"), (snap) => {
       if (snap.exists()) {
         setGlobalBonus(snap.data().bonusPercentage || 0);
       }
     });
     return () => unsub();
-  }, [db, user]);
+  }, [db]);
 
   const notificationsQuery = useMemoFirebase(() => {
     if (!db || !user) return null;

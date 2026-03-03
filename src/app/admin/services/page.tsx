@@ -70,6 +70,7 @@ export default function ServiceManagerPage() {
   const isActuallyAdmin = user?.email === ADMIN_EMAIL || user?.uid === "s55uL0f8PmcypR75usVYOLwVs7O2";
 
   const servicesQuery = useMemoFirebase(() => {
+    // Only query if user is definitely admin to avoid permission errors
     if (!db || !isActuallyAdmin) return null;
     return query(collection(db, "services"), orderBy("order", "asc"));
   }, [db, isActuallyAdmin]);
@@ -85,17 +86,23 @@ export default function ServiceManagerPage() {
     isActive: true,
     pricePer1000: 0,
     minQuantity: 100,
-    order: (services?.length || 0) + 1
+    order: 0
   });
 
   useEffect(() => {
-    if (!isUserLoading && (!user || user.email !== ADMIN_EMAIL)) {
+    if (!isUserLoading && (!user || !isActuallyAdmin)) {
       router.push("/admin/login");
     }
-  }, [user, isUserLoading, router]);
+  }, [user, isUserLoading, isActuallyAdmin, router]);
+
+  useEffect(() => {
+    if (services) {
+      setNewService(prev => ({ ...prev, order: services.length + 1 }));
+    }
+  }, [services]);
 
   const handleSeedDefaults = async () => {
-    if (!db) return;
+    if (!db || !isActuallyAdmin) return;
     setIsSeeding(true);
     try {
       const batch = writeBatch(db);
@@ -113,7 +120,7 @@ export default function ServiceManagerPage() {
   };
 
   const handleAddService = async () => {
-    if (!db || !newService.name || !newService.id) {
+    if (!db || !newService.name || !newService.id || !isActuallyAdmin) {
       toast({ variant: "destructive", title: "Missing Fields", description: "Name and ID are required." });
       return;
     }
@@ -136,7 +143,7 @@ export default function ServiceManagerPage() {
   };
 
   const handleUpdateField = async (service: Service, field: keyof Service, value: string) => {
-    if (!db) return;
+    if (!db || !isActuallyAdmin) return;
     const numValue = parseFloat(value);
     if (isNaN(numValue)) return;
 
@@ -149,7 +156,7 @@ export default function ServiceManagerPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!db) return;
+    if (!db || !isActuallyAdmin) return;
     if (confirm("Are you sure? Users will no longer see this service.")) {
       try {
         await deleteDoc(doc(db, "services", id));
@@ -160,7 +167,7 @@ export default function ServiceManagerPage() {
     }
   };
 
-  if (isServicesLoading || !isActuallyAdmin) {
+  if (isUserLoading || !isActuallyAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <RefreshCw className="animate-spin text-blue-600" />
@@ -206,7 +213,7 @@ export default function ServiceManagerPage() {
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Order (Position)</label>
-                    <Input type="number" value={newService.order || 0} onChange={e => setNewService({...newService, order: parseInt(e.target.value)})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                    <Input type="number" value={newService.order || 0} onChange={e => setNewService({...newService, order: parseInt(e.target.value) || 0})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
                   </div>
                 </div>
                 <div className="space-y-1">
@@ -216,11 +223,11 @@ export default function ServiceManagerPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Price (₹ / 1k)</label>
-                    <Input type="number" value={newService.pricePer1000 || 0} onChange={e => setNewService({...newService, pricePer1000: parseFloat(e.target.value)})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                    <Input type="number" value={newService.pricePer1000 || 0} onChange={e => setNewService({...newService, pricePer1000: parseFloat(e.target.value) || 0})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Min Quantity</label>
-                    <Input type="number" value={newService.minQuantity || 100} onChange={e => setNewService({...newService, minQuantity: parseInt(e.target.value)})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                    <Input type="number" value={newService.minQuantity || 100} onChange={e => setNewService({...newService, minQuantity: parseInt(e.target.value) || 0})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
                   </div>
                 </div>
               </div>
