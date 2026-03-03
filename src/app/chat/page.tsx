@@ -105,7 +105,7 @@ export default function ChatPage() {
   const hasInitialGreeted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Dynamic Services Listener - Now using public read from Firestore Rules
+  // Dynamic Services Listener
   const servicesQuery = useMemoFirebase(() => {
     if (!db) return null;
     return query(collection(db, "services"), orderBy("order", "asc"));
@@ -527,9 +527,9 @@ export default function ChatPage() {
       return;
     }
 
-    // Dynamic Matching Logic: Find most specific service first
+    // Dynamic Matching Logic
     const selectedService = dynamicServices.find(s => cleanText.includes(s.name.toLowerCase()));
-    if (selectedService) {
+    if (selectedService && chatState === 'choosing_service') {
       if (currentOrder.type === 'bulk') {
         setCurrentOrder(prev => ({ ...prev, items: [{ service: selectedService, quantity: 0, link: '' }] }));
         setChatState('entering_bulk_links');
@@ -581,6 +581,25 @@ export default function ChatPage() {
     }
 
     switch (chatState) {
+      case 'choosing_service':
+        // Try to match by number or name
+        const match = displayServices.find((s, i) => 
+          cleanText.includes((i + 1).toString()) || 
+          cleanText.includes(s.name.toLowerCase())
+        );
+        if (match) {
+          if (currentOrder.type === 'bulk') {
+            setCurrentOrder(prev => ({ ...prev, items: [{ service: match, quantity: 0, link: '' }] }));
+            setChatState('entering_bulk_links');
+            botReply("🔗 Add your target links one by one below:", [], { isBulkLinkCard: true });
+          } else {
+            setCurrentOrder({ type: 'single', platform: 'instagram', items: [{ service: match, quantity: 0, link: '' }] });
+            setChatState('entering_quantity');
+            botReply(`📊 Quantity for ${match.name}? (Min ${match.minQuantity})`);
+          }
+        }
+        break;
+
       case 'entering_quantity':
         const qty = parseInt(text);
         const activeService = currentOrder.items[0]?.service;

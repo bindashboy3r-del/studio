@@ -22,7 +22,7 @@ import {
   Percent,
   ChevronDown
 } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -103,12 +103,20 @@ export function MessageBubble({
   const [bulkLinks, setBulkLinks] = useState<string[]>([]);
   const [currentBulkLink, setCurrentBulkLink] = useState("");
 
-  const [comboItems, setComboItems] = useState<{ serviceId: string, quantity: number }[]>([
-    { serviceId: 'likes', quantity: 100 },
-    { serviceId: 'views', quantity: 500 },
-    { serviceId: 'comments', quantity: 50 }
-  ]);
+  const [comboItems, setComboItems] = useState<{ serviceId: string, quantity: number }[]>([]);
   const [comboLink, setComboLink] = useState("");
+
+  // Initialize combo items when dynamic services load
+  useEffect(() => {
+    if (isComboCard && dynamicServices && dynamicServices.length > 0 && comboItems.length === 0) {
+      // Pick first 2 or 3 services as defaults
+      const defaults = dynamicServices.slice(0, 3).map(s => ({
+        serviceId: s.id,
+        quantity: s.minQuantity || 100
+      }));
+      setComboItems(defaults);
+    }
+  }, [isComboCard, dynamicServices, comboItems.length]);
 
   const price = paymentPrice || fundPrice || 0;
   const upiId = "smmxpressbot@slc";
@@ -177,7 +185,8 @@ export function MessageBubble({
   }, [comboItems, dynamicServices]);
 
   const addComboService = (serviceId: string) => {
-    setComboItems([...comboItems, { serviceId, quantity: 0 }]);
+    const s = dynamicServices?.find(sv => sv.id === serviceId);
+    setComboItems([...comboItems, { serviceId, quantity: s?.minQuantity || 100 }]);
   };
 
   const removeComboService = (index: number) => {
@@ -440,7 +449,9 @@ export function MessageBubble({
                     return (
                       <div key={idx} className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 animate-in slide-in-from-bottom-2 duration-300">
                         <div className="flex items-center justify-between mb-3">
-                          <span className="text-[11px] font-black uppercase tracking-wider text-[#312ECB] dark:text-blue-400">{s?.name || 'Service'}</span>
+                          <span className="text-[11px] font-black uppercase tracking-wider text-[#312ECB] dark:text-blue-400">
+                            {s?.name || 'Service'}
+                          </span>
                           <button onClick={() => removeComboService(idx)} className="text-red-400 hover:text-red-600 p-1">
                             <Trash2 size={14} />
                           </button>
