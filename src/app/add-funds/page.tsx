@@ -10,7 +10,8 @@ import {
   Zap,
   Loader2,
   AlertCircle,
-  Download
+  Download,
+  MessageCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -86,6 +87,21 @@ export default function AddFundsPage() {
     }
   };
 
+  const handleWhatsAppNotify = () => {
+    if (!user || !utr) {
+      toast({ variant: "destructive", title: "Error", description: "Please enter Amount and UTR ID first." });
+      return;
+    }
+    const msg = encodeURIComponent(
+      `🚀 *NEW PAYMENT SUBMITTED!*\n\n` +
+      `👤 *User Name:* ${user.displayName || 'User'}\n` +
+      `🔢 *UTR ID:* ${utr}\n` +
+      `💰 *Amount:* ₹${amount}\n\n` +
+      `Kripya mera payment check karein aur balance add karein. Dhanyawad!`
+    );
+    window.open(`https://wa.me/919116399517?text=${msg}`, '_blank');
+  };
+
   const handleSubmit = async () => {
     if (!user || !db) return;
     
@@ -124,9 +140,9 @@ export default function AddFundsPage() {
 
       toast({ 
         title: "Request Submitted!", 
-        description: "Admin will verify and credit your wallet within 30-60 mins." 
+        description: "Your payment info is saved. Verification is in progress." 
       });
-      router.push("/chat");
+      // We don't redirect immediately so they can click the WhatsApp button if they want
     } catch (error) {
       toast({ variant: "destructive", title: "Error", description: "Failed to submit request. Try again." });
     } finally {
@@ -212,7 +228,7 @@ export default function AddFundsPage() {
               </div>
 
               <div className="space-y-4">
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">3. Enter UTR ID</label>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">3. Enter 12-Digit UTR ID</label>
                 <Input 
                   placeholder="Paste 12-Digit UTR ID" 
                   value={utr}
@@ -225,17 +241,27 @@ export default function AddFundsPage() {
               <div className="bg-blue-50/50 p-4 rounded-2xl flex items-start gap-3 border border-blue-100/50">
                 <AlertCircle size={16} className="text-[#312ECB] mt-0.5" />
                 <p className="text-[10px] font-bold text-blue-600 uppercase leading-relaxed">
-                  Admin will verify your payment manually. Balance is usually added within 1 hour.
+                  Payment verification is under process. Balance will be added to your wallet within 1 hour.
                 </p>
               </div>
 
-              <Button 
-                onClick={handleSubmit}
-                disabled={loading || utr.length !== 12}
-                className="w-full h-16 bg-[#312ECB] hover:bg-[#2825A6] text-white rounded-[1.5rem] font-black text-[13px] uppercase tracking-widest shadow-2xl"
-              >
-                {loading ? <><Loader2 className="animate-spin mr-2" /> Submitting...</> : "Submit Request"}
-              </Button>
+              <div className="space-y-3">
+                <Button 
+                  onClick={handleSubmit}
+                  disabled={loading || utr.length !== 12}
+                  className="w-full h-16 bg-[#312ECB] hover:bg-[#2825A6] text-white rounded-[1.5rem] font-black text-[13px] uppercase tracking-widest shadow-2xl"
+                >
+                  {loading ? <><Loader2 className="animate-spin mr-2" /> Submitting...</> : "Submit Request"}
+                </Button>
+
+                <Button 
+                  onClick={handleWhatsAppNotify}
+                  variant="outline"
+                  className="w-full h-14 bg-[#25D366] hover:bg-[#20bd5b] text-white border-none rounded-[1.5rem] font-black text-[11px] uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"
+                >
+                  <MessageCircle size={18} /> Send Info to WhatsApp
+                </Button>
+              </div>
             </div>
           )}
         </div>
