@@ -298,6 +298,16 @@ export default function ChatPage() {
         return;
     }
 
+    // Determine the descriptive service name for Success Card
+    let successServiceName = "";
+    if (currentOrder.type === 'combo') {
+      successServiceName = `Combo: ${currentOrder.items.map(i => `${i.service.name}(${i.quantity})`).join(", ")}`;
+    } else if (currentOrder.type === 'bulk') {
+      successServiceName = `Bulk: ${currentOrder.items[0].service.name}`;
+    } else {
+      successServiceName = currentOrder.items[0].service.name;
+    }
+
     for (const link of targets) {
       for (const item of currentOrder.items) {
         const orderId = `SB-B-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -327,13 +337,13 @@ export default function ChatPage() {
 
     await batch.commit();
     setChatState('idle');
-    botReply(`✅ ${orderResults.length} orders submitted for verification!`, [], {
+    botReply(`✅ Order submitted for verification!`, [], {
       isSuccessCard: true,
       successDetails: {
-        orderId: `BUNDLE-${orderResults.length}`,
+        orderId: orderResults[0].orderId,
         platform: 'Instagram',
-        service: 'Multiple Services',
-        quantity: orderResults.reduce((a, b) => a + b.quantity, 0),
+        service: successServiceName,
+        quantity: currentOrder.items.reduce((a, b) => a + b.quantity, 0) * (currentOrder.bulkLinks?.length || 1),
         price: totalPrice,
         link: targets[0] + (targets.length > 1 ? ` (+${targets.length - 1} more)` : ''),
         utrId: utr
@@ -360,6 +370,18 @@ export default function ChatPage() {
         toast({ variant: "destructive", title: "Missing Link", description: "Please provide a valid Instagram link." });
         return;
     }
+
+    // Determine the descriptive service name for Success Card
+    let successServiceName = "";
+    if (currentOrder.type === 'combo') {
+      successServiceName = `Combo: ${currentOrder.items.map(i => `${i.service.name}(${i.quantity})`).join(", ")}`;
+    } else if (currentOrder.type === 'bulk') {
+      successServiceName = `Bulk: ${currentOrder.items[0].service.name}`;
+    } else {
+      successServiceName = currentOrder.items[0].service.name;
+    }
+
+    const orderResults: any[] = [];
 
     for (const link of targets) {
       for (const item of currentOrder.items) {
@@ -399,7 +421,7 @@ export default function ChatPage() {
         let itemPrice = (item.quantity / 1000) * item.service.pricePer1000;
         if (currentOrder.type === 'combo') itemPrice *= 0.95;
 
-        batch.set(orderRef, {
+        const orderData = {
           userId: user.uid,
           orderId,
           platform: 'Instagram',
@@ -413,7 +435,10 @@ export default function ChatPage() {
           providerId,
           apiError,
           createdAt: serverTimestamp()
-        });
+        };
+        
+        batch.set(orderRef, orderData);
+        orderResults.push(orderData);
       }
     }
 
@@ -426,12 +451,12 @@ export default function ChatPage() {
       botReply(`✅ Orders processed from Wallet!`, [], {
         isSuccessCard: true,
         successDetails: {
-          orderId: `WALLET-BUNDLE`,
+          orderId: orderResults[0].orderId,
           platform: 'Instagram',
-          service: 'Multiple Services',
+          service: successServiceName,
           quantity: currentOrder.items.reduce((a, b) => a + b.quantity, 0) * (currentOrder.bulkLinks?.length || 1),
           price: totalPrice,
-          link: targets[0],
+          link: targets[0] + (targets.length > 1 ? ` (+${targets.length - 1} more)` : ''),
           utrId: 'WALLET-PAYMENT'
         }
       });

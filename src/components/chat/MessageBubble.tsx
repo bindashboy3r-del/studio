@@ -222,13 +222,20 @@ export function MessageBubble({
               
               <div className="space-y-2 text-[13px] font-bold text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl">
                 <p className="flex justify-between"><span>Order ID:</span> <span className="text-[#312ECB] dark:text-blue-400">#{successDetails.orderId}</span></p>
-                <p className="flex justify-between"><span>Service:</span> <span>{successDetails.service}</span></p>
+                <div className="flex flex-col">
+                  <span className="text-slate-400 text-[10px] uppercase">Service:</span>
+                  <span className="leading-tight">{successDetails.service}</span>
+                </div>
                 <p className="flex justify-between"><span>Quantity:</span> <span>{successDetails.quantity}</span></p>
                 <p className="flex justify-between"><span>Amount:</span> <span className="text-[#25D366]">₹{successDetails.price.toFixed(2)}</span></p>
                 <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Target Link:</p>
                   <p className="break-all text-[#312ECB] dark:text-blue-400 leading-snug">{successDetails.link}</p>
                 </div>
+                <p className="flex justify-between pt-1 border-t border-slate-100 dark:border-slate-800">
+                  <span className="text-[10px] uppercase text-slate-400">UTR ID:</span>
+                  <span className="text-[10px] font-black">{successDetails.utrId}</span>
+                </p>
               </div>
             </div>
 
