@@ -9,8 +9,7 @@ import {
   Save, 
   CreditCard, 
   Link as LinkIcon,
-  ShieldCheck,
-  Zap
+  ShieldCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

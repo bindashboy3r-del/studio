@@ -9,7 +9,6 @@ import {
   Wallet, 
   Zap,
   Loader2,
-  CheckCircle2,
   AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -126,7 +125,7 @@ export default function AddFundsPage() {
               <Wallet size={28} />
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Manual Verification</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Payment Gateway</p>
               <h2 className="text-2xl font-black uppercase tracking-tight">Refill Wallet</h2>
             </div>
           </div>
