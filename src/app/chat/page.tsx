@@ -32,12 +32,10 @@ import {
   User as UserIcon,
   Zap,
   Clock,
-  Circle,
   Instagram,
   Wallet,
   PlusCircle,
   Layers,
-  Copy,
   Link as LinkIcon,
   Percent
 } from "lucide-react";
@@ -128,7 +126,7 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
-    if (!db) return;
+    if (!db || !user) return;
     const broadcastQuery = query(
       collection(db, "globalAnnouncements"),
       where("active", "==", true),
@@ -143,17 +141,17 @@ export default function ChatPage() {
       }
     });
     return () => unsubscribe();
-  }, [db]);
+  }, [db, user]);
 
   useEffect(() => {
-    if (!db) return;
+    if (!db || !user) return;
     const unsub = onSnapshot(doc(db, "globalSettings", "finance"), (snap) => {
       if (snap.exists()) {
         setGlobalBonus(snap.data().bonusPercentage || 0);
       }
     });
     return () => unsub();
-  }, [db]);
+  }, [db, user]);
 
   const notificationsQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
@@ -458,7 +456,6 @@ export default function ChatPage() {
     await addMessage('user', text);
     const cleanText = text.toLowerCase();
 
-    // 1. Check for Reset Keywords
     if (cleanText === 'hi' || cleanText.includes("main menu") || cleanText.includes("start")) {
       setChatState('choosing_order_type');
       setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
@@ -469,7 +466,6 @@ export default function ChatPage() {
       return;
     }
 
-    // 2. Check for Platform/Service Selection AT ANY TIME
     const selectedService = SERVICES.instagram.find(s => cleanText.includes(s.name.toLowerCase()));
     if (selectedService) {
       if (currentOrder.type === 'bulk') {
@@ -484,7 +480,6 @@ export default function ChatPage() {
       return;
     }
 
-    // 3. Check for Order Type Selection
     if (cleanText.includes("single order")) {
       setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
       setChatState('choosing_service');
@@ -521,7 +516,6 @@ export default function ChatPage() {
       return;
     }
 
-    // 4. Handle State Transitions
     switch (chatState) {
       case 'entering_quantity':
         const qty = parseInt(text);
