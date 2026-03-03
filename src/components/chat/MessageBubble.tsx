@@ -200,6 +200,9 @@ export function MessageBubble({
     return item.quantity >= (s?.minQuantity || 50);
   }) && comboLink.trim() !== "";
 
+  // Check if the success card is for a Wallet order
+  const isWalletPayment = successDetails?.utrId === 'WALLET-PAYMENT';
+
   return (
     <div className={cn("flex w-full mb-4", isUser ? "justify-end" : "justify-start")}>
       <div className={cn(
@@ -240,19 +243,23 @@ export function MessageBubble({
             </div>
 
             <div className="space-y-3 mt-4">
-              <div className="text-center">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
-                  Order confirm karne ke liye admin ko send kre
-                </p>
-                <Button 
-                  asChild
-                  className="w-full h-14 bg-[#25D366] hover:bg-[#20bd5b] text-white rounded-2xl font-black uppercase text-[12px] tracking-widest gap-2 shadow-lg"
-                >
-                  <a href={getWhatsAppAdminUrl()} target="_blank" rel="noopener noreferrer">
-                    <MessageCircle size={18} /> Send to Admin
-                  </a>
-                </Button>
-              </div>
+              {/* Only show WhatsApp button if NOT a wallet payment */}
+              {!isWalletPayment && (
+                <div className="text-center">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                    Order confirm karne ke liye admin ko send kre
+                  </p>
+                  <Button 
+                    asChild
+                    className="w-full h-14 bg-[#25D366] hover:bg-[#20bd5b] text-white rounded-2xl font-black uppercase text-[12px] tracking-widest gap-2 shadow-lg"
+                  >
+                    <a href={getWhatsAppAdminUrl()} target="_blank" rel="noopener noreferrer">
+                      <MessageCircle size={18} /> Send to Admin
+                    </a>
+                  </Button>
+                </div>
+              )}
+              
               <div className="grid grid-cols-2 gap-3">
                 <Button 
                   variant="outline" 
