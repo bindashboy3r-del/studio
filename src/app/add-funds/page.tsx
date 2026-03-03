@@ -39,6 +39,7 @@ export default function AddFundsPage() {
 
   const numAmount = parseFloat(amount) || 0;
   
+  // Dynamic UPI Link generation
   const upiLink = `upi://pay?pa=${paymentConfig.upiId}&pn=${encodeURIComponent(paymentConfig.merchantName)}&am=${numAmount.toFixed(2)}&cu=INR`;
   const generatedQrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(upiLink)}&size=400&margin=1&format=png`;
   const activeQrUrl = paymentConfig.qrImageUrl || generatedQrUrl;
@@ -53,7 +54,7 @@ export default function AddFundsPage() {
       }
     });
 
-    // Load Payment Settings
+    // Load Payment Settings from Admin Panel
     const unsubPayment = onSnapshot(doc(db, "globalSettings", "payment"), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
@@ -94,7 +95,10 @@ export default function AddFundsPage() {
   };
 
   const handleSubmit = async () => {
-    if (!user || !db || numAmount < 10 || utr.length !== 12) return;
+    if (!user || !db || numAmount < 10 || utr.length !== 12) {
+      toast({ variant: "destructive", title: "Invalid Data", description: "Minimum ₹10 and valid 12-digit UTR required." });
+      return;
+    }
     setLoading(true);
     
     try {
@@ -151,7 +155,7 @@ export default function AddFundsPage() {
                 <Zap className="fill-current" size={20} />
               </div>
               <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-100">Limited Offer</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-100">Special Offer</p>
                 <h3 className="text-lg font-black uppercase">Get {globalBonus}% Extra!</h3>
               </div>
             </div>
@@ -174,7 +178,7 @@ export default function AddFundsPage() {
             </div>
             {globalBonus > 0 && numAmount >= 10 && (
               <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest ml-1">
-                + Extra ₹{((numAmount * globalBonus) / 100).toFixed(0)} will be added to your wallet!
+                + Extra ₹{((numAmount * globalBonus) / 100).toFixed(0)} bonus will be added!
               </p>
             )}
           </div>
@@ -205,7 +209,7 @@ export default function AddFundsPage() {
               <div className="space-y-4">
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Step 3: Submit 12-Digit UTR ID</label>
                 <p className="text-[9px] font-bold text-red-500 uppercase tracking-tight ml-1 mb-1">
-                  ⚠️ Yaha sahi 12-digit UTR ID bharein. Galat ID dalne par payment verify nahi hoga.
+                  ⚠️ Verify payment using the 12-digit transaction ID from your bank app.
                 </p>
                 <Input 
                   placeholder="Enter Transaction ID" 
@@ -219,7 +223,7 @@ export default function AddFundsPage() {
               <div className="bg-blue-50/50 p-4 rounded-2xl flex items-start gap-3 border border-blue-100/50">
                 <Info size={16} className="text-[#312ECB] mt-0.5" />
                 <p className="text-[10px] font-bold text-blue-600 uppercase leading-relaxed">
-                  Note: Funds are credited after verification. Check status in your profile history.
+                  Note: Balance is credited instantly after admin verification.
                 </p>
               </div>
 
@@ -228,7 +232,7 @@ export default function AddFundsPage() {
                 disabled={loading || utr.length !== 12}
                 className="w-full h-16 bg-[#312ECB] hover:bg-[#2825A6] text-white rounded-[1.5rem] font-black text-[13px] uppercase tracking-widest shadow-2xl transition-all active:scale-95"
               >
-                {loading ? "Processing..." : "Submit Payment Request"}
+                {loading ? "Verifying..." : "Submit Transaction"}
               </Button>
             </div>
           )}

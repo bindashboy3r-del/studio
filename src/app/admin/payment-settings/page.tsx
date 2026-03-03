@@ -10,8 +10,7 @@ import {
   CreditCard, 
   User, 
   Link as LinkIcon,
-  ShieldCheck,
-  Zap
+  ShieldCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,8 +29,9 @@ export default function PaymentSettingsPage() {
   const [qrImageUrl, setQrImageUrl] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
+  const ADMIN_EMAIL = "chetanmadhav4@gmail.com";
+
   useEffect(() => {
-    const ADMIN_EMAIL = "chetanmadhav4@gmail.com";
     if (!isUserLoading && (!user || user.email !== ADMIN_EMAIL)) {
       router.push("/admin/login");
     }
@@ -94,7 +94,7 @@ export default function PaymentSettingsPage() {
               <QrCode size={28} />
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Paytm / UPI Config</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">UPI / QR Configuration</p>
               <h2 className="text-2xl font-black uppercase tracking-tight">Merchant Settings</h2>
             </div>
           </div>
@@ -108,10 +108,10 @@ export default function PaymentSettingsPage() {
               <div className="relative">
                 <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                 <Input 
-                  placeholder="e.g. merchant@paytm" 
+                  placeholder="e.g. paytmqr2810@paytm" 
                   value={upiId}
                   onChange={(e) => setUpiId(e.target.value)}
-                  className="h-14 bg-slate-50 border-none rounded-2xl pl-12 pr-5 text-sm font-bold focus-visible:ring-1 focus-visible:ring-pink-500/20 shadow-inner"
+                  className="h-14 bg-slate-50 border-none rounded-2xl pl-12 pr-5 text-sm font-bold shadow-inner"
                 />
               </div>
             </div>
@@ -124,7 +124,7 @@ export default function PaymentSettingsPage() {
                   placeholder="e.g. SocialBoost Official" 
                   value={merchantName}
                   onChange={(e) => setMerchantName(e.target.value)}
-                  className="h-14 bg-slate-50 border-none rounded-2xl pl-12 pr-5 text-sm font-bold focus-visible:ring-1 focus-visible:ring-pink-500/20 shadow-inner"
+                  className="h-14 bg-slate-50 border-none rounded-2xl pl-12 pr-5 text-sm font-bold shadow-inner"
                 />
               </div>
             </div>
@@ -134,14 +134,14 @@ export default function PaymentSettingsPage() {
               <div className="relative">
                 <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                 <Input 
-                  placeholder="https://imgur.com/your-qr.png" 
+                  placeholder="Link to hosted QR image" 
                   value={qrImageUrl}
                   onChange={(e) => setQrImageUrl(e.target.value)}
-                  className="h-14 bg-slate-50 border-none rounded-2xl pl-12 pr-5 text-sm font-bold focus-visible:ring-1 focus-visible:ring-pink-500/20 shadow-inner"
+                  className="h-14 bg-slate-50 border-none rounded-2xl pl-12 pr-5 text-sm font-bold shadow-inner"
                 />
               </div>
               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight ml-1">
-                If empty, system will auto-generate QR based on UPI ID.
+                Leave empty to auto-generate QR from UPI ID.
               </p>
             </div>
           </div>
@@ -149,17 +149,13 @@ export default function PaymentSettingsPage() {
           <div className="bg-pink-50 p-5 rounded-3xl border border-pink-100 flex items-start gap-4">
             <ShieldCheck className="text-pink-600 shrink-0" size={20} />
             <p className="text-[10px] font-bold text-pink-700 leading-relaxed uppercase">
-              Important: These details are public. All payments made by users will be sent directly to this UPI/Merchant account.
+              Important: Users will scan this QR to send money to your account. Please double-check all details.
             </p>
           </div>
 
-          <div className="pt-4">
-            <div className="w-full border-t border-slate-50 relative mb-8">
-              <span className="absolute left-1/2 -top-3 -translate-x-1/2 bg-white px-4 text-[10px] font-black text-slate-300 uppercase tracking-widest">Preview</span>
-            </div>
-            
-            <div className="flex flex-col items-center gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100 border-dashed">
-              <div className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100">
+          <div className="pt-4 flex flex-col items-center gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100 border-dashed">
+             <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Live Preview</span>
+             <div className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100">
                 <img 
                   src={qrImageUrl || `https://quickchart.io/qr?text=${encodeURIComponent(`upi://pay?pa=${upiId || 'test@upi'}&pn=${merchantName || 'SocialBoost'}`)}&size=300`} 
                   alt="QR Preview" 
@@ -170,7 +166,6 @@ export default function PaymentSettingsPage() {
                 <p className="text-[11px] font-black text-slate-800">{merchantName || 'Merchant Name'}</p>
                 <p className="text-[9px] font-bold text-slate-400">{upiId || 'upi-id@bank'}</p>
               </div>
-            </div>
           </div>
         </div>
       </main>
