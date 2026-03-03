@@ -110,7 +110,13 @@ export default function ChatPage() {
     if (!db) return null;
     return query(collection(db, "services"), where("isActive", "==", true));
   }, [db]);
-  const { data: dynamicServices } = useCollection<SMMService>(servicesQuery);
+  const { data: rawDynamicServices } = useCollection<SMMService>(servicesQuery);
+
+  // Sort services by name length descending to match most specific names first (e.g., "Premium Followers" before "Followers")
+  const dynamicServices = useMemo(() => {
+    if (!rawDynamicServices) return null;
+    return [...rawDynamicServices].sort((a, b) => b.name.length - a.name.length);
+  }, [rawDynamicServices]);
 
   const userDocRef = useMemoFirebase(() => {
     if (!db || !user) return null;
@@ -516,6 +522,7 @@ export default function ChatPage() {
       return;
     }
 
+    // Dynamic Matching Logic: Find most specific service first
     const selectedService = dynamicServices.find(s => cleanText.includes(s.name.toLowerCase()));
     if (selectedService) {
       if (currentOrder.type === 'bulk') {

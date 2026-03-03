@@ -13,7 +13,8 @@ import {
   Instagram, 
   DollarSign, 
   Hash,
-  AlertCircle
+  AlertCircle,
+  Zap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +27,8 @@ import {
   deleteDoc, 
   serverTimestamp, 
   query, 
-  orderBy 
+  orderBy,
+  writeBatch
 } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -48,6 +50,14 @@ interface Service {
   isActive: boolean;
 }
 
+const DEFAULT_SERVICES: Service[] = [
+  { id: 'ig_followers', name: 'Followers', platform: 'instagram', pricePer1000: 89, minQuantity: 100, isActive: true },
+  { id: 'ig_likes', name: 'Likes', platform: 'instagram', pricePer1000: 18, minQuantity: 100, isActive: true },
+  { id: 'ig_views', name: 'Views', platform: 'instagram', pricePer1000: 0.60, minQuantity: 500, isActive: true },
+  { id: 'ig_comments', name: 'Comments', platform: 'instagram', pricePer1000: 260, minQuantity: 50, isActive: true },
+  { id: 'ig_shares', name: 'Shares', platform: 'instagram', pricePer1000: 7, minQuantity: 100, isActive: true },
+];
+
 export default function ServiceManagerPage() {
   const { user, isUserLoading } = useUser();
   const db = useFirestore();
@@ -62,6 +72,7 @@ export default function ServiceManagerPage() {
   const { data: services, isLoading: isServicesLoading } = useCollection<Service>(servicesQuery);
 
   const [isAdding, setIsAdding] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
   const [newService, setNewService] = useState<Partial<Service>>({
     id: "",
     name: "",
@@ -78,6 +89,24 @@ export default function ServiceManagerPage() {
     }
   }, [user, isUserLoading, router]);
 
+  const handleSeedDefaults = async () => {
+    if (!db) return;
+    setIsSeeding(true);
+    try {
+      const batch = writeBatch(db);
+      DEFAULT_SERVICES.forEach(s => {
+        const ref = doc(db, "services", s.id);
+        batch.set(ref, { ...s, updatedAt: serverTimestamp() }, { merge: true });
+      });
+      await batch.commit();
+      toast({ title: "Defaults Loaded", description: "Standard SMM services have been populated." });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Seed Failed" });
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
   const handleAddService = async () => {
     if (!db || !newService.name || !newService.id) {
       toast({ variant: "destructive", title: "Missing Fields", description: "Name and ID are required." });
@@ -85,9 +114,10 @@ export default function ServiceManagerPage() {
     }
 
     try {
-      const docRef = doc(db, "services", newService.id);
+      const docRef = doc(db, "services", newService.id.toLowerCase().replace(/\s+/g, '_'));
       await setDoc(docRef, {
         ...newService,
+        id: newService.id.toLowerCase().replace(/\s+/g, '_'),
         updatedAt: serverTimestamp()
       });
       toast({ title: "Service Added", description: `${newService.name} is now available.` });
@@ -140,64 +170,77 @@ export default function ServiceManagerPage() {
           </button>
           <h1 className="text-lg font-black tracking-tight text-[#111B21]">Service Management</h1>
         </div>
-        <Dialog open={isAdding} onOpenChange={setIsAdding}>
-          <DialogTrigger asChild>
-            <Button className="bg-[#312ECB] hover:bg-[#2825A6] rounded-xl h-10 px-5 font-black uppercase text-[10px] tracking-widest gap-2 shadow-lg">
-              <Plus size={16} /> Add New Service
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-8">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
-                <Layers className="text-[#312ECB]" /> New SMM Service
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Unique ID (lowercase)</label>
-                <Input placeholder="e.g. ig_followers_real" value={newService.id || ""} onChange={e => setNewService({...newService, id: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Display Name</label>
-                <Input placeholder="e.g. Followers (High Quality)" value={newService.name || ""} onChange={e => setNewService({...newService, name: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="outline" 
+            onClick={handleSeedDefaults} 
+            disabled={isSeeding}
+            className="rounded-xl h-10 px-4 font-black uppercase text-[10px] tracking-widest gap-2 border-blue-100 text-[#312ECB]"
+          >
+            <Zap size={14} className={isSeeding ? "animate-pulse" : ""} /> {isSeeding ? "Loading..." : "Load Defaults"}
+          </Button>
+          <Dialog open={isAdding} onOpenChange={setIsAdding}>
+            <DialogTrigger asChild>
+              <Button className="bg-[#312ECB] hover:bg-[#2825A6] rounded-xl h-10 px-5 font-black uppercase text-[10px] tracking-widest gap-2 shadow-lg">
+                <Plus size={16} /> Add Custom
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-8">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
+                  <Layers className="text-[#312ECB]" /> New SMM Service
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Price (₹ / 1k)</label>
-                  <Input type="number" value={newService.pricePer1000} onChange={e => setNewService({...newService, pricePer1000: parseFloat(e.target.value)})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Unique ID</label>
+                  <Input placeholder="e.g. ig_followers_real" value={newService.id} onChange={e => setNewService({...newService, id: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Min Quantity</label>
-                  <Input type="number" value={newService.minQuantity} onChange={e => setNewService({...newService, minQuantity: parseInt(e.target.value)})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Display Name</label>
+                  <Input placeholder="e.g. Followers (High Quality)" value={newService.name} onChange={e => setNewService({...newService, name: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Price (₹ / 1k)</label>
+                    <Input type="number" value={newService.pricePer1000} onChange={e => setNewService({...newService, pricePer1000: parseFloat(e.target.value)})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Min Quantity</label>
+                    <Input type="number" value={newService.minQuantity} onChange={e => setNewService({...newService, minQuantity: parseInt(e.target.value)})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                  </div>
                 </div>
               </div>
-            </div>
-            <DialogFooter>
-              <Button onClick={handleAddService} className="w-full h-14 bg-[#312ECB] text-white font-black uppercase tracking-widest rounded-2xl">Create Service</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter>
+                <Button onClick={handleAddService} className="w-full h-14 bg-[#312ECB] text-white font-black uppercase tracking-widest rounded-2xl">Create Service</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </header>
 
       <main className="max-w-3xl mx-auto p-6 space-y-6">
         <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-slate-100">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
-              <Instagram size={24} />
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
+                <Instagram size={24} />
+              </div>
+              <div>
+                <h2 className="text-xl font-black uppercase tracking-tight">Services List</h2>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active services visible in Chat</p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-xl font-black uppercase tracking-tight">Active Services</h2>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Edit prices and limits live</p>
-            </div>
+            <Badge className="bg-blue-50 text-[#312ECB] border-none font-black text-[10px] uppercase">{services?.length || 0} Total</Badge>
           </div>
 
           <div className="space-y-4">
             {services?.map((service) => (
-              <div key={service.id} className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 flex flex-col md:flex-row md:items-center gap-6 group">
+              <div key={service.id} className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 flex flex-col md:flex-row md:items-center gap-6 group transition-all hover:shadow-md">
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-[14px] font-black text-[#111B21]">{service.name}</span>
-                    <Badge variant="outline" className="text-[8px] font-black uppercase opacity-50">{service.id}</Badge>
+                    <Badge variant="outline" className="text-[8px] font-black uppercase opacity-50 border-slate-200">{service.id}</Badge>
                   </div>
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Instagram Hub</p>
                 </div>
@@ -211,7 +254,7 @@ export default function ServiceManagerPage() {
                         type="number" 
                         defaultValue={service.pricePer1000} 
                         onBlur={(e) => handleUpdatePrice(service, 'pricePer1000', e.target.value)}
-                        className="h-10 w-28 bg-white border-none rounded-xl pl-8 text-xs font-black text-emerald-700" 
+                        className="h-10 w-28 bg-white border-none rounded-xl pl-8 text-xs font-black text-emerald-700 shadow-sm" 
                       />
                     </div>
                   </div>
@@ -223,13 +266,13 @@ export default function ServiceManagerPage() {
                         type="number" 
                         defaultValue={service.minQuantity} 
                         onBlur={(e) => handleUpdatePrice(service, 'minQuantity', e.target.value)}
-                        className="h-10 w-28 bg-white border-none rounded-xl pl-8 text-xs font-black text-blue-700" 
+                        className="h-10 w-28 bg-white border-none rounded-xl pl-8 text-xs font-black text-blue-700 shadow-sm" 
                       />
                     </div>
                   </div>
                 </div>
 
-                <button onClick={() => handleDelete(service.id)} className="p-3 text-red-200 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
+                <button onClick={() => handleDelete(service.id)} className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
                   <Trash2 size={18} />
                 </button>
               </div>
@@ -239,15 +282,16 @@ export default function ServiceManagerPage() {
               <div className="py-20 text-center space-y-4">
                 <Layers size={48} className="mx-auto text-slate-200" />
                 <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">No services added yet</p>
+                <Button onClick={handleSeedDefaults} variant="link" className="text-[#312ECB] font-black text-[10px] uppercase">Click to load standard services</Button>
               </div>
             )}
           </div>
         </div>
 
-        <div className="bg-amber-50 p-6 rounded-[2rem] border border-amber-100 flex items-start gap-4">
-          <AlertCircle className="text-amber-600 shrink-0" size={20} />
-          <p className="text-[10px] font-bold text-amber-700 leading-relaxed uppercase">
-            Pricing Notice: Changes made here reflect instantly across the entire application for all users. Ensure you update your API mappings in "API Settings" for any new services added.
+        <div className="bg-blue-50 p-6 rounded-[2rem] border border-blue-100 flex items-start gap-4">
+          <AlertCircle className="text-[#312ECB] shrink-0" size={20} />
+          <p className="text-[10px] font-bold text-blue-700 leading-relaxed uppercase">
+            Live Pricing: Jo bhi price aap yahan badlenge, woh users ko turant chat interface mein dikhayi degi. Service ID ko small letters aur unique rakhein.
           </p>
         </div>
       </main>
