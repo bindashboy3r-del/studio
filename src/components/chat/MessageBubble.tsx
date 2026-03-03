@@ -121,15 +121,13 @@ export function MessageBubble({
     try {
       const response = await fetch(qrUrl);
       if (!response.ok) throw new Error('Failed to fetch image');
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
+      const blob = window.URL.createObjectURL(await response.blob());
       const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
+      a.href = blob;
       a.download = `SocialBoost_Payment_QR.png`;
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(blob);
       document.body.removeChild(a);
       toast({ title: "Success", description: "QR Code download started." });
     } catch (error) {
@@ -227,21 +225,30 @@ export function MessageBubble({
                 </h3>
               </div>
               
-              <div className="space-y-2 text-[13px] font-bold text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl">
-                <p className="flex justify-between"><span>Order ID:</span> <span className="text-[#312ECB] dark:text-blue-400">#{successDetails.orderId}</span></p>
-                <div className="flex flex-col">
-                  <span className="text-slate-400 text-[10px] uppercase">Service:</span>
-                  <span className="leading-tight">{successDetails.service}</span>
+              <div className="space-y-3 text-[13px] font-bold text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900 p-5 rounded-3xl border border-slate-100 dark:border-slate-800">
+                <p className="flex justify-between items-center">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-widest">Order ID:</span>
+                  <span className="text-[#312ECB] dark:text-blue-400 font-black">#{successDetails.orderId}</span>
+                </p>
+                <div className="flex flex-col gap-1">
+                  <span className="text-slate-400 text-[10px] uppercase tracking-widest">Service(s):</span>
+                  <span className="leading-snug bg-white/50 dark:bg-black/20 p-2 rounded-xl text-[12px]">{successDetails.service}</span>
                 </div>
-                <p className="flex justify-between"><span>Quantity:</span> <span>{successDetails.quantity}</span></p>
-                <p className="flex justify-between"><span>Amount:</span> <span className="text-[#25D366]">₹{successDetails.price.toFixed(2)}</span></p>
+                <p className="flex justify-between">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-widest">Quantity:</span>
+                  <span className="font-black">{successDetails.quantity}</span>
+                </p>
+                <p className="flex justify-between">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-widest">Amount:</span>
+                  <span className="text-[#25D366] font-black">₹{successDetails.price.toFixed(2)}</span>
+                </p>
                 <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Target Link:</p>
-                  <p className="break-all text-[#312ECB] dark:text-blue-400 leading-snug">{successDetails.link}</p>
+                  <p className="break-all text-[#312ECB] dark:text-blue-400 leading-snug text-[11px] bg-white/50 dark:bg-black/20 p-2 rounded-xl">{successDetails.link}</p>
                 </div>
                 <p className="flex justify-between pt-1 border-t border-slate-100 dark:border-slate-800">
-                  <span className="text-[10px] uppercase text-slate-400">UTR ID:</span>
-                  <span className="text-[10px] font-black">{successDetails.utrId}</span>
+                  <span className="text-[10px] uppercase text-slate-400 tracking-widest">Payment Method:</span>
+                  <span className="text-[10px] font-black">{successDetails.utrId === 'WALLET-PAYMENT' ? 'WALLET' : 'UPI'}</span>
                 </p>
               </div>
             </div>

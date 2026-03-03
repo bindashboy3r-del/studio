@@ -105,7 +105,7 @@ export default function ChatPage() {
   const hasInitialGreeted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Dynamic Services Listener - Now ordered by "order" field
+  // Dynamic Services Listener - Ordered by "order" field
   const servicesQuery = useMemoFirebase(() => {
     if (!db) return null;
     return query(collection(db, "services"), where("isActive", "==", true), orderBy("order", "asc"));
@@ -546,7 +546,6 @@ export default function ChatPage() {
     if (cleanText.includes("single order")) {
       setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
       setChatState('choosing_service');
-      // Numbers services in UI
       const numberedOptions = displayServices.map((s, i) => `${i + 1}. ${s.name}`);
       botReply("Select Instagram service:", numberedOptions);
       return;

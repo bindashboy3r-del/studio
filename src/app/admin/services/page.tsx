@@ -117,10 +117,11 @@ export default function ServiceManagerPage() {
     }
 
     try {
-      const docRef = doc(db, "services", newService.id.toLowerCase().replace(/\s+/g, '_'));
+      const docId = newService.id.toLowerCase().replace(/\s+/g, '_');
+      const docRef = doc(db, "services", docId);
       await setDoc(docRef, {
         ...newService,
-        id: newService.id.toLowerCase().replace(/\s+/g, '_'),
+        id: docId,
         order: Number(newService.order) || (services?.length || 0) + 1,
         updatedAt: serverTimestamp()
       });
@@ -199,25 +200,25 @@ export default function ServiceManagerPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Unique ID</label>
-                    <Input placeholder="ig_followers" value={newService.id} onChange={e => setNewService({...newService, id: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                    <Input placeholder="ig_followers" value={newService.id || ""} onChange={e => setNewService({...newService, id: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Order (Position)</label>
-                    <Input type="number" value={newService.order} onChange={e => setNewService({...newService, order: parseInt(e.target.value)})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                    <Input type="number" value={newService.order || 0} onChange={e => setNewService({...newService, order: parseInt(e.target.value)})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
                   </div>
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Display Name</label>
-                  <Input placeholder="e.g. Followers (High Quality)" value={newService.name} onChange={e => setNewService({...newService, name: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                  <Input placeholder="e.g. Followers (High Quality)" value={newService.name || ""} onChange={e => setNewService({...newService, name: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Price (₹ / 1k)</label>
-                    <Input type="number" value={newService.pricePer1000} onChange={e => setNewService({...newService, pricePer1000: parseFloat(e.target.value)})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                    <Input type="number" value={newService.pricePer1000 || 0} onChange={e => setNewService({...newService, pricePer1000: parseFloat(e.target.value)})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Min Quantity</label>
-                    <Input type="number" value={newService.minQuantity} onChange={e => setNewService({...newService, minQuantity: parseInt(e.target.value)})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                    <Input type="number" value={newService.minQuantity || 100} onChange={e => setNewService({...newService, minQuantity: parseInt(e.target.value)})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
                   </div>
                 </div>
               </div>
