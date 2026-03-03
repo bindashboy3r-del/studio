@@ -12,7 +12,6 @@ import {
   MessageCircle, 
   Copy, 
   CheckCircle, 
-  Loader2, 
   History, 
   Wallet,
   Plus,
@@ -186,7 +185,9 @@ export function MessageBubble({
 
   const addComboService = (serviceId: string) => {
     const s = dynamicServices?.find(sv => sv.id === serviceId);
-    setComboItems([...comboItems, { serviceId, quantity: s?.minQuantity || 100 }]);
+    if (s) {
+      setComboItems([...comboItems, { serviceId, quantity: s.minQuantity || 100 }]);
+    }
   };
 
   const removeComboService = (index: number) => {

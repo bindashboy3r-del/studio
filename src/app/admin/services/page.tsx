@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { 
   ChevronLeft, 
   Plus, 
-  Save, 
   Trash2, 
   RefreshCw, 
   Layers, 
@@ -70,7 +69,6 @@ export default function ServiceManagerPage() {
   const isActuallyAdmin = user?.email === ADMIN_EMAIL || user?.uid === "s55uL0f8PmcypR75usVYOLwVs7O2";
 
   const servicesQuery = useMemoFirebase(() => {
-    // Only query if user is definitely confirmed as admin
     if (!db || !isActuallyAdmin) return null;
     return query(collection(db, "services"), orderBy("order", "asc"));
   }, [db, isActuallyAdmin]);
@@ -322,13 +320,6 @@ export default function ServiceManagerPage() {
               </div>
             )}
           </div>
-        </div>
-
-        <div className="bg-blue-50 p-6 rounded-[2rem] border border-blue-100 flex items-start gap-4">
-          <AlertCircle className="text-[#312ECB] shrink-0" size={20} />
-          <p className="text-[10px] font-bold text-blue-700 leading-relaxed uppercase">
-            Order System: 'Order' number se aap services ki sequence badal sakte hain. Kam number pehle dikhayi dega. Nayi service add karte waqt use apne hisaab se order number dein.
-          </p>
         </div>
       </main>
     </div>

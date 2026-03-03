@@ -14,8 +14,7 @@ import {
   doc,
   writeBatch,
   increment,
-  getDoc,
-  deleteDoc
+  getDoc
 } from "firebase/firestore";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
@@ -27,25 +26,16 @@ import {
   Moon, 
   Sun,
   History,
-  Rocket,
   X,
   Megaphone,
-  User as UserIcon,
   Zap,
-  Clock,
-  Instagram,
   Wallet,
   PlusCircle,
-  Layers,
-  Link as LinkIcon,
-  Percent,
   Trash2
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { SMMService, Platform } from "@/app/lib/constants";
 import { useAuth, useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from "@/firebase";
-import { errorEmitter } from "@/firebase/error-emitter";
-import { FirestorePermissionError } from "@/firebase/errors";
 import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
@@ -114,11 +104,10 @@ export default function ChatPage() {
 
   // Filtering for active services
   const dynamicServices = useMemo(() => {
-    if (!rawDynamicServices) return null;
+    if (!rawDynamicServices) return [];
     return [...rawDynamicServices].filter(s => s.isActive !== false).sort((a, b) => (a.order || 0) - (b.order || 0));
   }, [rawDynamicServices]);
 
-  // Original list for numbering
   const displayServices = useMemo(() => {
     return dynamicServices || [];
   }, [dynamicServices]);
@@ -483,9 +472,9 @@ export default function ChatPage() {
     if (links.length === 0) return;
     await addMessage('user', `Added ${links.length} links for bulk order.`);
     setCurrentOrder(prev => ({ ...prev, bulkLinks: links }));
-    const selectedService = currentOrder.items[0].service;
-    setChatState('entering_quantity'); 
-    botReply(`📊 Quantity PER LINK for ${selectedService.name}? (Min ${selectedService.minQuantity})`);
+    setChatState('choosing_service');
+    const numberedOptions = displayServices.map((s, i) => `${i + 1}. ${s.name}`);
+    botReply(`📊 Select Instagram service for these ${links.length} links:`, numberedOptions);
   };
 
   const handleComboFromCard = async (items: { serviceId: string, quantity: number }[], link: string) => {
@@ -512,7 +501,14 @@ export default function ChatPage() {
 
   const handleSend = async (manualText?: string) => {
     const text = manualText || inputValue.trim();
-    if (!text || !db || !user || !dynamicServices) return;
+    if (!text || !db || !user) return;
+    
+    // Ensure services are loaded for any selection logic
+    if (isServicesLoading && !manualText) {
+      toast({ title: "Please wait", description: "Loading services from database..." });
+      return;
+    }
+
     if (!manualText) setInputValue("");
     await addMessage('user', text);
     const cleanText = text.toLowerCase();
@@ -527,26 +523,15 @@ export default function ChatPage() {
       return;
     }
 
-    // Dynamic Matching Logic
-    const selectedService = dynamicServices.find(s => cleanText.includes(s.name.toLowerCase()));
-    if (selectedService && chatState === 'choosing_service') {
-      if (currentOrder.type === 'bulk') {
-        setCurrentOrder(prev => ({ ...prev, items: [{ service: selectedService, quantity: 0, link: '' }] }));
-        setChatState('entering_bulk_links');
-        botReply("🔗 Add your target links one by one below:", [], { isBulkLinkCard: true });
-      } else {
-        setCurrentOrder({ type: 'single', platform: 'instagram', items: [{ service: selectedService, quantity: 0, link: '' }] });
-        setChatState('entering_quantity');
-        botReply(`📊 Quantity for ${selectedService.name}? (Min ${selectedService.minQuantity})`);
-      }
-      return;
-    }
-
     if (cleanText.includes("single order")) {
       setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
       setChatState('choosing_service');
       const numberedOptions = displayServices.map((s, i) => `${i + 1}. ${s.name}`);
-      botReply("Select Instagram service:", numberedOptions);
+      if (numberedOptions.length === 0) {
+        botReply("No services found. Kripya admin se sampark karein ya 'Load Defaults' dabayein.");
+      } else {
+        botReply("Select Instagram service:", numberedOptions);
+      }
       return;
     } else if (cleanText.includes("combo order")) {
       setCurrentOrder({ type: 'combo', platform: 'instagram', items: [] });
@@ -555,9 +540,8 @@ export default function ChatPage() {
       return;
     } else if (cleanText.includes("bulk order")) {
       setCurrentOrder({ type: 'bulk', platform: 'instagram', items: [] });
-      setChatState('choosing_service');
-      const numberedOptions = displayServices.map((s, i) => `${i + 1}. ${s.name}`);
-      botReply("Select Instagram service for bulk:", numberedOptions);
+      setChatState('entering_bulk_links');
+      botReply("🔗 Add your target links one by one for Bulk Order:", [], { isBulkLinkCard: true });
       return;
     }
 
@@ -582,21 +566,15 @@ export default function ChatPage() {
 
     switch (chatState) {
       case 'choosing_service':
-        // Try to match by number or name
         const match = displayServices.find((s, i) => 
           cleanText.includes((i + 1).toString()) || 
           cleanText.includes(s.name.toLowerCase())
         );
         if (match) {
-          if (currentOrder.type === 'bulk') {
-            setCurrentOrder(prev => ({ ...prev, items: [{ service: match, quantity: 0, link: '' }] }));
-            setChatState('entering_bulk_links');
-            botReply("🔗 Add your target links one by one below:", [], { isBulkLinkCard: true });
-          } else {
-            setCurrentOrder({ type: 'single', platform: 'instagram', items: [{ service: match, quantity: 0, link: '' }] });
-            setChatState('entering_quantity');
-            botReply(`📊 Quantity for ${match.name}? (Min ${match.minQuantity})`);
-          }
+          const updatedItems = [{ service: match, quantity: 0, link: '' }];
+          setCurrentOrder(prev => ({ ...prev, items: updatedItems }));
+          setChatState('entering_quantity');
+          botReply(`📊 Quantity for ${match.name}? (Min ${match.minQuantity})`);
         }
         break;
 
