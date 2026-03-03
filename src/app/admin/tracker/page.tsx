@@ -32,7 +32,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, isValid, addMinutes, isAfter } from "date-fns";
 import { ChevronLeft, RefreshCw, ExternalLink, Copy, Clock, Globe, Wallet, AlertCircle } from "lucide-react";
-import { useFirestore, useUser } from "@/firebase";
+import { useFirestore, useUser, useMemoFirebase } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { useToast } from "@/hooks/use-toast";
@@ -48,6 +48,7 @@ export default function TrackerPage() {
   const router = useRouter();
 
   const ADMIN_EMAIL = "chetanmadhav4@gmail.com";
+  const isActuallyAdmin = user?.email === ADMIN_EMAIL || user?.uid === "s55uL0f8PmcypR75usVYOLwVs7O2";
 
   useEffect(() => {
     if (!isUserLoading && (!user || user.email !== ADMIN_EMAIL)) {
@@ -56,7 +57,7 @@ export default function TrackerPage() {
   }, [user, isUserLoading, router]);
 
   useEffect(() => {
-    if (!user || !db || user.email !== ADMIN_EMAIL) return;
+    if (!user || !db || !isActuallyAdmin) return;
 
     const q = collectionGroup(db, "orders");
     
@@ -107,7 +108,7 @@ export default function TrackerPage() {
     });
     
     return () => unsubscribe();
-  }, [user, db]);
+  }, [user, db, isActuallyAdmin]);
 
   const syncAllWithApi = async () => {
     if (!db) return;
@@ -285,7 +286,7 @@ export default function TrackerPage() {
     </div>
   );
 
-  if (loading) return (
+  if (loading || !isActuallyAdmin) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
       <RefreshCw className="animate-spin text-blue-600" />
     </div>

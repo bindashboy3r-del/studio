@@ -66,10 +66,13 @@ export default function ServiceManagerPage() {
   const router = useRouter();
   const { toast } = useToast();
 
+  const ADMIN_EMAIL = "chetanmadhav4@gmail.com";
+  const isActuallyAdmin = user?.email === ADMIN_EMAIL || user?.uid === "s55uL0f8PmcypR75usVYOLwVs7O2";
+
   const servicesQuery = useMemoFirebase(() => {
-    if (!db) return null;
+    if (!db || !isActuallyAdmin) return null;
     return query(collection(db, "services"), orderBy("order", "asc"));
-  }, [db]);
+  }, [db, isActuallyAdmin]);
 
   const { data: services, isLoading: isServicesLoading } = useCollection<Service>(servicesQuery);
 
@@ -86,7 +89,6 @@ export default function ServiceManagerPage() {
   });
 
   useEffect(() => {
-    const ADMIN_EMAIL = "chetanmadhav4@gmail.com";
     if (!isUserLoading && (!user || user.email !== ADMIN_EMAIL)) {
       router.push("/admin/login");
     }
@@ -158,7 +160,7 @@ export default function ServiceManagerPage() {
     }
   };
 
-  if (isServicesLoading) {
+  if (isServicesLoading || !isActuallyAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <RefreshCw className="animate-spin text-blue-600" />
