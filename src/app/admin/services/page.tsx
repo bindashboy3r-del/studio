@@ -37,6 +37,7 @@ import {
   DialogTrigger,
   DialogFooter
 } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 
 interface Service {
   id: string;
@@ -62,6 +63,8 @@ export default function ServiceManagerPage() {
 
   const [isAdding, setIsAdding] = useState(false);
   const [newService, setNewService] = useState<Partial<Service>>({
+    id: "",
+    name: "",
     platform: 'instagram',
     isActive: true,
     pricePer1000: 0,
@@ -89,7 +92,7 @@ export default function ServiceManagerPage() {
       });
       toast({ title: "Service Added", description: `${newService.name} is now available.` });
       setIsAdding(false);
-      setNewService({ platform: 'instagram', isActive: true, pricePer1000: 0, minQuantity: 100 });
+      setNewService({ id: "", name: "", platform: 'instagram', isActive: true, pricePer1000: 0, minQuantity: 100 });
     } catch (e) {
       toast({ variant: "destructive", title: "Error", description: "Failed to add service." });
     }
@@ -152,11 +155,11 @@ export default function ServiceManagerPage() {
             <div className="space-y-4 py-4">
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Unique ID (lowercase)</label>
-                <Input placeholder="e.g. ig_followers_real" value={newService.id} onChange={e => setNewService({...newService, id: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                <Input placeholder="e.g. ig_followers_real" value={newService.id || ""} onChange={e => setNewService({...newService, id: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Display Name</label>
-                <Input placeholder="e.g. Followers (High Quality)" value={newService.name} onChange={e => setNewService({...newService, name: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                <Input placeholder="e.g. Followers (High Quality)" value={newService.name || ""} onChange={e => setNewService({...newService, name: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
