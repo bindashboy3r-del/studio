@@ -318,7 +318,7 @@ export function MessageBubble({
                   ⚠️ Kripya sahi 12-digit UTR ID hi dalein. Galat ID se verify nahi hoga.
                 </p>
                 <Input 
-                  placeholder="Enter 12-Digit Transaction ID"
+                  placeholder="Enter 12-Digit UTR ID"
                   value={utr}
                   maxLength={12}
                   onChange={(e) => setUtr(e.target.value.replace(/[^0-9]/g, ''))}

@@ -9,7 +9,8 @@ import {
   Wallet, 
   Zap,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Download
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,7 @@ export default function AddFundsPage() {
   const [utr, setUtr] = useState("");
   const [loading, setLoading] = useState(false);
   const [globalBonus, setGlobalBonus] = useState(0);
+  const [isDownloading, setIsDownloading] = useState(false);
   
   const [paymentConfig, setPaymentConfig] = useState({
     upiId: "smmxpressbot@slc",
@@ -60,6 +62,30 @@ export default function AddFundsPage() {
     });
   }, [db]);
 
+  const handleDownloadQR = async () => {
+    setIsDownloading(true);
+    try {
+      const response = await fetch(activeQrUrl);
+      if (!response.ok) throw new Error('Failed to fetch image');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `SocialBoost_Payment_QR.png`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast({ title: "Success", description: "QR Code download started." });
+    } catch (error) {
+      window.open(activeQrUrl, '_blank');
+      toast({ title: "Download Help", description: "Long-press image to save." });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!user || !db) return;
     
@@ -80,7 +106,7 @@ export default function AddFundsPage() {
       const q = query(collection(db, "fundRequests"), where("utrId", "==", utr));
       const snap = await getDocs(q);
       if (!snap.empty) {
-        toast({ variant: "destructive", title: "Duplicate UTR", description: "This Transaction ID has already been submitted." });
+        toast({ variant: "destructive", title: "Duplicate UTR", description: "This UTR ID has already been submitted." });
         setLoading(false);
         return;
       }
@@ -171,19 +197,24 @@ export default function AddFundsPage() {
                     <p className="text-[12px] font-black text-slate-800">{paymentConfig.merchantName}</p>
                     <p className="text-[10px] font-bold text-slate-400">{paymentConfig.upiId}</p>
                   </div>
-                  <Button variant="outline" onClick={() => {
-                    navigator.clipboard.writeText(paymentConfig.upiId);
-                    toast({ title: "Copied!" });
-                  }} className="w-full h-12 rounded-2xl border-slate-200 text-[#312ECB] font-black text-[10px] uppercase gap-2">
-                    <Copy size={14} /> Copy UPI ID
-                  </Button>
+                  <div className="flex w-full gap-2">
+                    <Button variant="outline" onClick={() => {
+                      navigator.clipboard.writeText(paymentConfig.upiId);
+                      toast({ title: "Copied!" });
+                    }} className="flex-1 h-12 rounded-2xl border-slate-200 text-[#312ECB] font-black text-[10px] uppercase gap-2">
+                      <Copy size={14} /> Copy UPI
+                    </Button>
+                    <Button variant="outline" onClick={handleDownloadQR} disabled={isDownloading} className="flex-1 h-12 rounded-2xl border-slate-200 text-[#312ECB] font-black text-[10px] uppercase gap-2">
+                      <Download size={14} /> Download QR
+                    </Button>
+                  </div>
                 </div>
               </div>
 
               <div className="space-y-4">
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">3. Enter UTR ID</label>
                 <Input 
-                  placeholder="Paste 12-Digit Transaction ID" 
+                  placeholder="Paste 12-Digit UTR ID" 
                   value={utr}
                   maxLength={12}
                   onChange={(e) => setUtr(e.target.value.replace(/[^0-9]/g, ''))}
