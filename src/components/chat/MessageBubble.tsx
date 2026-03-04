@@ -138,7 +138,7 @@ export function MessageBubble({
       a.download = `SocialBoost_Pay_${price.toFixed(0)}.png`;
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(blob ? url : "");
       document.body.removeChild(a);
       toast({ title: "QR Saved", description: "Payment QR code downloaded." });
     } catch (e) {

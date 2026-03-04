@@ -495,7 +495,8 @@ export default function ChatPage() {
               const total = calculateTotalPrice(comboItems, 'combo');
               botReply(`🎁 Real Price: ₹${rawTotal.toFixed(2)}\n🔥 Combo Total: ₹${total.toFixed(2)} (${globalDiscounts.combo}% OFF Applied)`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]); 
             }}
-            isWalletCard={m.isWalletCard} onWalletSubmit={handleBundleWalletSubmit} timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} dynamicServices={dynamicServices} discountPct={m.discountPct || globalDiscounts.combo}
+            isWalletCard={m.isWalletCard} onWalletSubmit={handleBundleWalletSubmit} timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} dynamicServices={dynamicServices} 
+            discountPct={m.discountPct ?? 0}
           />
         ))}
         {isTyping && <TypingIndicator />}
