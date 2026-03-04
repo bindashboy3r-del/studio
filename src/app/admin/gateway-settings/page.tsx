@@ -11,7 +11,8 @@ import {
   Globe, 
   Copy,
   Zap,
-  Webhook
+  Webhook,
+  Lock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,7 @@ export default function GatewaySettingsPage() {
   const { toast } = useToast();
 
   const [apiKey, setApiKey] = useState("");
+  const [apiSecret, setApiSecret] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [webhookUrl, setWebhookUrl] = useState("");
 
@@ -49,6 +51,7 @@ export default function GatewaySettingsPage() {
       if (snap.exists()) {
         const data = snap.data();
         setApiKey(data.uropayApiKey || "");
+        setApiSecret(data.uropayApiSecret || "");
       }
     });
     return () => unsub();
@@ -60,10 +63,11 @@ export default function GatewaySettingsPage() {
     try {
       await setDoc(doc(db, "globalSettings", "gateway"), {
         uropayApiKey: apiKey,
+        uropayApiSecret: apiSecret,
         updatedAt: serverTimestamp(),
         updatedBy: user.email
       }, { merge: true });
-      toast({ title: "Settings Saved", description: "UroPay API config updated successfully." });
+      toast({ title: "Settings Saved", description: "UroPay API Key & Secret updated successfully." });
     } catch (e) {
       toast({ variant: "destructive", title: "Save Failed", description: "Database error." });
     } finally {
@@ -117,10 +121,23 @@ export default function GatewaySettingsPage() {
               <div className="relative">
                 <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                 <Input 
-                  type="password"
-                  placeholder="Your UroPay API Key" 
+                  placeholder="Paste API Key here" 
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
+                  className="h-14 bg-slate-50 border-none rounded-2xl pl-12 pr-5 text-sm font-bold shadow-inner"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">UroPay API Secret</label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                <Input 
+                  type="password"
+                  placeholder="Paste Secret here" 
+                  value={apiSecret}
+                  onChange={(e) => setApiSecret(e.target.value)}
                   className="h-14 bg-slate-50 border-none rounded-2xl pl-12 pr-5 text-sm font-bold shadow-inner"
                 />
               </div>
@@ -147,7 +164,7 @@ export default function GatewaySettingsPage() {
           <div className="bg-blue-50 p-5 rounded-3xl border border-blue-100 flex items-start gap-4">
             <ShieldCheck className="text-blue-600 shrink-0" size={20} />
             <p className="text-[10px] font-bold text-blue-700 leading-relaxed uppercase">
-              Notice: Automated system is now active. Users will be redirected to UroPay for payments. Manual UTR system will remain as a backup option.
+              Notice: Automated system is now active. Ensure both Key and Secret are correct to avoid failed transactions.
             </p>
           </div>
         </div>

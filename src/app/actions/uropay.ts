@@ -22,17 +22,18 @@ export async function initiateUropayPayment(params: InitiatePaymentParams) {
     const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
     const db = getFirestore(app);
 
-    // Get API Key from Firestore
+    // Get Credentials from Firestore
     const gatewaySnap = await getDoc(doc(db, "globalSettings", "gateway"));
-    const apiKey = gatewaySnap.data()?.uropayApiKey;
+    const data = gatewaySnap.data();
+    const apiKey = data?.uropayApiKey;
+    const apiSecret = data?.uropayApiSecret;
 
     if (!apiKey) {
       return { success: false, error: "UroPay API Key not configured in Admin Panel." };
     }
 
     const orderId = `UP-${Date.now()}`;
-    const callbackUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://' + process.env.VERCEL_URL}/api/webhooks/uropay`;
-    const redirectUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://' + process.env.VERCEL_URL}/chat`;
+    const redirectUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://' + (process.env.VERCEL_URL || 'localhost:9002')}/chat`;
 
     // Initialize temporary pending record in DB
     await addDoc(collection(db, "fundRequests"), {
@@ -40,30 +41,14 @@ export async function initiateUropayPayment(params: InitiatePaymentParams) {
       userEmail,
       displayName: userName,
       amount,
-      utrId: orderId, // We use orderId as a unique identifier for now
+      utrId: orderId, 
       status: 'Pending',
       type: 'Automated',
       createdAt: serverTimestamp()
     });
 
-    // UroPay API Call
-    // Based on typical UroPay Integration
-    const payload = new URLSearchParams();
-    payload.append('key', apiKey);
-    payload.append('client_txn_id', orderId);
-    payload.append('amount', amount.toString());
-    payload.append('p_info', 'Wallet Refill');
-    payload.append('customer_name', userName);
-    payload.append('customer_email', userEmail);
-    payload.append('customer_mobile', '9999999999');
-    payload.append('redirect_url', redirectUrl);
-
-    // Note: In a real implementation, you'd use the actual endpoint URL from UroPay docs
-    // This is a standard integration pattern
-    const endpoint = "https://api.uropay.in/order/create"; 
-    
-    // For prototype purposes, we simulate the redirect to their checkout
-    // Normally you'd fetch() here to get a payment URL
+    // For prototype purposes, we construct the redirect URL
+    // In production, you would fetch() to UroPay's order creation endpoint with the Secret
     const paymentUrl = `https://uropay.in/checkout?key=${apiKey}&amount=${amount}&client_txn_id=${orderId}&redirect_url=${encodeURIComponent(redirectUrl)}`;
 
     return { 
