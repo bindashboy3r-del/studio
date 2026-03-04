@@ -27,7 +27,8 @@ import {
   QrCode,
   Share2,
   Percent,
-  ShieldCheck
+  ShieldCheck,
+  Zap
 } from "lucide-react";
 import {
   Dialog,
@@ -148,7 +149,7 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        {/* Admin Management Section - ONLY VISIBLE TO ADMIN */}
+        {/* Admin Management Section - Centralized */}
         {isActuallyAdmin && (
           <section className="space-y-4">
             <div className="flex items-center gap-2 text-[10px] font-black uppercase text-pink-600 tracking-[0.2em] px-2">
@@ -164,6 +165,16 @@ export default function ProfilePage() {
                     <QrCode size={24} />
                   </div>
                   <span className="text-[10px] font-black uppercase text-pink-600 dark:text-pink-400 tracking-widest">Payments</span>
+                </button>
+
+                <button 
+                  onClick={() => router.push("/admin/gateway-settings")}
+                  className="flex flex-col items-center gap-3 p-5 bg-emerald-50 dark:bg-emerald-900/10 rounded-3xl border border-emerald-100 dark:border-emerald-900/30 hover:scale-[1.02] transition-transform active:scale-95"
+                >
+                  <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shadow-lg">
+                    <Zap size={24} />
+                  </div>
+                  <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-widest">Gateway</span>
                 </button>
 
                 <button 
@@ -183,17 +194,19 @@ export default function ProfilePage() {
                   <div className="w-12 h-12 bg-rose-500 rounded-2xl flex items-center justify-center text-white shadow-lg">
                     <Share2 size={24} />
                   </div>
-                  <span className="text-[10px] font-black uppercase text-rose-600 dark:text-rose-400 tracking-widest">Social Media</span>
+                  <span className="text-[10px] font-black uppercase text-rose-600 dark:text-rose-400 tracking-widest">Social</span>
                 </button>
 
                 <button 
                   onClick={() => router.push("/admin/discounts")}
-                  className="flex flex-col items-center gap-3 p-5 bg-indigo-50 dark:bg-indigo-900/10 rounded-3xl border border-indigo-100 dark:border-indigo-900/30 hover:scale-[1.02] transition-transform active:scale-95"
+                  className="flex flex-col items-center gap-3 p-5 bg-indigo-50 dark:bg-indigo-900/10 rounded-3xl border border-indigo-100 dark:border-indigo-900/30 hover:scale-[1.02] transition-transform active:scale-95 col-span-2"
                 >
-                  <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg">
-                    <Percent size={24} />
+                  <div className="w-full flex items-center justify-center gap-4">
+                    <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg">
+                      <Percent size={24} />
+                    </div>
+                    <span className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 tracking-widest">Discount Manager</span>
                   </div>
-                  <span className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 tracking-widest">Discounts</span>
                 </button>
               </div>
             </Card>
