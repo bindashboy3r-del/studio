@@ -12,7 +12,8 @@ import {
   Copy,
   Zap,
   Webhook,
-  Lock
+  Lock,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,14 +63,14 @@ export default function GatewaySettingsPage() {
     setIsSaving(true);
     try {
       await setDoc(doc(db, "globalSettings", "gateway"), {
-        uropayApiKey: apiKey,
-        uropayApiSecret: apiSecret,
+        uropayApiKey: apiKey.trim(),
+        uropayApiSecret: apiSecret.trim(),
         updatedAt: serverTimestamp(),
         updatedBy: user.email
       }, { merge: true });
-      toast({ title: "Settings Saved", description: "UroPay API Key & Secret updated successfully." });
-    } catch (e) {
-      toast({ variant: "destructive", title: "Save Failed", description: "Database error." });
+      toast({ title: "Settings Saved", description: "UroPay Credentials updated successfully." });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Save Failed", description: e.message || "Database error." });
     } finally {
       setIsSaving(false);
     }
@@ -79,6 +80,10 @@ export default function GatewaySettingsPage() {
     navigator.clipboard.writeText(webhookUrl);
     toast({ title: "Copied!", description: "Webhook URL copied to clipboard." });
   };
+
+  if (isUserLoading || !user) {
+    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-[#312ECB]" /></div>;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 font-body pb-20">
@@ -94,7 +99,7 @@ export default function GatewaySettingsPage() {
           disabled={isSaving}
           className="bg-[#312ECB] hover:bg-[#2825A6] rounded-xl h-10 px-5 font-black uppercase text-[10px] tracking-widest gap-2 shadow-lg"
         >
-          {isSaving ? "Saving..." : <><Save size={16} /> Save Changes</>}
+          {isSaving ? <Loader2 className="animate-spin" size={16} /> : <><Save size={16} /> Save Changes</>}
         </Button>
       </header>
 

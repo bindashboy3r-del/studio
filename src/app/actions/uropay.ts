@@ -1,54 +1,52 @@
 
 'use server';
 
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { firebaseConfig } from '@/firebase/config';
+import { initializeFirebase } from '@/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 interface InitiatePaymentParams {
   amount: number;
   userId: string;
-  userName: string;
-  userEmail: string;
 }
 
 /**
  * Initiates a payment session with UroPay Gateway.
+ * Fetches credentials from Firestore and returns the constructed payment URL.
  */
 export async function initiateUropayPayment(params: InitiatePaymentParams) {
-  const { amount, userId, userName, userEmail } = params;
+  const { amount, userId } = params;
 
   try {
-    const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-    const db = getFirestore(app);
+    // Use the standard initialization utility
+    const { firestore } = initializeFirebase();
 
     // Get Credentials from Firestore
-    const gatewaySnap = await getDoc(doc(db, "globalSettings", "gateway"));
+    // Note: In some environments, server-side client SDK access might require public read rules 
+    // or correct App Hosting service account setup.
+    const gatewayRef = doc(firestore, "globalSettings", "gateway");
+    const gatewaySnap = await getDoc(gatewayRef);
+    
+    if (!gatewaySnap.exists()) {
+      return { success: false, error: "UroPay config not found in database. Please save settings in Admin Panel." };
+    }
+
     const data = gatewaySnap.data();
     const apiKey = data?.uropayApiKey;
     const apiSecret = data?.uropayApiSecret;
 
-    if (!apiKey) {
-      return { success: false, error: "UroPay API Key not configured in Admin Panel." };
+    if (!apiKey || !apiSecret) {
+      return { success: false, error: "UroPay API Key or Secret is missing in Admin Panel." };
     }
 
-    const orderId = `UP-${Date.now()}`;
-    const redirectUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://' + (process.env.VERCEL_URL || 'localhost:9002')}/chat`;
+    // Construct Unique Order ID
+    const orderId = `UP-${Date.now()}-${userId.slice(0, 4)}`;
+    
+    // Construct Redirect URL (Where user goes after payment)
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://' + (process.env.VERCEL_URL || 'localhost:9002');
+    const redirectUrl = `${baseUrl}/chat`;
 
-    // Initialize temporary pending record in DB
-    await addDoc(collection(db, "fundRequests"), {
-      userId,
-      userEmail,
-      displayName: userName,
-      amount,
-      utrId: orderId, 
-      status: 'Pending',
-      type: 'Automated',
-      createdAt: serverTimestamp()
-    });
-
-    // For prototype purposes, we construct the redirect URL
-    // In production, you would fetch() to UroPay's order creation endpoint with the Secret
+    // UroPay Checkout URL Construction
+    // For production, usually you'd sign this request, but following UroPay's basic redirect pattern:
     const paymentUrl = `https://uropay.in/checkout?key=${apiKey}&amount=${amount}&client_txn_id=${orderId}&redirect_url=${encodeURIComponent(redirectUrl)}`;
 
     return { 
@@ -58,7 +56,10 @@ export async function initiateUropayPayment(params: InitiatePaymentParams) {
     };
 
   } catch (error: any) {
-    console.error("UroPay Action Error:", error);
-    return { success: false, error: "Gateway connection failed." };
+    console.error("UroPay Action Error Details:", error);
+    return { 
+      success: false, 
+      error: error.message || "Could not connect to database for credentials." 
+    };
   }
 }
