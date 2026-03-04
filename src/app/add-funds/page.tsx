@@ -12,14 +12,16 @@ import {
   CreditCard,
   History,
   ShieldCheck,
-  ChevronRight
+  ChevronRight,
+  QrCode,
+  Copy,
+  CheckCircle2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useUser, useFirestore } from "@/firebase";
 import { doc, onSnapshot, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
-import { initiateUropayPayment } from "@/app/actions/uropay";
 
 export default function AddFundsPage() {
   const { user } = useUser();
@@ -28,60 +30,75 @@ export default function AddFundsPage() {
   const { toast } = useToast();
 
   const [amount, setAmount] = useState("");
+  const [utrId, setUtrId] = useState("");
   const [loading, setLoading] = useState(false);
   const [globalBonus, setGlobalBonus] = useState(0);
-  const [activeTab, setActiveTab] = useState<'automated' | 'manual'>('automated');
+  const [paymentConfig, setPaymentConfig] = useState<any>(null);
 
   useEffect(() => {
     if (!db) return;
-    const unsub = onSnapshot(doc(db, "globalSettings", "finance"), (snap) => {
+    // Load Finance Settings (Bonus)
+    const unsubFinance = onSnapshot(doc(db, "globalSettings", "finance"), (snap) => {
       if (snap.exists()) setGlobalBonus(snap.data().bonusPercentage || 0);
     });
-    return () => unsub();
+    // Load Payment Hub Config (UPI ID / Merchant)
+    const unsubPayment = onSnapshot(doc(db, "globalSettings", "payment"), (snap) => {
+      if (snap.exists()) setPaymentConfig(snap.data());
+    });
+    return () => {
+      unsubFinance();
+      unsubPayment();
+    };
   }, [db]);
 
-  const handleAutomatedPay = async () => {
-    if (!user || !db || !amount || parseFloat(amount) < 10) {
-      toast({ variant: "destructive", title: "Invalid Amount", description: "Minimum ₹10 is required." });
+  const upiId = paymentConfig?.upiId || "smmxpressbot@slc";
+  const merchantName = paymentConfig?.merchantName || "SocialBoost";
+  const customQrUrl = paymentConfig?.qrImageUrl;
+  
+  // Logic for QR Generation
+  const upiLink = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&cu=INR`;
+  const generatedQr = `https://quickchart.io/qr?text=${encodeURIComponent(upiLink)}&size=400&margin=1&format=png`;
+  const finalQrUrl = customQrUrl || generatedQr;
+
+  const handleManualSubmit = async () => {
+    if (!user || !db || !amount || !utrId) {
+      toast({ variant: "destructive", title: "Missing Fields", description: "Please enter both amount and UTR ID." });
+      return;
+    }
+
+    if (utrId.length !== 12) {
+      toast({ variant: "destructive", title: "Invalid UTR", description: "UTR ID must be exactly 12 digits." });
       return;
     }
 
     setLoading(true);
     try {
-      // 1. Get Payment URL from Server
-      const result = await initiateUropayPayment({
+      await addDoc(collection(db, "fundRequests"), {
+        userId: user.uid,
+        userEmail: user.email || '',
+        displayName: user.displayName || 'User',
         amount: parseFloat(amount),
-        userId: user.uid
+        utrId: utrId.trim(),
+        status: 'Pending',
+        type: 'Manual',
+        createdAt: serverTimestamp()
       });
 
-      if (result.success && result.paymentUrl && result.orderId) {
-        // 2. Create Pending Request Record on Client (where auth is present)
-        await addDoc(collection(db, "fundRequests"), {
-          userId: user.uid,
-          userEmail: user.email || '',
-          displayName: user.displayName || 'User',
-          amount: parseFloat(amount),
-          utrId: result.orderId, // We use UroPay's client_txn_id as the tracking UTR
-          status: 'Pending',
-          type: 'Automated',
-          createdAt: serverTimestamp()
-        });
-
-        // 3. Redirect to Gateway
-        window.location.href = result.paymentUrl;
-      } else {
-        throw new Error(result.error || 'Failed to initialize gateway');
-      }
-    } catch (error: any) {
-      console.error("Payment Init Error:", error);
       toast({ 
-        variant: "destructive", 
-        title: "Gateway Error", 
-        description: error.message || "Try again later." 
+        title: "Request Submitted!", 
+        description: "Admin will verify and credit your wallet within 30-60 mins." 
       });
+      router.push('/orders'); // Redirect to history
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Submission Failed", description: "Try again later." });
     } finally {
       setLoading(false);
     }
+  };
+
+  const copyUpi = () => {
+    navigator.clipboard.writeText(upiId);
+    toast({ title: "Copied!", description: "UPI ID copied to clipboard." });
   };
 
   return (
@@ -95,14 +112,15 @@ export default function AddFundsPage() {
       </header>
 
       <main className="max-w-md mx-auto p-6 space-y-6 mt-4">
+        {/* Hero Card */}
         <div className="bg-[#312ECB] rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden">
           <div className="relative z-10 flex items-center gap-4">
             <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center">
-              <CreditCard size={28} />
+              <QrCode size={28} />
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Automated System</p>
-              <h2 className="text-2xl font-black uppercase tracking-tight">Refill Wallet</h2>
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Manual Refill</p>
+              <h2 className="text-2xl font-black uppercase tracking-tight">Scan & Pay</h2>
             </div>
           </div>
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10 blur-3xl" />
@@ -120,70 +138,76 @@ export default function AddFundsPage() {
           </div>
         )}
 
-        <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100">
+        {/* Payment QR Section */}
+        <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-gray-50 flex flex-col items-center space-y-6">
+          <div className="text-center space-y-1">
+            <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">Step 1: Pay via QR</h3>
+            <p className="text-[11px] font-bold text-slate-800 uppercase">Merchant: {merchantName}</p>
+          </div>
+
+          <div className="bg-slate-50 p-4 rounded-[2rem] border border-slate-100 shadow-inner relative group">
+            <img 
+              src={finalQrUrl} 
+              alt="Payment QR" 
+              className="w-48 h-44 object-contain rounded-xl"
+            />
+          </div>
+
           <button 
-            onClick={() => setActiveTab('automated')}
-            className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'automated' ? 'bg-[#312ECB] text-white shadow-lg' : 'text-slate-400'}`}
+            onClick={copyUpi}
+            className="flex items-center gap-3 px-6 py-3 bg-slate-50 rounded-full border border-slate-100 hover:bg-slate-100 transition-colors group"
           >
-            Instant (UPI)
-          </button>
-          <button 
-            onClick={() => setActiveTab('manual')}
-            className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'manual' ? 'bg-[#312ECB] text-white shadow-lg' : 'text-slate-400'}`}
-          >
-            Manual (UTR)
+            <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">{upiId}</span>
+            <Copy size={14} className="text-[#312ECB] group-active:scale-90 transition-transform" />
           </button>
         </div>
 
-        <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-gray-50 space-y-8">
-          {activeTab === 'automated' ? (
-            <div className="space-y-6">
-              <div className="space-y-4">
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Enter Amount (Min ₹10)</label>
-                <div className="relative">
-                  <span className="absolute left-5 top-1/2 -translate-y-1/2 font-black text-slate-400">₹</span>
-                  <Input 
-                    type="number" 
-                    placeholder="0.00" 
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    className="h-14 bg-slate-50 border-none rounded-2xl pl-10 pr-5 text-lg font-black focus-visible:ring-2 focus-visible:ring-[#312ECB]/10"
-                  />
-                </div>
-              </div>
+        {/* UTR Form Section */}
+        <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-gray-50 space-y-6">
+          <div className="text-center">
+            <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">Step 2: Submit Details</h3>
+          </div>
 
-              <div className="bg-blue-50/50 p-4 rounded-2xl flex items-start gap-3 border border-blue-100/50">
-                <ShieldCheck size={16} className="text-[#312ECB] mt-0.5" />
-                <p className="text-[10px] font-bold text-blue-600 uppercase leading-relaxed">
-                  Money will be credited instantly after successful payment via UroPay UPI Gateway.
-                </p>
-              </div>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Payment Amount (₹)</label>
+              <Input 
+                type="number" 
+                placeholder="0.00" 
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="h-14 bg-slate-50 border-none rounded-2xl px-6 text-lg font-black focus-visible:ring-2 focus-visible:ring-[#312ECB]/10"
+              />
+            </div>
 
-              <Button 
-                onClick={handleAutomatedPay}
-                disabled={loading || !amount || parseFloat(amount) < 10}
-                className="w-full h-16 bg-[#312ECB] hover:bg-[#2825A6] text-white rounded-[1.5rem] font-black text-[13px] uppercase tracking-widest shadow-2xl gap-3 transition-all active:scale-95"
-              >
-                {loading ? <Loader2 className="animate-spin" /> : "Pay with UPI Now"}
-                <ChevronRight size={18} />
-              </Button>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">12-Digit UTR ID</label>
+              <Input 
+                type="text" 
+                placeholder="Enter Transaction ID" 
+                value={utrId}
+                maxLength={12}
+                onChange={(e) => setUtrId(e.target.value.replace(/[^0-9]/g, ''))}
+                className="h-14 bg-slate-50 border-none rounded-2xl px-6 text-lg font-black tracking-widest focus-visible:ring-2 focus-visible:ring-[#312ECB]/10"
+              />
             </div>
-          ) : (
-            <div className="space-y-6 text-center py-4">
-              <AlertCircle size={40} className="mx-auto text-amber-500 mb-2" />
-              <h3 className="text-sm font-black uppercase">Manual System Backup</h3>
-              <p className="text-[11px] font-bold text-slate-400 uppercase leading-relaxed">
-                If the automated system is slow, please contact admin on WhatsApp for manual refill instructions.
-              </p>
-              <Button 
-                variant="outline"
-                onClick={() => window.open('https://wa.me/919116399517', '_blank')}
-                className="w-full h-14 border-slate-200 text-[#312ECB] rounded-2xl font-black uppercase text-[11px] tracking-widest"
-              >
-                WhatsApp Admin
-              </Button>
-            </div>
-          )}
+          </div>
+
+          <div className="bg-blue-50/50 p-4 rounded-2xl flex items-start gap-3 border border-blue-100/50">
+            <ShieldCheck size={16} className="text-[#312ECB] mt-0.5" />
+            <p className="text-[10px] font-bold text-blue-600 uppercase leading-relaxed">
+              Money will be verified and credited within 1 hour. Do not submit fake UTR IDs.
+            </p>
+          </div>
+
+          <Button 
+            onClick={handleManualSubmit}
+            disabled={loading || !amount || utrId.length !== 12}
+            className="w-full h-16 bg-[#312ECB] hover:bg-[#2825A6] text-white rounded-[1.5rem] font-black text-[13px] uppercase tracking-widest shadow-2xl gap-3 transition-all active:scale-95"
+          >
+            {loading ? <Loader2 className="animate-spin" /> : "Verify Payment Now"}
+            <CheckCircle2 size={18} />
+          </Button>
         </div>
 
         <button 
@@ -192,7 +216,7 @@ export default function AddFundsPage() {
         >
           <div className="flex items-center gap-3">
             <History className="text-slate-400" size={20} />
-            <span className="text-[11px] font-black uppercase tracking-widest">Transaction History</span>
+            <span className="text-[11px] font-black uppercase tracking-widest">Request History</span>
           </div>
           <ChevronRight className="text-slate-300" size={18} />
         </button>
