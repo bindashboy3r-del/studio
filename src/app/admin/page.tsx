@@ -9,17 +9,10 @@ import {
   Megaphone, 
   Users, 
   ChevronRight, 
-  Moon, 
-  Bell, 
   LogOut,
   Zap,
   Wallet,
-  Settings2,
-  QrCode,
-  Layers,
-  Percent,
-  Share2,
-  User as UserIcon
+  Layers
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -59,39 +52,11 @@ export default function AdminHub() {
       path: "/admin/services"
     },
     {
-      title: "DISCOUNT MANAGER",
-      subtitle: "SET SINGLE, COMBO & BULK %",
-      icon: <Percent size={28} />,
-      color: "bg-[#6366F1]", 
-      path: "/admin/discounts"
-    },
-    {
-      title: "SOCIAL MEDIA",
-      subtitle: "MANAGE EXTERNAL LINKS",
-      icon: <Share2 size={28} />,
-      color: "bg-[#F43F5E]", 
-      path: "/admin/social-settings"
-    },
-    {
       title: "FUND REQUESTS",
       subtitle: "APPROVE WALLET TOP-UPS",
       icon: <Wallet size={28} />,
       color: "bg-[#F59E0B]", 
       path: "/admin/funds"
-    },
-    {
-      title: "PAYMENT SETTINGS",
-      subtitle: "QR & MERCHANT CONFIG",
-      icon: <QrCode size={28} />,
-      color: "bg-[#EC4899]", 
-      path: "/admin/payment-settings"
-    },
-    {
-      title: "API SETTINGS",
-      subtitle: "CONNECT SMM PANEL",
-      icon: <Settings2 size={28} />,
-      color: "bg-[#7C3AED]", 
-      path: "/admin/api-settings"
     },
     {
       title: "BROADCAST MSG",
@@ -131,7 +96,7 @@ export default function AdminHub() {
       <main className="max-w-md mx-auto p-6 space-y-6 pt-12">
         <div className="space-y-1">
           <h2 className="text-[28px] font-black text-[#111B21] dark:text-white tracking-tight">ADMIN PANEL</h2>
-          <p className="text-[11px] font-black text-[#312ECB] dark:text-blue-400 uppercase tracking-[0.3em]">Management Hub</p>
+          <p className="text-[11px] font-black text-[#312ECB] dark:blue-400 uppercase tracking-[0.3em]">Operational Hub</p>
         </div>
 
         <div className="space-y-4">
@@ -142,7 +107,7 @@ export default function AdminHub() {
               className={`${item.color} w-full rounded-[2.5rem] p-8 text-white flex items-center justify-between shadow-xl transition-all active:scale-[0.98] group relative overflow-hidden`}
             >
               <div className="flex items-center gap-6 z-10">
-                <div className="w-16 h-16 rounded-[1.2rem] bg-white/20 flex items-center justify-center border border-white/10">
+                <div className="w-16 h-16 rounded-[1.2rem] bg-white/20 flex items-center justify-center border border-white/20">
                   {item.icon}
                 </div>
                 <div className="text-left">
@@ -155,7 +120,6 @@ export default function AdminHub() {
               <div className="z-10 bg-white/10 p-2 rounded-full group-hover:translate-x-1 transition-transform">
                 <ChevronRight size={24} />
               </div>
-              {/* Subtle pattern overlay */}
               <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10 blur-3xl" />
             </button>
           ))}
