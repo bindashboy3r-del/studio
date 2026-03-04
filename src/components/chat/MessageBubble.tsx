@@ -119,7 +119,7 @@ export function MessageBubble({
 
   const price = paymentPrice || 0;
   // Calculate original price if discount exists
-  const originalPrice = discountPct > 0 ? price / (1 - discountPct / 100) : price;
+  const originalPrice = discountPct > 0 ? price / (1 - (Number(discountPct) || 0) / 100) : price;
 
   const upiId = "smmxpressbot@slc";
   const upiLink = `upi://pay?pa=${upiId}&pn=SocialBoost&am=${price.toFixed(2)}&cu=INR`;
@@ -151,7 +151,7 @@ export function MessageBubble({
       const s = dynamicServices?.find(sv => sv.id === item.serviceId);
       return sum + (item.quantity / 1000) * (s?.pricePer1000 || 0);
     }, 0);
-    return { raw, discounted: raw * (1 - (discountPct || 0) / 100) };
+    return { raw, discounted: raw * (1 - (Number(discountPct) || 0) / 100) };
   }, [comboItems, dynamicServices, discountPct]);
 
   const [displayTime, setDisplayTime] = useState("");
@@ -185,7 +185,7 @@ export function MessageBubble({
               <p className="text-[10px] font-black text-[#312ECB] uppercase tracking-widest">Step 1: Scan & Pay</p>
               <div className="flex flex-col items-center justify-center">
                 {discountPct > 0 && (
-                  <span className="text-[12px] font-bold text-slate-400 line-through">₹{originalPrice.toFixed(2)}</span>
+                  <span className="text-[12px] font-bold text-slate-400 line-through">Real Price: ₹{originalPrice.toFixed(2)}</span>
                 )}
                 <h3 className="text-[22px] font-black text-slate-800 dark:text-white leading-tight">Pay ₹{price.toFixed(2)}</h3>
                 {discountPct > 0 && (
@@ -297,8 +297,8 @@ export function MessageBubble({
             </div>
             <div className="bg-emerald-50 dark:bg-emerald-950 p-4 rounded-3xl border border-emerald-100 dark:border-emerald-900 text-center">
               <div className="flex flex-col items-center">
-                {discountPct > 0 && (
-                  <span className="text-[10px] font-bold text-slate-400 line-through uppercase">Original: ₹{comboTotal.raw.toFixed(2)}</span>
+                {Number(discountPct) > 0 && (
+                  <span className="text-[10px] font-bold text-slate-400 line-through uppercase">Real Price: ₹{comboTotal.raw.toFixed(2)}</span>
                 )}
                 <p className="text-[14px] font-black text-emerald-600 dark:text-emerald-400 uppercase">Combo Total: ₹{comboTotal.discounted.toFixed(2)}</p>
               </div>
@@ -334,7 +334,7 @@ export function MessageBubble({
                   <p className="text-[12px] font-black text-slate-500 uppercase tracking-widest">Wallet Payment</p>
                   <div className="flex flex-col items-center">
                     {discountPct > 0 && (
-                      <span className="text-[12px] font-bold text-slate-400 line-through mt-1">₹{originalPrice.toFixed(2)}</span>
+                      <span className="text-[12px] font-bold text-slate-400 line-through mt-1">Real Price: ₹{originalPrice.toFixed(2)}</span>
                     )}
                     <p className="text-[26px] font-black text-[#312ECB] leading-none">₹{price.toFixed(2)}</p>
                     {discountPct > 0 && (
