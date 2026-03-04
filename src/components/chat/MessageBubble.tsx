@@ -118,6 +118,9 @@ export function MessageBubble({
   }, [isComboCard, dynamicServices, comboItems.length]);
 
   const price = paymentPrice || 0;
+  // Calculate original price if discount exists
+  const originalPrice = discountPct > 0 ? price / (1 - discountPct / 100) : price;
+
   const upiId = "smmxpressbot@slc";
   const upiLink = `upi://pay?pa=${upiId}&pn=SocialBoost&am=${price.toFixed(2)}&cu=INR`;
   const qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(upiLink)}&size=400&margin=1&format=png`;
@@ -180,10 +183,15 @@ export function MessageBubble({
           <div className="space-y-4 min-w-[260px]">
             <div className="text-center space-y-1">
               <p className="text-[10px] font-black text-[#312ECB] uppercase tracking-widest">Step 1: Scan & Pay</p>
-              <h3 className="text-[18px] font-black text-slate-800 dark:text-white">Pay ₹{price.toFixed(2)}</h3>
-              {discountPct > 0 && (
-                <Badge className="bg-emerald-500 text-white font-black text-[9px] uppercase">{discountPct}% Discount Applied</Badge>
-              )}
+              <div className="flex flex-col items-center justify-center">
+                {discountPct > 0 && (
+                  <span className="text-[12px] font-bold text-slate-400 line-through">₹{originalPrice.toFixed(2)}</span>
+                )}
+                <h3 className="text-[22px] font-black text-slate-800 dark:text-white leading-tight">Pay ₹{price.toFixed(2)}</h3>
+                {discountPct > 0 && (
+                  <Badge className="bg-emerald-500 text-white font-black text-[9px] uppercase mt-1">{discountPct}% Discount Applied</Badge>
+                )}
+              </div>
             </div>
 
             <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-[2.5rem] flex flex-col items-center gap-4 border border-slate-100 dark:border-slate-800 shadow-inner">
@@ -211,21 +219,29 @@ export function MessageBubble({
             </div>
 
             <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest">Step 2: Enter Details</label>
-                <Input 
-                  placeholder="Paste Instagram Link Here" 
-                  value={link} 
-                  onChange={(e) => setLink(e.target.value)} 
-                  className="h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white border-none shadow-inner font-bold" 
-                />
-                <Input 
-                  placeholder="Paste 12-Digit UTR/Transaction ID" 
-                  value={utr} 
-                  maxLength={12} 
-                  onChange={(e) => setUtr(e.target.value.replace(/[^0-9]/g, ''))} 
-                  className="h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white border-none shadow-inner font-bold tracking-widest" 
-                />
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest">Step 2: Profile/Post Link</label>
+                  <Input 
+                    placeholder="Paste Instagram Link Here" 
+                    value={link} 
+                    onChange={(e) => setLink(e.target.value)} 
+                    className="h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white border-none shadow-inner font-bold" 
+                  />
+                </div>
+                
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-red-500 ml-1 tracking-widest leading-tight">
+                    Shi utr dalo agar utr se payment verify nhi hoga
+                  </label>
+                  <Input 
+                    placeholder="Enter 12-Digit UTR ID" 
+                    value={utr} 
+                    maxLength={12} 
+                    onChange={(e) => setUtr(e.target.value.replace(/[^0-9]/g, ''))} 
+                    className="h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white border-none shadow-inner font-black tracking-widest" 
+                  />
+                </div>
               </div>
 
               <div className="bg-blue-50 dark:bg-blue-900/10 p-3 rounded-2xl border border-blue-100 dark:border-blue-800/30 flex items-start gap-3">
@@ -280,7 +296,12 @@ export function MessageBubble({
               <Input placeholder="Post or Profile Link" value={comboLink} onChange={(e) => setComboLink(e.target.value)} className="h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl text-slate-800 dark:text-white shadow-inner font-bold" />
             </div>
             <div className="bg-emerald-50 dark:bg-emerald-950 p-4 rounded-3xl border border-emerald-100 dark:border-emerald-900 text-center">
-              <p className="text-[14px] font-black text-emerald-600 dark:text-emerald-400 uppercase">Total: ₹{comboTotal.discounted.toFixed(2)}</p>
+              <div className="flex flex-col items-center">
+                {discountPct > 0 && (
+                  <span className="text-[10px] font-bold text-slate-400 line-through uppercase">Original: ₹{comboTotal.raw.toFixed(2)}</span>
+                )}
+                <p className="text-[14px] font-black text-emerald-600 dark:text-emerald-400 uppercase">Combo Total: ₹{comboTotal.discounted.toFixed(2)}</p>
+              </div>
             </div>
             <Button onClick={() => onComboSubmit?.(comboItems, comboLink)} disabled={!comboLink || comboItems.length === 0} className="w-full h-14 bg-[#312ECB] hover:bg-[#2825A6] font-black uppercase tracking-widest rounded-2xl shadow-xl">Confirm Bundle Order</Button>
           </div>
@@ -311,8 +332,15 @@ export function MessageBubble({
                 </div>
                 <div className="text-center">
                   <p className="text-[12px] font-black text-slate-500 uppercase tracking-widest">Wallet Payment</p>
-                  <p className="text-[24px] font-black text-[#312ECB]">₹{paymentPrice?.toFixed(2)}</p>
-                  {discountPct > 0 && <Badge className="bg-emerald-500 text-white font-black mt-2">{discountPct}% Discount Applied</Badge>}
+                  <div className="flex flex-col items-center">
+                    {discountPct > 0 && (
+                      <span className="text-[12px] font-bold text-slate-400 line-through mt-1">₹{originalPrice.toFixed(2)}</span>
+                    )}
+                    <p className="text-[26px] font-black text-[#312ECB] leading-none">₹{price.toFixed(2)}</p>
+                    {discountPct > 0 && (
+                      <Badge className="bg-emerald-500 text-white font-black mt-2 text-[9px] uppercase">{discountPct}% Discount Applied</Badge>
+                    )}
+                  </div>
                 </div>
              </div>
              <Button onClick={() => onWalletSubmit?.(link)} className="w-full h-14 bg-[#312ECB] font-black uppercase tracking-widest rounded-2xl shadow-xl transition-all active:scale-95">Confirm & Deduct</Button>
