@@ -31,7 +31,12 @@ import {
   Zap,
   Wallet,
   PlusCircle,
-  Trash2
+  Trash2,
+  Share2,
+  Instagram,
+  Youtube,
+  Facebook,
+  MessageCircle
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { SMMService, Platform } from "@/app/lib/constants";
@@ -80,16 +85,17 @@ export default function ChatPage() {
     platform: 'instagram',
     items: []
   });
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark'); // Default to dark for professional look
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark'); 
   const [activeBroadcast, setActiveBroadcast] = useState<any>(null);
   const [globalBonus, setGlobalBonus] = useState(0);
   const [globalDiscounts, setGlobalDiscounts] = useState({ single: 0, combo: 0, bulk: 0 });
+  const [socialLinks, setSocialLinks] = useState<any>(null);
+  const [showSocialMenu, setShowSocialMenu] = useState(false);
   
   const [sessionStartTime] = useState(() => Date.now());
   const hasInitialGreeted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Dynamic Services Listener
   const servicesQuery = useMemoFirebase(() => {
     if (!db) return null;
     return query(collection(db, "services"), orderBy("order", "asc"));
@@ -145,6 +151,10 @@ export default function ChatPage() {
         });
       }
     });
+
+    onSnapshot(doc(db, "globalSettings", "social"), (snap) => {
+      if (snap.exists()) setSocialLinks(snap.data());
+    });
   }, [db]);
 
   const messagesQuery = useMemoFirebase(() => {
@@ -199,7 +209,6 @@ export default function ChatPage() {
     }
   }, [user, isMessagesLoading]);
 
-  // Dynamic price calculator that can take temporary override values
   const calculateTotalPrice = (itemsOverride?: OrderItem[], typeOverride?: string) => {
     const items = itemsOverride || currentOrder.items;
     const type = typeOverride || currentOrder.type;
@@ -337,10 +346,7 @@ export default function ChatPage() {
     await addMessage('user', text);
     const cleanText = text.toLowerCase();
 
-    // Reset flow if a major menu button is clicked
     const isMajorSwitch = cleanText.includes("single order") || cleanText.includes("combo order") || cleanText.includes("bulk order") || cleanText === 'hi' || cleanText === 'menu';
-    
-    // Check for service selection in buttons (even if state is busy)
     const serviceMatch = dynamicServices.find((s, i) => cleanText === (i + 1).toString() || cleanText.includes(s.name.toLowerCase()));
 
     if (isMajorSwitch) {
@@ -386,14 +392,10 @@ export default function ChatPage() {
         const qty = parseInt(text);
         const s = currentOrder.items[0]?.service;
         if (s && qty >= s.minQuantity) {
-          // IMPORTANT: Update state
           setCurrentOrder(prev => ({ ...prev, items: prev.items.map(i => ({ ...i, quantity: qty })) }));
           setChatState('choosing_payment_method');
-          
-          // CRITICAL: Use the local qty for price calculation because state update is async
           const tempItems: OrderItem[] = [{ service: s, quantity: qty, link: '' }];
           const total = calculateTotalPrice(tempItems);
-          
           botReply(`✅ Total: ₹${total.toFixed(2)}\n💳 Wallet: ₹${walletBalance.toFixed(2)}`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]);
         } else if (s) {
           botReply(`⚠️ Minimum quantity for ${s.name} is ${s.minQuantity}. Kripya sahi quantity enter karein.`);
@@ -431,7 +433,7 @@ export default function ChatPage() {
         <button onClick={() => router.push('/orders')} className="text-[11px] font-black uppercase text-[#312ECB] dark:text-blue-400 flex items-center gap-2"><History size={16} /> HISTORY</button>
       </div>
 
-      <main className="flex-1 overflow-y-auto p-4 flex flex-col whatsapp-bg relative">
+      <main className="flex-1 overflow-y-auto p-4 flex flex-col whatsapp-bg relative pb-24">
         {activeBroadcast && (
           <div className="fixed inset-0 flex items-center justify-center z-[100] p-6 bg-black/40 backdrop-blur-sm">
             <div className="w-full max-w-[350px] bg-white dark:bg-slate-900 rounded-[3rem] p-8 items-center text-center space-y-4 shadow-2xl">
@@ -465,6 +467,43 @@ export default function ChatPage() {
         ))}
         {isTyping && <TypingIndicator />}
         <div ref={scrollRef} />
+
+        {/* Floating Social Menu */}
+        <div className="fixed bottom-24 right-6 z-50 flex flex-col items-end gap-3">
+          {showSocialMenu && (
+            <div className="flex flex-col gap-3 mb-2 animate-in slide-in-from-bottom-5 fade-in duration-300">
+              {socialLinks?.instagram && (
+                <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="w-12 h-12 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 rounded-full flex items-center justify-center text-white shadow-xl transform transition-transform hover:scale-110">
+                  <Instagram size={24} />
+                </a>
+              )}
+              {socialLinks?.facebook && (
+                <a href={socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="w-12 h-12 bg-[#1877F2] rounded-full flex items-center justify-center text-white shadow-xl transform transition-transform hover:scale-110">
+                  <Facebook size={24} />
+                </a>
+              )}
+              {socialLinks?.youtube && (
+                <a href={socialLinks.youtube} target="_blank" rel="noopener noreferrer" className="w-12 h-12 bg-[#FF0000] rounded-full flex items-center justify-center text-white shadow-xl transform transition-transform hover:scale-110">
+                  <Youtube size={24} />
+                </a>
+              )}
+              {socialLinks?.whatsapp && (
+                <a href={socialLinks.whatsapp} target="_blank" rel="noopener noreferrer" className="w-12 h-12 bg-[#25D366] rounded-full flex items-center justify-center text-white shadow-xl transform transition-transform hover:scale-110">
+                  <MessageCircle size={24} />
+                </a>
+              )}
+            </div>
+          )}
+          <button 
+            onClick={() => setShowSocialMenu(!showSocialMenu)}
+            className={cn(
+              "w-16 h-16 rounded-full flex items-center justify-center text-white shadow-[0_15px_30px_rgba(49,46,203,0.3)] transition-all active:scale-90 hover:scale-105",
+              showSocialMenu ? "bg-red-500 rotate-90" : "bg-[#312ECB]"
+            )}
+          >
+            {showSocialMenu ? <X size={28} /> : <Share2 size={28} />}
+          </button>
+        </div>
       </main>
 
       <footer className="p-3 bg-white dark:bg-slate-900 border-t dark:border-slate-800 z-50">

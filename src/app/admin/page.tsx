@@ -17,7 +17,8 @@ import {
   Settings2,
   QrCode,
   Layers,
-  Percent
+  Percent,
+  Share2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -62,6 +63,13 @@ export default function AdminHub() {
       icon: <Percent size={28} />,
       color: "bg-[#6366F1]", 
       path: "/admin/discounts"
+    },
+    {
+      title: "SOCIAL MEDIA",
+      subtitle: "MANAGE EXTERNAL LINKS",
+      icon: <Share2 size={28} />,
+      color: "bg-[#F43F5E]", 
+      path: "/admin/social-settings"
     },
     {
       title: "FUND REQUESTS",
