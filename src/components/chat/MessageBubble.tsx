@@ -120,7 +120,7 @@ export function MessageBubble({
   }, [isComboCard, dynamicServices, comboItems.length]);
 
   const price = paymentPrice || 0;
-  // Use passed rawPrice or back-calculate if missing
+  // Final Raw Price calculation
   const finalRawPrice = rawPrice || (discountPct > 0 ? price / (1 - (Number(discountPct) || 0) / 100) : price);
 
   const upiId = "smmxpressbot@slc";
