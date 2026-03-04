@@ -80,7 +80,7 @@ export default function ChatPage() {
     platform: 'instagram',
     items: []
   });
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark'); // Default to dark for professional look
   const [activeBroadcast, setActiveBroadcast] = useState<any>(null);
   const [globalBonus, setGlobalBonus] = useState(0);
   const [globalDiscounts, setGlobalDiscounts] = useState({ single: 0, combo: 0, bulk: 0 });
@@ -111,10 +111,9 @@ export default function ChatPage() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
-      if (savedTheme) {
-        setTheme(savedTheme);
-        document.documentElement.classList.toggle('dark', savedTheme === 'dark');
-      }
+      const initialTheme = savedTheme || 'dark';
+      setTheme(initialTheme);
+      document.documentElement.classList.toggle('dark', initialTheme === 'dark');
     }
   }, []);
 
@@ -196,19 +195,22 @@ export default function ChatPage() {
     if (user && !isMessagesLoading && !hasInitialGreeted.current) {
       hasInitialGreeted.current = true;
       setChatState('initial');
-      botReply("Send 'Hi' to start Instagram growth! 🚀");
+      botReply("👋 Welcome to SocialBoost! Send 'Hi' to see our Instagram growth menu. 🚀");
     }
   }, [user, isMessagesLoading]);
 
-  const calculateTotalPrice = (itemsOverride?: OrderItem[]) => {
+  // Dynamic price calculator that can take temporary override values
+  const calculateTotalPrice = (itemsOverride?: OrderItem[], typeOverride?: string) => {
     const items = itemsOverride || currentOrder.items;
+    const type = typeOverride || currentOrder.type;
+
     let total = items.reduce((total, item) => {
-      const multiplier = (currentOrder.type === 'bulk' && currentOrder.bulkLinks) ? currentOrder.bulkLinks.length : 1;
+      const multiplier = (type === 'bulk' && currentOrder.bulkLinks) ? currentOrder.bulkLinks.length : 1;
       return total + (item.quantity / 1000) * (item.service?.pricePer1000 || 0) * multiplier;
     }, 0);
 
-    const discPct = currentOrder.type === 'combo' ? globalDiscounts.combo : 
-                    currentOrder.type === 'bulk' ? globalDiscounts.bulk : 
+    const discPct = type === 'combo' ? globalDiscounts.combo : 
+                    type === 'bulk' ? globalDiscounts.bulk : 
                     globalDiscounts.single;
 
     if (discPct > 0) {
@@ -384,9 +386,14 @@ export default function ChatPage() {
         const qty = parseInt(text);
         const s = currentOrder.items[0]?.service;
         if (s && qty >= s.minQuantity) {
+          // IMPORTANT: Update state
           setCurrentOrder(prev => ({ ...prev, items: prev.items.map(i => ({ ...i, quantity: qty })) }));
           setChatState('choosing_payment_method');
-          const total = calculateTotalPrice();
+          
+          // CRITICAL: Use the local qty for price calculation because state update is async
+          const tempItems: OrderItem[] = [{ service: s, quantity: qty, link: '' }];
+          const total = calculateTotalPrice(tempItems);
+          
           botReply(`✅ Total: ₹${total.toFixed(2)}\n💳 Wallet: ₹${walletBalance.toFixed(2)}`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]);
         } else if (s) {
           botReply(`⚠️ Minimum quantity for ${s.name} is ${s.minQuantity}. Kripya sahi quantity enter karein.`);
