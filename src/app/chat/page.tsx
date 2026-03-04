@@ -36,7 +36,8 @@ import {
   Instagram,
   Youtube,
   Facebook,
-  MessageCircle
+  MessageCircle,
+  Loader2
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { SMMService, Platform } from "@/app/lib/constants";
@@ -95,6 +96,13 @@ export default function ChatPage() {
   const [sessionStartTime] = useState(() => Date.now());
   const hasInitialGreeted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Authentication Guard
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push("/");
+    }
+  }, [user, isUserLoading, router]);
 
   const servicesQuery = useMemoFirebase(() => {
     if (!db) return null;
@@ -172,10 +180,6 @@ export default function ChatPage() {
       return msgTime >= sessionStartTime;
     });
   }, [messagesData, sessionStartTime]);
-
-  useEffect(() => {
-    if (!isUserLoading && !user) router.push("/");
-  }, [user, isUserLoading, router]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollIntoView({ behavior: "smooth" });
@@ -413,6 +417,15 @@ export default function ChatPage() {
     }
   };
 
+  if (isUserLoading || (!user && !isUserLoading)) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-white dark:bg-slate-950">
+        <Loader2 className="w-12 h-12 text-[#312ECB] animate-spin mb-4" />
+        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Verifying session...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen max-w-lg mx-auto overflow-hidden relative shadow-2xl bg-white dark:bg-slate-950 font-body">
       <header className="bg-white dark:bg-slate-900 px-5 py-4 flex items-center justify-between border-b border-gray-100 dark:border-slate-800 z-50">
@@ -468,7 +481,6 @@ export default function ChatPage() {
         {isTyping && <TypingIndicator />}
         <div ref={scrollRef} />
 
-        {/* Floating Social Menu */}
         <div className="fixed bottom-24 right-6 z-50 flex flex-col items-end gap-3">
           {showSocialMenu && (
             <div className="flex flex-col gap-3 mb-2 animate-in slide-in-from-bottom-5 fade-in duration-300">

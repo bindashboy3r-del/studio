@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
@@ -11,9 +11,9 @@ import { doc, setDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useRouter } from "next/navigation";
-import { Zap, Instagram, ShieldCheck, Rocket, Globe } from "lucide-react";
+import { Zap, Instagram, ShieldCheck, Rocket, Globe, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth, useFirestore } from "@/firebase";
+import { useAuth, useFirestore, useUser } from "@/firebase";
 import { cn } from "@/lib/utils";
 
 export default function AuthPage() {
@@ -27,8 +27,21 @@ export default function AuthPage() {
   const db = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
+  const { user, isUserLoading } = useUser();
 
   const ADMIN_EMAIL = "chetanmadhav4@gmail.com";
+
+  // Auto-redirect if user is already logged in
+  useEffect(() => {
+    if (!isUserLoading && user) {
+      const userEmail = user.email?.toLowerCase();
+      if (userEmail === ADMIN_EMAIL.toLowerCase()) {
+        router.push("/admin");
+      } else {
+        router.push("/chat");
+      }
+    }
+  }, [user, isUserLoading, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,19 +49,14 @@ export default function AuthPage() {
     setLoading(true);
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
-      const userEmail = result.user.email?.toLowerCase();
-      if (userEmail === ADMIN_EMAIL.toLowerCase()) {
-        router.push("/admin");
-      } else {
-        router.push("/chat");
-      }
+      // Logic handled by useEffect above for redirection
+      toast({ title: "Welcome Back!", description: "Accessing your dashboard..." });
     } catch (error: any) {
       toast({ 
         variant: "destructive", 
         title: "Login Error", 
         description: error.message || "Invalid credentials." 
       });
-    } finally {
       setLoading(false);
     }
   };
@@ -69,37 +77,37 @@ export default function AuthPage() {
         createdAt: new Date().toISOString()
       });
       
-      const userEmail = result.user.email?.toLowerCase();
-      if (userEmail === ADMIN_EMAIL.toLowerCase()) {
-        router.push("/admin");
-      } else {
-        router.push("/chat");
-      }
+      toast({ title: "Account Created!", description: "Setting up your profile..." });
     } catch (error: any) {
       toast({ 
         variant: "destructive", 
         title: "Registration Error", 
         description: error.message || "Could not create account." 
       });
-    } finally {
       setLoading(false);
     }
   };
+
+  if (isUserLoading || (user && !loading)) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F0F2F5] dark:bg-slate-950">
+        <Loader2 className="w-12 h-12 text-[#312ECB] animate-spin mb-4" />
+        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Verifying Session...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#F0F2F5] dark:bg-slate-950 p-6 font-body overflow-x-hidden">
       <div className="w-full max-w-[440px] bg-white dark:bg-slate-900 rounded-[3.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.08)] p-10 pb-12 flex flex-col items-center relative overflow-hidden border border-white/50 dark:border-slate-800">
         
-        {/* Background Decorative Gradient */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-[#312ECB]/5 rounded-full -mr-16 -mt-16 blur-3xl" />
         <div className="absolute bottom-0 left-0 w-32 h-32 bg-[#312ECB]/5 rounded-full -ml-16 -mb-16 blur-3xl" />
 
-        {/* Logo Icon */}
         <div className="w-20 h-20 bg-[#312ECB] rounded-3xl flex items-center justify-center shadow-[0_12px_24px_rgba(49,46,203,0.3)] mb-8 relative z-10">
           <Zap className="text-white fill-current" size={36} />
         </div>
 
-        {/* Heading */}
         <div className="text-center space-y-2 mb-10 relative z-10">
           <h1 className="text-[32px] font-black tracking-tighter text-[#111B21] dark:text-white uppercase leading-none">
             WELCOME TO <br/> <span className="text-[#312ECB]">SOCIALBOOST</span>
@@ -109,7 +117,6 @@ export default function AuthPage() {
           </p>
         </div>
 
-        {/* Form */}
         <form onSubmit={isLogin ? handleLogin : handleSignup} className="w-full space-y-6 relative z-10">
           {!isLogin && (
             <div className="space-y-2">
@@ -160,11 +167,10 @@ export default function AuthPage() {
             disabled={loading}
             className="w-full h-16 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[13px] uppercase tracking-[0.2em] rounded-2xl shadow-[0_15px_30px_rgba(49,46,203,0.3)] transition-all active:scale-95 mt-4"
           >
-            {loading ? "INITIALIZING..." : isLogin ? "ACCESS PORTAL" : "CREATE ACCOUNT"}
+            {loading ? <><Loader2 className="mr-2 animate-spin" /> INITIALIZING...</> : isLogin ? "ACCESS PORTAL" : "CREATE ACCOUNT"}
           </Button>
         </form>
 
-        {/* Toggle */}
         <div className="mt-10 text-center relative z-10">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">
             {isLogin ? "NEW TO OUR PLATFORM?" : "ALREADY A MEMBER?"}
@@ -178,7 +184,6 @@ export default function AuthPage() {
         </div>
       </div>
 
-      {/* Trust Badges */}
       <div className="mt-10 flex items-center gap-6 opacity-30 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-700">
         <div className="flex items-center gap-2">
           <ShieldCheck size={16} />
@@ -194,7 +199,6 @@ export default function AuthPage() {
         </div>
       </div>
 
-      {/* Footer Credits */}
       <div className="mt-12 flex flex-col items-center space-y-4">
         <p className="text-[10px] font-black text-[#111B21] dark:text-slate-500 uppercase tracking-[0.3em] opacity-40">
           CREATED BY CHETAN NAGANI
