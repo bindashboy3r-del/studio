@@ -205,28 +205,32 @@ export default function ChatPage() {
     }
   }, [user, isMessagesLoading]);
 
-  const calculateTotalPrice = (itemsOverride?: OrderItem[], typeOverride?: string) => {
+  const calculateRawPrice = (itemsOverride?: OrderItem[], typeOverride?: string) => {
     const items = itemsOverride || currentOrder.items;
     const type = typeOverride || currentOrder.type;
-
     if (!items || items.length === 0) return 0;
 
-    let totalRaw = items.reduce((sum, item) => {
+    return items.reduce((sum, item) => {
       if (!item.service || !item.quantity) return sum;
       const multiplier = (type === 'bulk' && currentOrder.bulkLinks) ? currentOrder.bulkLinks.length : 1;
       const itemCost = (item.quantity / 1000) * (item.service.pricePer1000 || 0);
       return sum + (itemCost * multiplier);
     }, 0);
+  };
+
+  const calculateTotalPrice = (itemsOverride?: OrderItem[], typeOverride?: string) => {
+    const rawTotal = calculateRawPrice(itemsOverride, typeOverride);
+    const type = typeOverride || currentOrder.type;
 
     const discPct = type === 'combo' ? globalDiscounts.combo : 
                     type === 'bulk' ? globalDiscounts.bulk : 
                     globalDiscounts.single;
 
     if (discPct > 0) {
-      totalRaw = totalRaw * (1 - discPct / 100);
+      return rawTotal * (1 - discPct / 100);
     }
 
-    return totalRaw;
+    return rawTotal;
   };
 
   const handleBundlePaymentSubmit = async (utr: string, linkOverride?: string) => {
@@ -397,11 +401,15 @@ export default function ChatPage() {
           setCurrentOrder(prev => ({ ...prev, items: updatedItems }));
           setChatState('choosing_payment_method');
           
-          const total = calculateTotalPrice(updatedItems, currentOrder.type);
+          const rawTotal = calculateRawPrice(updatedItems, currentOrder.type);
+          const discountedTotal = calculateTotalPrice(updatedItems, currentOrder.type);
           const currentDisc = currentOrder.type === 'bulk' ? globalDiscounts.bulk : globalDiscounts.single;
-          const discText = currentDisc > 0 ? `(${currentDisc}% Discount Applied)` : "";
           
-          botReply(`✅ Total: ₹${total.toFixed(2)} ${discText}\n💳 Wallet: ₹${walletBalance.toFixed(2)}`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]);
+          const priceMsg = currentDisc > 0 
+            ? `✅ Real Price: ₹${rawTotal.toFixed(2)}\n🔥 Discounted Total: ₹${discountedTotal.toFixed(2)} (${currentDisc}% OFF)`
+            : `✅ Total: ₹${discountedTotal.toFixed(2)}`;
+
+          botReply(`${priceMsg}\n💳 Wallet: ₹${walletBalance.toFixed(2)}`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]);
         } else if (s) {
           botReply(`⚠️ Minimum quantity for ${s.name} is ${s.minQuantity}. Kripya sahi quantity enter karein.`);
         } else {
@@ -410,13 +418,14 @@ export default function ChatPage() {
         break;
       case 'choosing_payment_method':
         if (cleanText.includes("wallet")) {
+          const raw = calculateRawPrice();
           const total = calculateTotalPrice();
           const currentDisc = currentOrder.type === 'combo' ? globalDiscounts.combo : currentOrder.type === 'bulk' ? globalDiscounts.bulk : globalDiscounts.single;
-          if (walletBalance >= total) botReply(`💳 Confirm Wallet Payment (${currentDisc}% OFF Applied):`, [], { isWalletCard: true, paymentPrice: total, discountPct: currentDisc });
+          if (walletBalance >= total) botReply(`💳 Confirm Wallet Payment:`, [], { isWalletCard: true, paymentPrice: total, discountPct: currentDisc });
           else botReply("❌ Insufficient balance!", ["💳 ADD FUNDS", "🏠 MAIN MENU"]);
         } else if (cleanText.includes("upi")) {
           const currentDisc = currentOrder.type === 'combo' ? globalDiscounts.combo : currentOrder.type === 'bulk' ? globalDiscounts.bulk : globalDiscounts.single;
-          botReply(`📸 Pay ₹${calculateTotalPrice().toFixed(2)} via UPI QR ${currentDisc > 0 ? `(${currentDisc}% OFF Applied)` : ""}:`, [], { isPaymentCard: true, paymentPrice: calculateTotalPrice(), discountPct: currentDisc });
+          botReply(`📸 Scan & Pay via UPI QR:`, [], { isPaymentCard: true, paymentPrice: calculateTotalPrice(), discountPct: currentDisc });
         }
         break;
     }
@@ -480,8 +489,9 @@ export default function ChatPage() {
               const comboItems = items.map(it => ({ service: dynamicServices.find(s => s.id === it.serviceId)!, quantity: it.quantity, link }));
               setCurrentOrder(p => ({ ...p, type: 'combo', items: comboItems })); 
               setChatState('choosing_payment_method'); 
+              const rawTotal = calculateRawPrice(comboItems, 'combo');
               const total = calculateTotalPrice(comboItems, 'combo');
-              botReply(`🎁 Combo Total: ₹${total.toFixed(2)} (${globalDiscounts.combo}% OFF Applied)`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]); 
+              botReply(`🎁 Real Price: ₹${rawTotal.toFixed(2)}\n🔥 Combo Total: ₹${total.toFixed(2)} (${globalDiscounts.combo}% OFF Applied)`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]); 
             }}
             isWalletCard={m.isWalletCard} onWalletSubmit={handleBundleWalletSubmit} timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} dynamicServices={dynamicServices} discountPct={m.discountPct || globalDiscounts.combo}
           />
