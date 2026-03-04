@@ -421,11 +421,13 @@ export default function ChatPage() {
           const raw = calculateRawPrice();
           const total = calculateTotalPrice();
           const currentDisc = currentOrder.type === 'combo' ? globalDiscounts.combo : currentOrder.type === 'bulk' ? globalDiscounts.bulk : globalDiscounts.single;
-          if (walletBalance >= total) botReply(`💳 Confirm Wallet Payment:`, [], { isWalletCard: true, paymentPrice: total, discountPct: currentDisc });
+          if (walletBalance >= total) botReply(`💳 Confirm Wallet Payment:`, [], { isWalletCard: true, paymentPrice: total, rawPrice: raw, discountPct: currentDisc });
           else botReply("❌ Insufficient balance!", ["💳 ADD FUNDS", "🏠 MAIN MENU"]);
         } else if (cleanText.includes("upi")) {
+          const raw = calculateRawPrice();
+          const total = calculateTotalPrice();
           const currentDisc = currentOrder.type === 'combo' ? globalDiscounts.combo : currentOrder.type === 'bulk' ? globalDiscounts.bulk : globalDiscounts.single;
-          botReply(`📸 Scan & Pay via UPI QR:`, [], { isPaymentCard: true, paymentPrice: calculateTotalPrice(), discountPct: currentDisc });
+          botReply(`📸 Scan & Pay via UPI QR:`, [], { isPaymentCard: true, paymentPrice: total, rawPrice: raw, discountPct: currentDisc });
         }
         break;
     }
@@ -473,7 +475,7 @@ export default function ChatPage() {
 
         {messages.map((m: any) => (
           <MessageBubble key={m.id} sender={m.sender} text={m.text} options={m.options} onOptionClick={handleSend}
-            isPaymentCard={m.isPaymentCard} paymentPrice={m.paymentPrice} onPaymentSubmit={(link, utr) => handleBundlePaymentSubmit(utr, link)}
+            isPaymentCard={m.isPaymentCard} paymentPrice={m.paymentPrice} rawPrice={m.rawPrice} onPaymentSubmit={(link, utr) => handleBundlePaymentSubmit(utr, link)}
             isSuccessCard={m.isSuccessCard} successDetails={m.successDetails} isBulkLinkCard={m.isBulkLinkCard} 
             onBulkLinksSubmit={(l) => { setCurrentOrder(p => ({ ...p, type: 'bulk', bulkLinks: l })); setChatState('choosing_service'); botReply(`Select Service for Bulk Order (${globalDiscounts.bulk}% OFF):`, dynamicServices.map((s, i) => `${i + 1}. ${s.name}`)); }}
             isComboCard={m.isComboCard} onComboSubmit={(items, link) => { 

@@ -54,6 +54,7 @@ interface MessageBubbleProps {
   onOptionClick?: (option: string) => void;
   isPaymentCard?: boolean;
   paymentPrice?: number;
+  rawPrice?: number;
   onPaymentSubmit?: (link: string, utr: string) => void;
   isSuccessCard?: boolean;
   successDetails?: SuccessDetails;
@@ -75,6 +76,7 @@ export function MessageBubble({
   onOptionClick,
   isPaymentCard,
   paymentPrice,
+  rawPrice,
   onPaymentSubmit,
   isSuccessCard,
   successDetails,
@@ -118,8 +120,8 @@ export function MessageBubble({
   }, [isComboCard, dynamicServices, comboItems.length]);
 
   const price = paymentPrice || 0;
-  // Calculate original price if discount exists
-  const originalPrice = discountPct > 0 ? price / (1 - (Number(discountPct) || 0) / 100) : price;
+  // Use passed rawPrice or back-calculate if missing
+  const finalRawPrice = rawPrice || (discountPct > 0 ? price / (1 - (Number(discountPct) || 0) / 100) : price);
 
   const upiId = "smmxpressbot@slc";
   const upiLink = `upi://pay?pa=${upiId}&pn=SocialBoost&am=${price.toFixed(2)}&cu=INR`;
@@ -170,7 +172,7 @@ export function MessageBubble({
               <CheckCircle size={24} className="text-[#25D366]" />
               <h3 className="text-[15px] font-black uppercase text-slate-800 dark:text-white">Order Submitted</h3>
             </div>
-            <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-3xl text-[12px] font-bold space-y-2 text-slate-800 dark:text-slate-100 border dark:border-slate-700">
+            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-3xl text-[12px] font-bold space-y-2 text-slate-800 dark:text-slate-100 border dark:border-slate-700">
               <p className="flex justify-between gap-4"><span>Order ID:</span><span className="text-[#312ECB] font-black">#{successDetails.orderId}</span></p>
               <p className="flex justify-between gap-4"><span>Service:</span><span className="text-right truncate max-w-[140px]">{successDetails.service}</span></p>
               <p className="flex justify-between gap-4"><span>Amount:</span><span className="text-emerald-600 font-black">₹{successDetails.price.toFixed(2)}</span></p>
@@ -185,7 +187,7 @@ export function MessageBubble({
               <p className="text-[10px] font-black text-[#312ECB] uppercase tracking-widest">Step 1: Scan & Pay</p>
               <div className="flex flex-col items-center justify-center">
                 {discountPct > 0 && (
-                  <span className="text-[12px] font-bold text-slate-400 line-through">Real Price: ₹{originalPrice.toFixed(2)}</span>
+                  <span className="text-[12px] font-bold text-slate-400 line-through">Real Price: ₹{finalRawPrice.toFixed(2)}</span>
                 )}
                 <h3 className="text-[22px] font-black text-slate-800 dark:text-white leading-tight">Pay ₹{price.toFixed(2)}</h3>
                 {discountPct > 0 && (
@@ -235,7 +237,7 @@ export function MessageBubble({
                     Shi utr dalo agar utr se payment verify nhi hoga
                   </label>
                   <Input 
-                    placeholder="Enter 12-Digit UTR ID" 
+                    placeholder="Enter 12-Digit UTR" 
                     value={utr} 
                     maxLength={12} 
                     onChange={(e) => setUtr(e.target.value.replace(/[^0-9]/g, ''))} 
@@ -256,7 +258,7 @@ export function MessageBubble({
                 disabled={!link || utr.length !== 12} 
                 className="w-full h-14 bg-[#312ECB] hover:bg-[#2825A6] font-black uppercase tracking-widest rounded-2xl shadow-xl transition-all active:scale-95"
               >
-                Submit Payment info
+                Submit Payment Info
               </Button>
             </div>
           </div>
@@ -334,7 +336,7 @@ export function MessageBubble({
                   <p className="text-[12px] font-black text-slate-500 uppercase tracking-widest">Wallet Payment</p>
                   <div className="flex flex-col items-center">
                     {discountPct > 0 && (
-                      <span className="text-[12px] font-bold text-slate-400 line-through mt-1">Real Price: ₹{originalPrice.toFixed(2)}</span>
+                      <span className="text-[12px] font-bold text-slate-400 line-through mt-1">Real Price: ₹{finalRawPrice.toFixed(2)}</span>
                     )}
                     <p className="text-[26px] font-black text-[#312ECB] leading-none">₹{price.toFixed(2)}</p>
                     {discountPct > 0 && (
