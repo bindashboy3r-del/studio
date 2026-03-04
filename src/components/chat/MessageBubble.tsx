@@ -128,6 +128,12 @@ export function MessageBubble({
     return { raw, discounted: raw * (1 - (discountPct || 0) / 100) };
   }, [comboItems, dynamicServices, discountPct]);
 
+  // Client-side only time rendering to avoid hydration mismatch
+  const [displayTime, setDisplayTime] = useState("");
+  useEffect(() => {
+    if (mounted) setDisplayTime(format(timestamp, 'HH:mm'));
+  }, [mounted, timestamp]);
+
   if (!mounted) return null;
 
   return (
@@ -137,43 +143,49 @@ export function MessageBubble({
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <CheckCircle size={24} className="text-[#25D366]" />
-              <h3 className="text-[15px] font-black uppercase text-slate-800">Order Submitted</h3>
+              <h3 className="text-[15px] font-black uppercase text-slate-800 dark:text-white">Order Submitted</h3>
             </div>
-            <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-3xl text-[12px] font-bold space-y-2 text-slate-800 dark:text-slate-100">
-              <p className="flex justify-between"><span>ID:</span><span className="text-[#312ECB]">#{successDetails.orderId}</span></p>
-              <p className="flex justify-between"><span>Amount:</span><span className="text-emerald-600">₹{successDetails.price.toFixed(2)}</span></p>
-              <p className="flex justify-between"><span>Link:</span><span className="truncate max-w-[150px]">{successDetails.link}</span></p>
+            <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-3xl text-[12px] font-bold space-y-2 text-slate-800 dark:text-slate-100 border dark:border-slate-700">
+              <p className="flex justify-between gap-4"><span>Order ID:</span><span className="text-[#312ECB] font-black">#{successDetails.orderId}</span></p>
+              <p className="flex justify-between gap-4"><span>Service:</span><span className="text-right truncate max-w-[140px]">{successDetails.service}</span></p>
+              <p className="flex justify-between gap-4"><span>Amount:</span><span className="text-emerald-600 font-black">₹{successDetails.price.toFixed(2)}</span></p>
+              <p className="flex justify-between gap-4"><span>Target:</span><span className="truncate max-w-[140px] opacity-60">{successDetails.link}</span></p>
+              <p className="flex justify-between gap-4"><span>UTR:</span><span className="opacity-60">{successDetails.utrId}</span></p>
             </div>
-            <Button onClick={() => onOptionClick?.("Main Menu")} className="w-full h-12 bg-[#312ECB] uppercase font-black">Main Menu</Button>
+            <Button onClick={() => onOptionClick?.("Main Menu")} className="w-full h-12 bg-[#312ECB] hover:bg-[#2825A6] uppercase font-black tracking-widest rounded-2xl">Return to Menu</Button>
           </div>
         ) : isPaymentCard ? (
           <div className="space-y-4">
-            <p className="text-[13px] font-bold text-slate-800">Pay <span className="text-[#312ECB]">₹{price.toFixed(2)}</span> via UPI:</p>
+            <p className="text-[13px] font-bold text-slate-800 dark:text-white">Pay <span className="text-[#312ECB]">₹{price.toFixed(2)}</span> via UPI QR:</p>
             <div className="flex flex-col items-center gap-3">
-              <img src={qrUrl} alt="UPI QR" className="w-40 h-40 rounded-xl" />
-              <Button onClick={() => { navigator.clipboard.writeText(upiId); toast({ title: "Copied!" }); }} variant="outline" className="w-full h-10 text-[10px] uppercase font-black border-slate-200 text-slate-600">Copy UPI ID</Button>
+              <div className="bg-white p-2 rounded-2xl shadow-inner border">
+                <img src={qrUrl} alt="UPI QR" className="w-40 h-40" />
+              </div>
+              <Button onClick={() => { navigator.clipboard.writeText(upiId); toast({ title: "Copied!" }); }} variant="outline" className="w-full h-10 text-[10px] uppercase font-black border-slate-200 text-slate-600 dark:text-slate-400">Copy UPI ID</Button>
             </div>
-            <Input placeholder="Instagram Link" value={link} onChange={(e) => setLink(e.target.value)} className="h-11 rounded-xl text-slate-800" />
-            <Input placeholder="12-Digit UTR ID" value={utr} maxLength={12} onChange={(e) => setUtr(e.target.value.replace(/[^0-9]/g, ''))} className="h-11 rounded-xl text-slate-800" />
-            <Button onClick={() => onPaymentSubmit?.(link, utr)} disabled={!link || utr.length !== 12} className="w-full h-12 bg-[#312ECB] font-black uppercase">Submit Order</Button>
+            <Input placeholder="Instagram Link" value={link} onChange={(e) => setLink(e.target.value)} className="h-11 rounded-xl text-slate-800 dark:bg-slate-800 dark:text-white border-none shadow-inner" />
+            <Input placeholder="12-Digit UTR ID" value={utr} maxLength={12} onChange={(e) => setUtr(e.target.value.replace(/[^0-9]/g, ''))} className="h-11 rounded-xl text-slate-800 dark:bg-slate-800 dark:text-white border-none shadow-inner" />
+            <Button onClick={() => onPaymentSubmit?.(link, utr)} disabled={!link || utr.length !== 12} className="w-full h-12 bg-[#312ECB] font-black uppercase tracking-widest rounded-2xl">Verify & Place Order</Button>
           </div>
         ) : isComboCard ? (
           <div className="space-y-4 min-w-[260px]">
-            <div className="flex items-center justify-between">
-              <span className="text-[12px] font-black uppercase text-slate-800">Combo Builder</span>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[12px] font-black uppercase text-slate-800 dark:text-white tracking-widest">Combo Builder</span>
               {discountPct > 0 && <Badge className="bg-emerald-500 text-white font-black">{discountPct}% OFF</Badge>}
             </div>
-            <div className="max-h-[180px] overflow-y-auto space-y-2 pr-2">
+            <div className="max-h-[220px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
               {comboItems.map((item, idx) => {
                 const s = dynamicServices?.find(sv => sv.id === item.serviceId);
                 return (
-                  <div key={idx} className="bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl flex flex-col gap-2 border border-slate-100 dark:border-slate-700">
+                  <div key={idx} className="bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl flex flex-col gap-2 border border-slate-100 dark:border-slate-700 shadow-sm">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[10px] font-black uppercase truncate flex-1 text-slate-800 dark:text-slate-100">{s?.name || 'Loading...'}</span>
-                      <button onClick={() => setComboItems(prev => prev.filter((_, i) => i !== idx))} className="text-red-400 p-1 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={14}/></button>
+                      <button onClick={() => setComboItems(prev => prev.filter((_, i) => i !== idx))} className="text-red-400 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"><Trash2 size={14}/></button>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Input type="number" value={item.quantity} onChange={(e) => setComboItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: parseInt(e.target.value) || 0 } : it))} className="h-8 flex-1 text-[10px] bg-white text-slate-800" placeholder={`Min ${s?.minQuantity}`} />
+                      <div className="relative flex-1">
+                        <Input type="number" value={item.quantity} onChange={(e) => setComboItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: parseInt(e.target.value) || 0 } : it))} className="h-9 w-full text-[10px] bg-white dark:bg-slate-900 text-slate-800 dark:text-white border-none shadow-inner" placeholder={`Min ${s?.minQuantity}`} />
+                      </div>
                       <span className="text-[9px] font-bold text-slate-400">Min: {s?.minQuantity}</span>
                     </div>
                   </div>
@@ -181,64 +193,70 @@ export function MessageBubble({
               })}
             </div>
             <DropdownMenu>
-              <DropdownMenuTrigger asChild><Button variant="outline" className="w-full h-10 text-[10px] font-black uppercase border-slate-200 text-[#312ECB]"><Plus size={14} className="mr-1" /> Add Service</Button></DropdownMenuTrigger>
-              <DropdownMenuContent className="w-[200px] max-h-[200px] overflow-y-auto">
-                {dynamicServices?.filter(s => !comboItems.find(it => it.serviceId === s.id)).map(s => <DropdownMenuItem key={s.id} onClick={() => setComboItems([...comboItems, { serviceId: s.id, quantity: s.minQuantity }])} className="text-[10px] font-black uppercase">{s.name}</DropdownMenuItem>)}
+              <DropdownMenuTrigger asChild><Button variant="outline" className="w-full h-11 text-[10px] font-black uppercase border-slate-200 text-[#312ECB] rounded-2xl"><Plus size={14} className="mr-1" /> Add Service</Button></DropdownMenuTrigger>
+              <DropdownMenuContent className="w-[200px] max-h-[200px] overflow-y-auto rounded-2xl p-2 shadow-2xl">
+                {dynamicServices?.filter(s => !comboItems.find(it => it.serviceId === s.id)).map(s => <DropdownMenuItem key={s.id} onClick={() => setComboItems([...comboItems, { serviceId: s.id, quantity: s.minQuantity }])} className="text-[10px] font-black uppercase p-3 rounded-xl cursor-pointer">{s.name}</DropdownMenuItem>)}
               </DropdownMenuContent>
             </DropdownMenu>
-            <div className="space-y-2">
-              <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Instagram Target Link</label>
-              <Input placeholder="Paste Post/Profile Link" value={comboLink} onChange={(e) => setComboLink(e.target.value)} className="h-11 text-slate-800" />
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest">Instagram Link</label>
+              <Input placeholder="Post or Profile Link" value={comboLink} onChange={(e) => setComboLink(e.target.value)} className="h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl text-slate-800 dark:text-white shadow-inner" />
             </div>
-            <div className="bg-emerald-50 p-3 rounded-2xl border border-emerald-100 text-center">
-              <p className="text-[13px] font-black text-emerald-600 uppercase">Combo Price: ₹{comboTotal.discounted.toFixed(2)}</p>
+            <div className="bg-emerald-50 dark:bg-emerald-950 p-4 rounded-2xl border border-emerald-100 dark:border-emerald-900 text-center">
+              <p className="text-[14px] font-black text-emerald-600 dark:text-emerald-400 uppercase">Total: ₹{comboTotal.discounted.toFixed(2)}</p>
             </div>
-            <Button onClick={() => onComboSubmit?.(comboItems, comboLink)} disabled={!comboLink || comboItems.length === 0} className="w-full h-14 bg-[#312ECB] font-black uppercase tracking-widest shadow-lg">Confirm Combo Order</Button>
+            <Button onClick={() => onComboSubmit?.(comboItems, comboLink)} disabled={!comboLink || comboItems.length === 0} className="w-full h-14 bg-[#312ECB] hover:bg-[#2825A6] font-black uppercase tracking-widest rounded-2xl shadow-xl">Confirm Bundle Order</Button>
           </div>
         ) : isBulkLinkCard ? (
           <div className="space-y-4 min-w-[260px]">
-            <span className="text-[12px] font-black uppercase text-slate-800">Bulk Link Add</span>
-            <div className="space-y-2">
+            <span className="text-[12px] font-black uppercase text-slate-800 dark:text-white tracking-widest">Bulk Link Manager</span>
+            <div className="space-y-3">
               <div className="flex gap-2">
-                <Input placeholder="Enter Link" value={currentBulkLink} onChange={(e) => setCurrentBulkLink(e.target.value)} className="h-11 text-slate-800" />
-                <Button onClick={() => { if(currentBulkLink) { setBulkLinks([...bulkLinks, currentBulkLink]); setCurrentBulkLink(""); } }} className="h-11 bg-blue-600"><Plus size={18}/></Button>
+                <Input placeholder="Add Instagram Link..." value={currentBulkLink} onChange={(e) => setCurrentBulkLink(e.target.value)} className="h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl text-slate-800 dark:text-white shadow-inner flex-1" />
+                <Button onClick={() => { if(currentBulkLink) { setBulkLinks([...bulkLinks, currentBulkLink]); setCurrentBulkLink(""); } }} className="h-12 w-12 bg-[#312ECB] rounded-2xl shadow-lg"><Plus size={20}/></Button>
               </div>
-              <div className="max-h-[120px] overflow-y-auto space-y-1">
+              <div className="max-h-[140px] overflow-y-auto space-y-1.5 pr-2 custom-scrollbar">
                 {bulkLinks.map((l, i) => (
-                  <div key={i} className="flex items-center justify-between bg-slate-50 p-2 rounded-xl text-[10px] text-slate-600">
+                  <div key={i} className="flex items-center justify-between bg-slate-50 dark:bg-slate-800 p-3 rounded-xl text-[10px] font-bold text-slate-600 dark:text-slate-300 border border-slate-100 dark:border-slate-700">
                     <span className="truncate max-w-[180px]">{l}</span>
-                    <button onClick={() => setBulkLinks(bulkLinks.filter((_, idx) => idx !== i))} className="text-red-400"><Trash2 size={12}/></button>
+                    <button onClick={() => setBulkLinks(bulkLinks.filter((_, idx) => idx !== i))} className="text-red-400 hover:text-red-600 p-1"><Trash2 size={14}/></button>
                   </div>
                 ))}
               </div>
             </div>
-            <Button onClick={() => onBulkLinksSubmit?.(bulkLinks)} disabled={bulkLinks.length === 0} className="w-full h-12 bg-[#312ECB] font-black uppercase">Next: Pick Service</Button>
+            <Button onClick={() => onBulkLinksSubmit?.(bulkLinks)} disabled={bulkLinks.length === 0} className="w-full h-14 bg-[#312ECB] font-black uppercase tracking-widest rounded-2xl shadow-xl">Select Service ({bulkLinks.length} Links)</Button>
           </div>
         ) : isWalletCard ? (
           <div className="space-y-4 min-w-[240px]">
-             <div className="flex flex-col items-center gap-2 p-4 bg-blue-50 rounded-3xl border border-blue-100">
-                <Wallet className="text-[#312ECB]" size={32} />
-                <p className="text-[14px] font-black text-slate-800 uppercase">Wallet Payment</p>
-                <p className="text-[20px] font-black text-[#312ECB]">₹{paymentPrice?.toFixed(2)}</p>
+             <div className="flex flex-col items-center gap-3 p-6 bg-blue-50 dark:bg-blue-900/20 rounded-3xl border border-blue-100 dark:border-blue-900">
+                <div className="w-14 h-14 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center shadow-sm">
+                  <Wallet className="text-[#312ECB]" size={28} />
+                </div>
+                <div className="text-center">
+                  <p className="text-[12px] font-black text-slate-500 uppercase tracking-widest">Wallet Payment</p>
+                  <p className="text-[24px] font-black text-[#312ECB]">₹{paymentPrice?.toFixed(2)}</p>
+                </div>
              </div>
-             <Button onClick={() => onWalletSubmit?.(link)} className="w-full h-12 bg-[#312ECB] font-black uppercase">Confirm Payment</Button>
+             <Button onClick={() => onWalletSubmit?.(link)} className="w-full h-14 bg-[#312ECB] font-black uppercase tracking-widest rounded-2xl shadow-xl">Confirm & Deduct</Button>
           </div>
         ) : (
-          <p className="text-[14px] font-bold whitespace-pre-wrap text-slate-800 dark:text-slate-100">{text}</p>
+          <p className="text-[14px] font-bold whitespace-pre-wrap text-slate-800 dark:text-slate-100 leading-relaxed">{text}</p>
         )}
         {options && !isPaymentCard && !isSuccessCard && !isComboCard && !isBulkLinkCard && !isWalletCard && (
-          <div className="mt-4 space-y-2">
+          <div className="mt-5 space-y-2.5">
             {options.map((opt, i) => (
-              <button key={i} onClick={() => onOptionClick?.(opt)} className="w-full bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-3.5 rounded-2xl flex items-center justify-between group hover:border-[#312ECB]/30 transition-all shadow-sm">
-                <span className="text-[10px] font-black uppercase text-[#312ECB] dark:text-blue-400">{opt}</span>
-                <SendHorizonal size={14} className="text-[#312ECB] dark:text-blue-400 group-hover:translate-x-1 transition-transform" />
+              <button key={i} onClick={() => onOptionClick?.(opt)} className="w-full bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl flex items-center justify-between group hover:border-[#312ECB]/30 transition-all shadow-sm active:scale-95">
+                <span className="text-[10px] font-black uppercase text-[#312ECB] dark:text-blue-400 tracking-widest">{opt}</span>
+                <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-400/10 flex items-center justify-center text-[#312ECB] dark:text-blue-400 group-hover:translate-x-1 transition-transform">
+                  <SendHorizonal size={14} />
+                </div>
               </button>
             ))}
           </div>
         )}
       </div>
-      <div className={cn("text-[9px] mt-1 text-slate-400 px-1", isUser ? "text-right" : "text-left")}>
-        {format(timestamp, 'HH:mm')}
+      <div className={cn("text-[9px] mt-1.5 text-slate-400 font-black px-2 uppercase tracking-tighter", isUser ? "text-right" : "text-left")}>
+        {displayTime}
       </div>
     </div>
   );

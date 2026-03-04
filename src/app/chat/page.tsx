@@ -37,12 +37,6 @@ import { useRouter } from "next/navigation";
 import { SMMService, Platform } from "@/app/lib/constants";
 import { useAuth, useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { placeApiOrder } from "@/app/actions/smm-api";
@@ -258,10 +252,14 @@ export default function ChatPage() {
 
     await batch.commit();
     setChatState('idle');
+    const successServiceName = currentOrder.type === 'combo' 
+      ? `Combo: ${currentOrder.items.map(it => `${it.service.name}(${it.quantity})`).join(', ')}`
+      : currentOrder.items[0]?.service?.name;
+
     botReply(`✅ Order submitted! Verification in progress.`, [], {
       isSuccessCard: true,
       successDetails: {
-        orderId: orderResults[0].orderId, platform: 'Instagram', service: currentOrder.type === 'combo' ? 'Combo Order' : currentOrder.items[0]?.service?.name,
+        orderId: orderResults[0].orderId, platform: 'Instagram', service: successServiceName,
         quantity: currentOrder.items.reduce((a, b) => a + b.quantity, 0) * (currentOrder.bulkLinks?.length || 1),
         price: totalPrice, link: targets[0], utrId: utr
       }
@@ -319,9 +317,13 @@ export default function ChatPage() {
     batch.update(doc(db, "users", user.uid), { balance: increment(-totalPrice) });
     await batch.commit().then(() => {
       setChatState('idle');
+      const successServiceName = currentOrder.type === 'combo' 
+        ? `Combo: ${currentOrder.items.map(it => `${it.service.name}(${it.quantity})`).join(', ')}`
+        : currentOrder.items[0]?.service?.name;
+
       botReply(`✅ Order placed from Wallet!`, [], {
         isSuccessCard: true,
-        successDetails: { orderId: orderResults[0].orderId, platform: 'Instagram', service: 'Dynamic Order', quantity: 0, price: totalPrice, link: targets[0], utrId: 'WALLET' }
+        successDetails: { orderId: orderResults[0].orderId, platform: 'Instagram', service: successServiceName, quantity: 0, price: totalPrice, link: targets[0], utrId: 'WALLET' }
       });
     });
   };
@@ -333,43 +335,47 @@ export default function ChatPage() {
     await addMessage('user', text);
     const cleanText = text.toLowerCase();
 
-    // Reset flow if a new service is detected from a previous message button
-    const serviceMatch = dynamicServices.find((s, i) => cleanText === (i + 1).toString() || cleanText.includes(s.name.toLowerCase()));
+    // Reset flow if a major menu button is clicked
+    const isMajorSwitch = cleanText.includes("single order") || cleanText.includes("combo order") || cleanText.includes("bulk order") || cleanText === 'hi' || cleanText === 'menu';
     
-    // Reset flow if user chooses a main menu option manually or via button
-    const isMainMenuTrigger = cleanText === 'hi' || cleanText.includes("menu") || cleanText.includes("single order") || cleanText.includes("combo order") || cleanText.includes("bulk order");
+    // Check for service selection in buttons (even if state is busy)
+    const serviceMatch = dynamicServices.find((s, i) => cleanText === (i + 1).toString() || cleanText.includes(s.name.toLowerCase()));
+
+    if (isMajorSwitch) {
+      if (cleanText.includes("single order")) {
+        setChatState('choosing_service');
+        setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
+        botReply("Select Instagram service:", dynamicServices.map((s, i) => `${i + 1}. ${s.name}`));
+        return;
+      } else if (cleanText.includes("combo order")) {
+        setChatState('choosing_combo_services');
+        setCurrentOrder({ type: 'combo', platform: 'instagram', items: [] });
+        botReply(`🎁 Configure Combo (${globalDiscounts.combo}% OFF):`, [], { isComboCard: true, dynamicServices, discountPct: globalDiscounts.combo });
+        return;
+      } else if (cleanText.includes("bulk order")) {
+        setChatState('entering_bulk_links');
+        setCurrentOrder({ type: 'bulk', platform: 'instagram', items: [] });
+        botReply("🔗 Add target links for Bulk Order:", [], { isBulkLinkCard: true });
+        return;
+      } else {
+        setChatState('choosing_order_type');
+        const singleLabel = globalDiscounts.single > 0 ? `1. SINGLE ORDER (${globalDiscounts.single}% OFF)` : "1. SINGLE ORDER";
+        const comboLabel = globalDiscounts.combo > 0 ? `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)` : "2. COMBO ORDER";
+        const bulkLabel = globalDiscounts.bulk > 0 ? `3. BULK ORDER (${globalDiscounts.bulk}% OFF)` : "3. BULK ORDER";
+        botReply("👋 Welcome! Choose your ordering method:", [singleLabel, comboLabel, bulkLabel]);
+        return;
+      }
+    }
 
     if (serviceMatch) {
-      setCurrentOrder({ type: 'single', platform: 'instagram', items: [{ service: serviceMatch, quantity: 0, link: '' }] });
+      setCurrentOrder(prev => ({ 
+        type: prev.type === 'bulk' ? 'bulk' : 'single', 
+        platform: 'instagram', 
+        items: [{ service: serviceMatch, quantity: 0, link: '' }],
+        bulkLinks: prev.bulkLinks
+      }));
       setChatState('entering_quantity');
       botReply(`📊 Quantity for ${serviceMatch.name}? (Min ${serviceMatch.minQuantity})`);
-      return;
-    }
-
-    if (cleanText === 'hi' || cleanText.includes("menu")) {
-      setChatState('choosing_order_type');
-      const singleLabel = globalDiscounts.single > 0 ? `1. SINGLE ORDER (${globalDiscounts.single}% OFF)` : "1. SINGLE ORDER";
-      const comboLabel = globalDiscounts.combo > 0 ? `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)` : "2. COMBO ORDER";
-      const bulkLabel = globalDiscounts.bulk > 0 ? `3. BULK ORDER (${globalDiscounts.bulk}% OFF)` : "3. BULK ORDER";
-      botReply("👋 Welcome! Choose your ordering method:", [singleLabel, comboLabel, bulkLabel]);
-      return;
-    }
-
-    // Explicitly handle menu choices even if state is busy
-    if (cleanText.includes("single order")) {
-      setChatState('choosing_service');
-      setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
-      botReply("Select Instagram service:", dynamicServices.map((s, i) => `${i + 1}. ${s.name}`));
-      return;
-    } else if (cleanText.includes("combo order")) {
-      setChatState('choosing_combo_services');
-      setCurrentOrder({ type: 'combo', platform: 'instagram', items: [] });
-      botReply(`🎁 Configure Combo (${globalDiscounts.combo}% OFF):`, [], { isComboCard: true, dynamicServices, discountPct: globalDiscounts.combo });
-      return;
-    } else if (cleanText.includes("bulk order")) {
-      setChatState('entering_bulk_links');
-      setCurrentOrder({ type: 'bulk', platform: 'instagram', items: [] });
-      botReply("🔗 Add target links for Bulk Order:", [], { isBulkLinkCard: true });
       return;
     }
 
@@ -383,14 +389,14 @@ export default function ChatPage() {
           const total = calculateTotalPrice();
           botReply(`✅ Total: ₹${total.toFixed(2)}\n💳 Wallet: ₹${walletBalance.toFixed(2)}`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]);
         } else if (s) {
-          botReply(`⚠️ Minimum quantity for ${s.name} is ${s.minQuantity}. Kripya fir se enter karein.`);
+          botReply(`⚠️ Minimum quantity for ${s.name} is ${s.minQuantity}. Kripya sahi quantity enter karein.`);
         }
         break;
       case 'choosing_payment_method':
         if (cleanText.includes("wallet")) {
           const total = calculateTotalPrice();
           if (walletBalance >= total) botReply("💳 Confirm Wallet Payment:", [], { isWalletCard: true, paymentPrice: total });
-          else botReply("❌ Insufficient balance!", ["💳 ADD FUNDS"]);
+          else botReply("❌ Insufficient balance!", ["💳 ADD FUNDS", "🏠 MAIN MENU"]);
         } else if (cleanText.includes("upi")) {
           botReply(`📸 Pay ₹${calculateTotalPrice().toFixed(2)} via UPI:`, [], { isPaymentCard: true, paymentPrice: calculateTotalPrice() });
         }
@@ -411,19 +417,19 @@ export default function ChatPage() {
         </div>
       </header>
 
-      <div className="bg-white px-6 py-3 flex items-center justify-between border-b z-40">
-        <button onClick={() => router.push('/add-funds')} className="flex items-center gap-2 bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-full border border-emerald-100">
+      <div className="bg-white dark:bg-slate-800 px-6 py-3 flex items-center justify-between border-b dark:border-slate-700 z-40">
+        <button onClick={() => router.push('/add-funds')} className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-800">
           <Wallet size={14} /> <span className="text-[11px] font-black">₹{walletBalance.toFixed(2)}</span> <PlusCircle size={14} />
         </button>
-        <button onClick={() => router.push('/orders')} className="text-[11px] font-black uppercase text-[#312ECB] flex items-center gap-2"><History size={16} /> HISTORY</button>
+        <button onClick={() => router.push('/orders')} className="text-[11px] font-black uppercase text-[#312ECB] dark:text-blue-400 flex items-center gap-2"><History size={16} /> HISTORY</button>
       </div>
 
       <main className="flex-1 overflow-y-auto p-4 flex flex-col whatsapp-bg relative">
         {activeBroadcast && (
           <div className="fixed inset-0 flex items-center justify-center z-[100] p-6 bg-black/40 backdrop-blur-sm">
-            <div className="w-full max-w-[350px] bg-white rounded-[3rem] p-8 items-center text-center space-y-4">
+            <div className="w-full max-w-[350px] bg-white dark:bg-slate-900 rounded-[3rem] p-8 items-center text-center space-y-4 shadow-2xl">
               <Megaphone size={32} className="text-[#312ECB] mx-auto" />
-              <p className="text-[15px] font-black text-slate-800">{activeBroadcast.text}</p>
+              <p className="text-[15px] font-black text-slate-800 dark:text-white">{activeBroadcast.text}</p>
               <Button onClick={() => setActiveBroadcast(null)} className="rounded-full bg-[#312ECB] w-full uppercase font-black">Close</Button>
             </div>
           </div>
@@ -432,16 +438,15 @@ export default function ChatPage() {
         {messages.map((m: any) => (
           <MessageBubble key={m.id} sender={m.sender} text={m.text} options={m.options} onOptionClick={handleSend}
             isPaymentCard={m.isPaymentCard} paymentPrice={m.paymentPrice} onPaymentSubmit={(link, utr) => handleBundlePaymentSubmit(utr, link)}
-            isSuccessCard={m.isSuccessCard} successDetails={m.successDetails} isBulkLinkCard={m.isBulkLinkCard} onBulkLinksSubmit={(l) => { setCurrentOrder(p => ({ ...p, type: 'bulk', bulkLinks: l })); setChatState('choosing_service'); botReply("Select Service:", dynamicServices.map((s, i) => `${i + 1}. ${s.name}`)); }}
+            isSuccessCard={m.isSuccessCard} successDetails={m.successDetails} isBulkLinkCard={m.isBulkLinkCard} onBulkLinksSubmit={(l) => { setCurrentOrder(p => ({ ...p, type: 'bulk', bulkLinks: l })); setChatState('choosing_service'); botReply("Select Service for Bulk Order:", dynamicServices.map((s, i) => `${i + 1}. ${s.name}`)); }}
             isComboCard={m.isComboCard} onComboSubmit={(items, link) => { 
-              // Validate min quantities
               const invalid = items.find(it => {
                 const s = dynamicServices.find(ds => ds.id === it.serviceId);
                 return it.quantity < (s?.minQuantity || 0);
               });
               if (invalid) {
                 const s = dynamicServices.find(ds => ds.id === invalid.serviceId);
-                toast({ variant: "destructive", title: "Invalid Quantity", description: `Minimum for ${s?.name} is ${s?.minQuantity}.` });
+                toast({ variant: "destructive", title: "Min Quantity Error", description: `${s?.name} requires min ${s?.minQuantity}.` });
                 return;
               }
               setCurrentOrder(p => ({ ...p, type: 'combo', items: items.map(it => ({ service: dynamicServices.find(s => s.id === it.serviceId)!, quantity: it.quantity, link })) })); 
@@ -455,10 +460,10 @@ export default function ChatPage() {
         <div ref={scrollRef} />
       </main>
 
-      <footer className="p-3 bg-white border-t z-50">
+      <footer className="p-3 bg-white dark:bg-slate-900 border-t dark:border-slate-800 z-50">
         <div className="flex items-center gap-3">
-          <Input value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSend()} placeholder="Type 'Hi' for Menu..." className="flex-1 bg-[#F0F2F5] rounded-full h-11" />
-          <Button onClick={() => handleSend()} size="icon" className="rounded-full h-12 w-12 bg-[#25D366]"><Send size={22} /></Button>
+          <Input value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSend()} placeholder="Type 'Hi' for Menu..." className="flex-1 bg-[#F0F2F5] dark:bg-slate-800 rounded-full h-11 border-none font-bold" />
+          <Button onClick={() => handleSend()} size="icon" className="rounded-full h-12 w-12 bg-[#25D366] hover:bg-[#20bd5b] shadow-lg"><Send size={22} /></Button>
         </div>
       </footer>
     </div>
