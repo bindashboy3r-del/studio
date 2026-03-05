@@ -144,12 +144,20 @@ export default function ChatPage() {
   useEffect(() => {
     if (!db || !currentUser) return; 
     
+    // Fixed: Simplified query to avoid "Index Required" error. Sorting done client-side.
     const unsubBroadcast = onSnapshot(
-      query(collection(db, "globalAnnouncements"), where("active", "==", true), orderBy("timestamp", "desc"), limit(1)), 
+      query(collection(db, "globalAnnouncements"), where("active", "==", true)), 
       (snap) => {
         if (!snap.empty) {
-          const data = snap.docs[0].data();
-          setActiveBroadcast(data);
+          const docs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+          // Sort client-side to get latest
+          docs.sort((a, b) => {
+            const timeA = a.timestamp?.toMillis?.() || a.timestamp?.seconds || 0;
+            const timeB = b.timestamp?.toMillis?.() || b.timestamp?.seconds || 0;
+            return timeB - timeA;
+          });
+          const latest = docs[0];
+          setActiveBroadcast(latest);
           if (!hasBroadcastShown.current) {
             setIsBroadcastOpen(true);
             hasBroadcastShown.current = true;
@@ -173,6 +181,7 @@ export default function ChatPage() {
       if (snap.exists()) setPaymentConfig(snap.data());
     });
 
+    // Fixed: Simplified notification query to avoid index errors
     const unsubNotifs = onSnapshot(collection(db, "users", currentUser.uid, "notifications"), (snap) => {
       const items = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((n: any) => n.read === false);
       setNotifications(items);
