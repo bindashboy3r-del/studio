@@ -80,7 +80,7 @@ export default function AuthPage() {
             {user ? "WELCOME BACK" : "SOCIALBOOST"}
           </h1>
           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em]">
-            {user ? (user.displayName || user.email?.split('@')[0]) : "Powering SMM Automation"}
+            {user ? (user.displayName || user.email?.split('@')[0]) : "GET VIRAL IN JUST ONE CLICK 🚀"}
           </p>
         </div>
 
@@ -122,7 +122,7 @@ export default function AuthPage() {
             </Button>
             <div className="mt-6 text-center">
               <button type="button" onClick={() => setIsLogin(!isLogin)} className="text-[11px] font-black text-[#312ECB] uppercase tracking-widest hover:opacity-80">
-                {isLogin ? "Join SocialBoost" : "Already a member? Login"}
+                {isLogin ? "New Member? Create Free Account" : "Already a member? Login"}
               </button>
             </div>
           </form>
