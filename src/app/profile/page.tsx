@@ -21,7 +21,9 @@ import {
   Wallet,
   PlusCircle,
   ShieldCheck,
-  LayoutGrid
+  LayoutGrid,
+  FileText,
+  X
 } from "lucide-react";
 import {
   Dialog,
@@ -169,11 +171,56 @@ export default function ProfilePage() {
 
         <section className="space-y-3">
           <div className="flex items-center gap-2 text-[8px] font-black uppercase text-slate-400 tracking-widest px-1">
-            <HelpCircle size={12} /> Support
+            <HelpCircle size={12} /> Support & Legal
           </div>
-          <Button asChild variant="outline" className="w-full h-12 bg-white dark:bg-slate-900 border-none rounded-xl font-black text-[9px] uppercase tracking-widest gap-2 shadow-sm">
-            <a href="https://wa.me/919116399517" target="_blank" rel="noopener noreferrer"><MessageCircle size={14} className="text-[#25D366]" /> WhatsApp Support</a>
-          </Button>
+          <div className="space-y-2">
+            <Button asChild variant="outline" className="w-full h-12 bg-white dark:bg-slate-900 border-none rounded-xl font-black text-[9px] uppercase tracking-widest gap-2 shadow-sm">
+              <a href="https://wa.me/919116399517" target="_blank" rel="noopener noreferrer"><MessageCircle size={14} className="text-[#25D366]" /> WhatsApp Support</a>
+            </Button>
+
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="w-full h-12 bg-white dark:bg-slate-900 border-none rounded-xl font-black text-[9px] uppercase tracking-widest gap-2 shadow-sm">
+                  <FileText size={14} className="text-blue-500" /> Terms & Conditions
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-[360px] rounded-[3rem] border-none shadow-2xl bg-white dark:bg-slate-900 p-0 overflow-hidden">
+                <div className="p-8 space-y-8 relative">
+                  <DialogHeader className="space-y-1 text-center">
+                    <DialogTitle className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Terms & Conditions</DialogTitle>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">SocialBoost Official Guidelines</p>
+                  </DialogHeader>
+
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <h4 className="text-[10px] font-black text-[#312ECB] uppercase tracking-widest">1. Service Usage</h4>
+                      <p className="text-[13px] font-bold text-slate-600 dark:text-slate-300 leading-relaxed">
+                        SocialBoost is an automation tool for social media services. We are not affiliated with Instagram.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h4 className="text-[10px] font-black text-[#312ECB] uppercase tracking-widest">2. Account Safety</h4>
+                      <p className="text-[13px] font-bold text-slate-600 dark:text-slate-300 leading-relaxed">
+                        We do not ask for your Instagram password. Ensure your account is <span className="text-red-500 uppercase">Public</span> before ordering.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h4 className="text-[10px] font-black text-[#312ECB] uppercase tracking-widest">3. Refund Policy</h4>
+                      <p className="text-[13px] font-bold text-slate-600 dark:text-slate-300 leading-relaxed">
+                        Once payment is confirmed, no refunds will be processed as order is final.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 text-center">
+                    <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest italic">© 2025 SocialBoost Pro System</p>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         </section>
 
         <div className="pt-4">
