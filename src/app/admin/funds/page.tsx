@@ -24,7 +24,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ChevronLeft, RefreshCw, Check, X as CloseIcon, Wallet, Zap, Save, Trash2, Mail } from "lucide-react";
+import { ChevronLeft, RefreshCw, Check, X as CloseIcon, Wallet, Zap, Save } from "lucide-react";
 import { useFirestore, useUser } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { errorEmitter } from "@/firebase/error-emitter";
@@ -134,7 +134,8 @@ export default function FundRequestsPage() {
 
     setProcessingId(request.id);
     
-    const finalCredit = action === 'Approved' ? parseFloat(creditAmounts[request.id]) : 0;
+    const finalCreditStr = creditAmounts[request.id];
+    const finalCredit = action === 'Approved' ? parseFloat(finalCreditStr) : 0;
     const validatedAmount = isNaN(finalCredit) ? request.amount : finalCredit;
 
     const batch = writeBatch(db);
@@ -153,10 +154,14 @@ export default function FundRequestsPage() {
         balance: increment(validatedAmount)
       });
 
+      const bonusPct = parseFloat(globalBonus) || 0;
+      const isBonusApplied = validatedAmount > request.amount;
+      const bonusMsg = isBonusApplied ? ` (Includes ${bonusPct}% bonus)` : "";
+
       const notifRef = doc(collection(db, "users", request.userId, "notifications"));
       batch.set(notifRef, {
         title: '💰 Wallet Credited!',
-        message: `₹${validatedAmount.toFixed(0)} has been added to your wallet successfully.`,
+        message: `₹${validatedAmount.toFixed(0)} has been added to your wallet successfully.${bonusMsg}`,
         read: false,
         createdAt: serverTimestamp()
       });
