@@ -12,7 +12,7 @@ import { doc, setDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useRouter } from "next/navigation";
-import { Zap, ShieldCheck, Rocket, Globe, Loader2, ArrowRight } from "lucide-react";
+import { Zap, ShieldCheck, Rocket, Globe, Loader2, ArrowRight, Instagram } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth, useFirestore, useUser } from "@/firebase";
 
@@ -129,17 +129,23 @@ export default function AuthPage() {
         )}
       </div>
 
-      {/* Footer Version Info */}
-      <div className="mt-16 flex flex-col items-center">
-        <p className="text-[11px] font-black text-slate-300 uppercase tracking-[0.5em]">
-          PRO VERSION 3.0
-        </p>
-      </div>
+      {/* Footer / Created By Section */}
+      <div className="mt-16 flex flex-col items-center gap-6">
+        <div className="flex items-center gap-2.5 bg-white/80 backdrop-blur-md px-5 py-2.5 rounded-2xl border border-white shadow-3d-sm transition-all hover:shadow-3d active:scale-95 cursor-default">
+          <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Created by</span>
+          <div className="flex items-center gap-1.5 text-[#312ECB]">
+            <Instagram size={14} className="fill-current/10" />
+            <span className="text-[12px] font-black tracking-tight italic">@bindash_boy3</span>
+          </div>
+        </div>
 
-      {/* Next.js N Logo (Bottom Left) */}
-      <div className="absolute bottom-8 left-8">
-        <div className="w-10 h-10 bg-[#111B21] rounded-full flex items-center justify-center shadow-lg">
-          <span className="text-white font-black text-lg italic">N</span>
+        <div className="text-center space-y-1.5">
+          <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.4em]">
+            © {new Date().getFullYear()} SOCIALBOOST • ALL RIGHTS RESERVED
+          </p>
+          <p className="text-[8px] font-bold text-[#312ECB]/30 uppercase tracking-[0.6em]">
+            PREMIUM VERSION 3.0
+          </p>
         </div>
       </div>
     </div>
