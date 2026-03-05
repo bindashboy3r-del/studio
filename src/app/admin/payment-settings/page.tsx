@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -96,7 +97,6 @@ export default function PaymentSettingsPage() {
       </header>
 
       <main className="max-w-md mx-auto p-6 space-y-6 mt-4">
-        {/* Payment Visibility Controls */}
         <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-slate-100 space-y-6">
           <div className="flex items-center gap-3 border-b border-slate-50 pb-4">
             <ToggleLeft className="text-[#312ECB]" size={20} />
@@ -157,7 +157,7 @@ export default function PaymentSettingsPage() {
                   placeholder="e.g. paytmqr2810@paytm" 
                   value={upiId}
                   onChange={(e) => setUpiId(e.target.value)}
-                  className="h-14 bg-slate-50 border-none rounded-2xl pl-12 pr-5 text-sm font-bold shadow-inner"
+                  className="h-14 bg-slate-50 border-none rounded-2xl pl-12 pr-5 text-sm font-bold shadow-inner text-slate-900"
                 />
               </div>
             </div>
@@ -168,7 +168,7 @@ export default function PaymentSettingsPage() {
                 placeholder="e.g. SocialBoost Official" 
                 value={merchantName}
                 onChange={(e) => setMerchantName(e.target.value)}
-                className="h-14 bg-slate-50 border-none rounded-2xl px-5 text-sm font-bold shadow-inner"
+                className="h-14 bg-slate-50 border-none rounded-2xl px-5 text-sm font-bold shadow-inner text-slate-900"
               />
             </div>
 
@@ -180,7 +180,7 @@ export default function PaymentSettingsPage() {
                   placeholder="Direct link to your QR png/jpg" 
                   value={qrImageUrl}
                   onChange={(e) => setQrImageUrl(e.target.value)}
-                  className="h-14 bg-slate-50 border-none rounded-2xl pl-12 pr-5 text-sm font-bold shadow-inner"
+                  className="h-14 bg-slate-50 border-none rounded-2xl pl-12 pr-5 text-sm font-bold shadow-inner text-slate-900"
                 />
               </div>
               <p className="text-[9px] font-bold text-slate-400 uppercase mt-1 ml-1">Leave empty to use auto-generated QR.</p>

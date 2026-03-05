@@ -119,7 +119,7 @@ export default function DiscountSettingsPage() {
                 type="number" 
                 value={discounts.single}
                 onChange={(e) => setDiscounts({...discounts, single: Number(e.target.value)})}
-                className="h-14 bg-slate-50 border-none rounded-2xl px-6 text-lg font-black shadow-inner"
+                className="h-14 bg-slate-50 border-none rounded-2xl px-6 text-lg font-black shadow-inner text-slate-900 focus-visible:ring-1 focus-visible:ring-[#312ECB]/20"
               />
             </div>
             <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Applied to every standard order.</p>
@@ -136,7 +136,7 @@ export default function DiscountSettingsPage() {
                 type="number" 
                 value={discounts.combo}
                 onChange={(e) => setDiscounts({...discounts, combo: Number(e.target.value)})}
-                className="h-14 bg-slate-50 border-none rounded-2xl px-6 text-lg font-black shadow-inner"
+                className="h-14 bg-slate-50 border-none rounded-2xl px-6 text-lg font-black shadow-inner text-slate-900 focus-visible:ring-1 focus-visible:ring-[#312ECB]/20"
               />
             </div>
             <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Applied to multi-service bundle carts.</p>
@@ -153,7 +153,7 @@ export default function DiscountSettingsPage() {
                 type="number" 
                 value={discounts.bulk}
                 onChange={(e) => setDiscounts({...discounts, bulk: Number(e.target.value)})}
-                className="h-14 bg-slate-50 border-none rounded-2xl px-6 text-lg font-black shadow-inner"
+                className="h-14 bg-slate-50 border-none rounded-2xl px-6 text-lg font-black shadow-inner text-slate-900 focus-visible:ring-1 focus-visible:ring-[#312ECB]/20"
               />
             </div>
             <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">Applied when multiple links are provided.</p>
