@@ -1,4 +1,3 @@
-
 "use client";
 
 import { cn } from "@/lib/utils";
@@ -20,7 +19,8 @@ import {
   Package,
   Info,
   ChevronRight,
-  TrendingDown
+  TrendingDown,
+  Loader2
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
@@ -136,9 +136,12 @@ export function MessageBubble({
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      toast({ title: "QR Saved" });
-    } catch (e) { window.open(qrUrl, '_blank'); }
-    finally { setIsDownloading(false); }
+      toast({ title: "QR Saved!" });
+    } catch (e) { 
+      window.open(qrUrl, '_blank'); 
+    } finally { 
+      setIsDownloading(false); 
+    }
   };
 
   const handleWhatsAppConfirmation = () => {
@@ -413,7 +416,7 @@ export function MessageBubble({
                   <Copy size={12} className="mr-1.5" /> COPY UPI
                 </Button>
                 <Button onClick={handleDownloadQR} disabled={isDownloading} variant="outline" className="flex-1 h-10 text-[9px] font-black uppercase rounded-xl border-white/10 shadow-3d active:shadow-3d-pressed text-[#312ECB]">
-                  <Download size={12} className="mr-1.5" /> SAVE QR
+                  {isDownloading ? <Loader2 size={12} className="animate-spin mr-1.5" /> : <Download size={12} className="mr-1.5" />} SAVE QR
                 </Button>
               </div>
             </div>

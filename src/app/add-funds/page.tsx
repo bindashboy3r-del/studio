@@ -14,7 +14,8 @@ import {
   QrCode,
   Copy,
   CheckCircle2,
-  MessageCircle
+  MessageCircle,
+  Download
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,7 @@ export default function AddFundsPage() {
   const [amount, setAmount] = useState("");
   const [utrId, setUtrId] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [globalBonus, setGlobalBonus] = useState(0);
   const [paymentConfig, setPaymentConfig] = useState<any>(null);
 
@@ -55,6 +57,27 @@ export default function AddFundsPage() {
   const upiLink = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&cu=INR`;
   const generatedQr = `https://quickchart.io/qr?text=${encodeURIComponent(upiLink)}&size=400&margin=1&format=png`;
   const finalQrUrl = customQrUrl || generatedQr;
+
+  const handleDownloadQR = async () => {
+    setIsDownloading(true);
+    try {
+      const response = await fetch(finalQrUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `SocialBoost_QR.png`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast({ title: "QR Saved!", description: "Image downloaded successfully." });
+    } catch (e) {
+      window.open(finalQrUrl, '_blank');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const handleManualSubmit = async () => {
     if (!user || !db || !amount || !utrId) {
@@ -140,7 +163,7 @@ export default function AddFundsPage() {
           </div>
         )}
 
-        <div className="bg-white rounded-[1.2rem] p-4 shadow-sm border border-gray-50 flex flex-col items-center space-y-2.5">
+        <div className="bg-white rounded-[1.2rem] p-4 shadow-sm border border-gray-50 flex flex-col items-center space-y-3">
           <div className="text-center">
             <h3 className="text-[8px] font-black uppercase tracking-widest text-slate-400">Step 1: Pay via QR</h3>
             <p className="text-[8px] font-bold text-slate-800 uppercase mt-0.5">{merchantName}</p>
@@ -150,17 +173,27 @@ export default function AddFundsPage() {
             <img 
               src={finalQrUrl} 
               alt="Payment QR" 
-              className="w-28 h-28 object-contain rounded-md"
+              className="w-32 h-32 object-contain rounded-md"
             />
           </div>
 
-          <button 
-            onClick={copyUpi}
-            className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-50 rounded-full border border-slate-100 shadow-sm active:scale-95 transition-all"
-          >
-            <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">{upiId}</span>
-            <Copy size={8} className="text-[#312ECB]" />
-          </button>
+          <div className="flex gap-2 w-full">
+            <button 
+              onClick={copyUpi}
+              className="flex-1 flex items-center justify-center gap-2 py-2 bg-slate-50 rounded-xl border border-slate-100 shadow-sm active:scale-95 transition-all"
+            >
+              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">{upiId}</span>
+              <Copy size={10} className="text-[#312ECB]" />
+            </button>
+            <button 
+              onClick={handleDownloadQR}
+              disabled={isDownloading}
+              className="px-4 py-2 bg-[#312ECB]/10 text-[#312ECB] rounded-xl border border-[#312ECB]/20 shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2"
+            >
+              {isDownloading ? <Loader2 size={12} className="animate-spin" /> : <Download size={14} />}
+              <span className="text-[8px] font-black uppercase">Save QR</span>
+            </button>
+          </div>
         </div>
 
         <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-50 space-y-4">
