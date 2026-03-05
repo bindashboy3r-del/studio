@@ -35,7 +35,8 @@ import {
   Youtube,
   Facebook,
   MessageCircle,
-  Loader2
+  Loader2,
+  Bell
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { SMMService, Platform } from "@/app/lib/constants";
@@ -88,6 +89,7 @@ export default function ChatPage() {
   const [globalDiscounts, setGlobalDiscounts] = useState({ single: 0, combo: 0, bulk: 0 });
   const [socialLinks, setSocialLinks] = useState<any>(null);
   const [showSocialMenu, setShowSocialMenu] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
   
   const [sessionStartTime] = useState(() => Date.now());
   const hasInitialGreeted = useRef(false);
@@ -134,7 +136,8 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
-    if (!db || !user) return; // Fixed: Wait for user to prevent permission errors
+    if (!db || !user) return; 
+    
     const unsubBroadcast = onSnapshot(query(collection(db, "globalAnnouncements"), where("active", "==", true), limit(1)), (snap) => {
       if (!snap.empty) setActiveBroadcast(snap.docs[0].data());
       else setActiveBroadcast(null);
@@ -155,10 +158,15 @@ export default function ChatPage() {
       if (snap.exists()) setSocialLinks(snap.data());
     });
 
+    const unsubNotifs = onSnapshot(query(collection(db, "users", user.uid, "notifications"), where("read", "==", false), limit(10)), (snap) => {
+      setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
     return () => {
       unsubBroadcast();
       unsubDiscounts();
       unsubSocial();
+      unsubNotifs();
     };
   }, [db, user]);
 
@@ -453,6 +461,12 @@ export default function ChatPage() {
         </div>
         <div className="flex items-center gap-2">
           <button onClick={toggleTheme} className="text-slate-400 p-1">{theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}</button>
+          <div className="relative">
+            <button className="text-slate-400 p-1"><Bell size={16} /></button>
+            {notifications.length > 0 && (
+              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-white" />
+            )}
+          </div>
           <button onClick={() => router.push('/profile')} className="w-7 h-7 rounded-full bg-[#312ECB] text-white font-black text-[10px]">{user?.displayName?.[0] || 'U'}</button>
         </div>
       </header>
@@ -461,7 +475,7 @@ export default function ChatPage() {
         <button onClick={() => router.push('/add-funds')} className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 px-2 py-1 rounded-full border border-emerald-100 dark:border-emerald-800">
           <Wallet size={10} /> <span className="text-[9px] font-black">₹{walletBalance.toFixed(0)}</span> <PlusCircle size={10} />
         </button>
-        <button onClick={() => router.push('/orders')} className="text-[9px] font-black uppercase text-[#312ECB] dark:text-blue-400 flex items-center gap-1"><History size={12} /> LOGS</button>
+        <button onClick={() => router.push('/orders')} className="text-[9px] font-black uppercase text-[#312ECB] dark:text-blue-400 flex items-center gap-1"><History size={12} /> HISTORY</button>
       </div>
 
       <main className="flex-1 overflow-y-auto p-2.5 flex flex-col whatsapp-bg relative pb-16">
