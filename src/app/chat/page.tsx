@@ -17,7 +17,8 @@ import {
   getDoc,
   updateDoc,
   deleteDoc,
-  getDocs
+  getDocs,
+  Timestamp
 } from "firebase/firestore";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
@@ -106,6 +107,7 @@ export default function ChatPage() {
   const [showSocialMenu, setShowSocialMenu] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [sessionStartTime, setSessionStartTime] = useState<Date>(new Date());
   
   const hasInitialGreeted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -119,7 +121,36 @@ export default function ChatPage() {
     return { user, isUserLoading };
   }
 
-  // 7-Day Auto-Cleanup for Chats
+  // Session Management: Keep chat only when returning from History/Orders
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    
+    const isReturning = sessionStorage.getItem('keepChatSession') === 'true';
+    const storedStartTime = sessionStorage.getItem('chatSessionStartTime');
+    
+    if (isReturning && storedStartTime) {
+      setSessionStartTime(new Date(storedStartTime));
+    } else {
+      const now = new Date();
+      setSessionStartTime(now);
+      sessionStorage.setItem('chatSessionStartTime', now.toISOString());
+    }
+    
+    // Reset the flag so that navigating to Profile next time clears the chat
+    sessionStorage.removeItem('keepChatSession');
+  }, []);
+
+  const navigateWithSession = (path: string, keep: boolean) => {
+    if (keep) {
+      sessionStorage.setItem('keepChatSession', 'true');
+    } else {
+      sessionStorage.removeItem('keepChatSession');
+      sessionStorage.removeItem('chatSessionStartTime');
+    }
+    router.push(path);
+  };
+
+  // 7-Day Rolling Auto-Cleanup for Chats
   useEffect(() => {
     if (!db || !currentUser) return;
     const cleanupOldChats = async () => {
@@ -134,10 +165,10 @@ export default function ChatPage() {
           const batch = writeBatch(db);
           snap.docs.forEach(d => batch.delete(d.ref));
           await batch.commit();
-          console.log(`Auto-cleaned ${snap.size} old chat messages.`);
+          console.log(`Auto-cleaned ${snap.size} messages older than 7 days.`);
         }
       } catch (e) {
-        console.error("Cleanup failed", e);
+        console.error("Rolling cleanup failed", e);
       }
     };
     cleanupOldChats();
@@ -214,8 +245,13 @@ export default function ChatPage() {
 
   const messagesQuery = useMemoFirebase(() => {
     if (!db || !currentUser) return null;
-    return query(collection(db, "users", currentUser.uid, "chatMessages"), orderBy("timestamp", "asc"));
-  }, [db, currentUser]);
+    // Query messages sent after the session started to simulate "clear on navigation"
+    return query(
+      collection(db, "users", currentUser.uid, "chatMessages"), 
+      where("timestamp", ">=", Timestamp.fromDate(sessionStartTime)),
+      orderBy("timestamp", "asc")
+    );
+  }, [db, currentUser, sessionStartTime]);
 
   const { data: messages, isLoading: isMessagesLoading } = useCollection(messagesQuery);
 
@@ -567,17 +603,17 @@ export default function ChatPage() {
             </SheetContent>
           </Sheet>
 
-          <button onClick={() => router.push('/profile')} className="w-7 h-7 rounded-full bg-[#312ECB] text-white font-black text-[10px]">{currentUser?.displayName?.[0] || 'U'}</button>
+          <button onClick={() => navigateWithSession('/profile', false)} className="w-7 h-7 rounded-full bg-[#312ECB] text-white font-black text-[10px]">{currentUser?.displayName?.[0] || 'U'}</button>
         </div>
       </header>
 
       <div className="bg-white dark:bg-slate-800 px-3 py-1.5 flex items-center justify-between border-b dark:border-slate-700 z-40">
-        <button onClick={() => router.push('/add-funds')} className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 px-2 py-1 rounded-full border border-emerald-100 dark:border-emerald-800">
+        <button onClick={() => navigateWithSession('/add-funds', false)} className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 px-2 py-1 rounded-full border border-emerald-100 dark:border-emerald-800">
           <Wallet size={10} /> <span className="text-[9px] font-black">₹{walletBalance.toFixed(0)}</span> <PlusCircle size={10} />
         </button>
         <div className="flex items-center gap-3">
-          <button onClick={() => router.push('/orders')} className="text-[8px] font-black uppercase text-[#312ECB] dark:text-blue-400 flex items-center gap-1"><History size={10} /> ORDERS</button>
-          <button onClick={() => router.push('/chat-logs')} className="text-[8px] font-black uppercase text-pink-500 dark:text-pink-400 flex items-center gap-1"><MessageSquareText size={10} /> CHATS</button>
+          <button onClick={() => navigateWithSession('/orders', true)} className="text-[8px] font-black uppercase text-[#312ECB] dark:text-blue-400 flex items-center gap-1"><History size={10} /> ORDERS</button>
+          <button onClick={() => navigateWithSession('/chat-logs', true)} className="text-[8px] font-black uppercase text-pink-500 dark:text-pink-400 flex items-center gap-1"><MessageSquareText size={10} /> CHATS</button>
         </div>
       </div>
 
@@ -621,25 +657,26 @@ export default function ChatPage() {
         {isTyping && <TypingIndicator />}
         <div ref={scrollRef} />
 
-        <div className="fixed bottom-16 right-3 z-50 flex flex-col items-end gap-2">
+        {/* Floating Social Menu - Moved to Left and Smaller */}
+        <div className="fixed bottom-16 left-3 z-50 flex flex-col items-start gap-2">
           {showSocialMenu && (
             <div className="flex flex-col gap-2 mb-1 animate-in slide-in-from-bottom-5 duration-300">
               {socialLinks?.instagram && (
-                <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="w-8 h-8 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 rounded-full flex items-center justify-center text-white shadow-lg"><Instagram size={16} /></a>
+                <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="w-7 h-7 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 rounded-full flex items-center justify-center text-white shadow-lg"><Instagram size={14} /></a>
               )}
               {socialLinks?.whatsapp && (
-                <a href={socialLinks.whatsapp} target="_blank" rel="noopener noreferrer" className="w-8 h-8 bg-[#25D366] rounded-full flex items-center justify-center text-white shadow-lg"><MessageCircle size={16} /></a>
+                <a href={socialLinks.whatsapp} target="_blank" rel="noopener noreferrer" className="w-7 h-7 bg-[#25D366] rounded-full flex items-center justify-center text-white shadow-lg"><MessageCircle size={14} /></a>
               )}
             </div>
           )}
           <button 
             onClick={() => setShowSocialMenu(!showSocialMenu)}
             className={cn(
-              "w-10 h-10 rounded-full flex items-center justify-center text-white shadow-xl transition-all active:scale-90",
+              "w-8 h-8 rounded-full flex items-center justify-center text-white shadow-xl transition-all active:scale-90",
               showSocialMenu ? "bg-red-500 rotate-90" : "bg-[#312ECB]"
             )}
           >
-            {showSocialMenu ? <X size={18} /> : <Share2 size={18} />}
+            {showSocialMenu ? <X size={16} /> : <Share2 size={16} />}
           </button>
         </div>
       </main>
