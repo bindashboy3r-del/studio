@@ -14,7 +14,8 @@ import {
   Hash,
   AlertCircle,
   Zap,
-  ArrowUpDown
+  ArrowUpDown,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,7 +70,7 @@ export default function ServiceManagerPage() {
 
   const ADMIN_EMAIL = "chetanmadhav4@gmail.com";
   const ADMIN_UID = "s55uL0f8PmcypR75usVYOLwVs7O2";
-  const isActuallyAdmin = user?.email === ADMIN_EMAIL || user?.uid === ADMIN_UID;
+  const isActuallyAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase() || user?.uid === ADMIN_UID;
 
   const servicesQuery = useMemoFirebase(() => {
     if (!db || !isActuallyAdmin) return null;
@@ -80,6 +81,7 @@ export default function ServiceManagerPage() {
 
   const [isAdding, setIsAdding] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [newService, setNewService] = useState<Partial<Service>>({
     id: "",
     name: "",
@@ -169,20 +171,24 @@ export default function ServiceManagerPage() {
   };
 
   const handleDelete = (id: string) => {
-    if (!db || !isActuallyAdmin) return;
-    if (confirm("Are you sure? Users will no longer see this service.")) {
-      const docRef = doc(db, "services", id);
-      deleteDoc(docRef)
-        .then(() => {
-          toast({ title: "Service Deleted", description: "Item removed from database." });
-        })
-        .catch((err) => {
-          errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: docRef.path,
-            operation: 'delete'
-          }));
-        });
-    }
+    if (!db || !isActuallyAdmin || deletingId) return;
+    
+    setDeletingId(id);
+    const docRef = doc(db, "services", id);
+    
+    deleteDoc(docRef)
+      .then(() => {
+        toast({ title: "Service Deleted", description: "Removed successfully." });
+      })
+      .catch((err) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: docRef.path,
+          operation: 'delete'
+        }));
+      })
+      .finally(() => {
+        setDeletingId(null);
+      });
   };
 
   if (isUserLoading || (!user && !isUserLoading)) {
@@ -274,7 +280,7 @@ export default function ServiceManagerPage() {
 
           <div className="space-y-4">
             {services?.map((service) => (
-              <div key={service.id} className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 flex flex-col md:flex-row md:items-center gap-6 group transition-all hover:shadow-md">
+              <div key={service.id} className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 flex flex-col md:flex-row md:items-center gap-6 group transition-all hover:shadow-md relative">
                 <div className="flex items-center gap-4 min-w-[50px]">
                    <span className="text-[12px] font-black text-slate-300">#{service.order}</span>
                 </div>
@@ -326,8 +332,12 @@ export default function ServiceManagerPage() {
                   </div>
                 </div>
 
-                <button onClick={() => handleDelete(service.id)} className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
-                  <Trash2 size={18} />
+                <button 
+                  onClick={() => handleDelete(service.id)} 
+                  disabled={deletingId === service.id}
+                  className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                >
+                  {deletingId === service.id ? <Loader2 size={18} className="animate-spin text-red-500" /> : <Trash2 size={18} />}
                 </button>
               </div>
             ))}
