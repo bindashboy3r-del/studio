@@ -56,6 +56,7 @@ type ChatState =
   | 'idle' 
   | 'initial'
   | 'choosing_order_type'
+  | 'bulk_entering_links'
   | 'choosing_service' 
   | 'entering_quantity' 
   | 'configuring_combo'
@@ -71,6 +72,7 @@ interface OrderInProgress {
   type: 'single' | 'combo' | 'bulk';
   platform: Platform;
   items: OrderItem[];
+  tempLinks?: string[];
 }
 
 export default function ChatPage() {
@@ -339,8 +341,8 @@ export default function ChatPage() {
         const basePrice = currentOrder.items.reduce((acc, item) => acc + (item.quantity / 1000) * (item.service.pricePer1000 || 0), 0);
         totalPrice = basePrice * (1 - disc / 100);
       } else {
-        const s = currentOrder.items[0]?.service;
-        const qty = currentOrder.items[0]?.quantity;
+        const s = currentOrder.items[0].service;
+        const qty = currentOrder.items[0].quantity;
         totalPrice = (qty / 1000) * (s.pricePer1000 || 0) * (1 - disc / 100) * numLinks;
       }
       
@@ -444,9 +446,26 @@ export default function ChatPage() {
     }
 
     if (cleanText.includes("bulk order") && chatState === 'choosing_order_type') {
-      setChatState('choosing_service'); 
-      setCurrentOrder({ type: 'bulk', platform: 'instagram', items: [] });
-      botReply(`🚀 BULK MODE: Pick a Service to apply to MULTIPLE links. You get ${globalDiscounts.bulk}% OFF!`, dynamicServices.map((s, i) => `${i + 1}. ${s.name}`));
+      setChatState('bulk_entering_links'); 
+      setCurrentOrder({ type: 'bulk', platform: 'instagram', items: [], tempLinks: [] });
+      botReply(`🚀 BULK MODE: Paste your links below (one per line). Type "DONE" when you are finished!`, ["DONE"]);
+      return;
+    }
+
+    // BULK LINKS COLLECTION
+    if (chatState === 'bulk_entering_links') {
+      if (cleanText === "done") {
+        if (!currentOrder.tempLinks || currentOrder.tempLinks.length === 0) {
+          botReply("⚠️ Please add at least one link!");
+          return;
+        }
+        setChatState('choosing_service');
+        botReply(`✅ ${currentOrder.tempLinks.length} links saved! Now pick a service for these links:`, dynamicServices.map((s, i) => `${i + 1}. ${s.name}`));
+      } else {
+        const newLinks = text.split('\n').map(l => l.trim()).filter(l => l);
+        setCurrentOrder(p => ({ ...p, tempLinks: [...(p.tempLinks || []), ...newLinks] }));
+        botReply(`🔗 Saved ${newLinks.length} more link(s). Total: ${[...(currentOrder.tempLinks || []), ...newLinks].length}.\nAdd more or type "DONE".`, ["DONE"]);
+      }
       return;
     }
 
@@ -472,11 +491,12 @@ export default function ChatPage() {
         setCurrentOrder(p => ({ ...p, items: updatedItems }));
         setChatState('choosing_payment_method');
         
-        const rawPrice = (qty / 1000) * (currentOrder.items[0].service.pricePer1000 || 0);
+        const numLinks = type === 'bulk' ? (currentOrder.tempLinks?.length || 1) : 1;
+        const rawPrice = (qty / 1000) * (currentOrder.items[0].service.pricePer1000 || 0) * numLinks;
         const disc = globalDiscounts[type] || 0;
         const discounted = rawPrice * (1 - disc / 100);
         
-        const summary = `✅ ${type.toUpperCase()} SUMMARY\n───────────────\nService: ${currentOrder.items[0].service.name}\nQuantity: ${qty}\nPrice: ₹${rawPrice.toFixed(2)}\nDiscount: ${disc}%\nFinal Price: ₹${discounted.toFixed(2)}\n───────────────\n💳 Wallet: ₹${walletBalance.toFixed(0)}`;
+        const summary = `✅ ${type.toUpperCase()} SUMMARY\n───────────────\nService: ${currentOrder.items[0].service.name}\nQuantity: ${qty} ${type === 'bulk' ? `(x ${numLinks} links)` : ''}\nReal Price: ₹${rawPrice.toFixed(2)}\nDiscount: ${disc}%\nFinal Price: ₹${discounted.toFixed(2)}\n───────────────\n💳 Wallet: ₹${walletBalance.toFixed(0)}`;
         
         const paymentOptions: string[] = [];
         if (paymentConfig?.walletEnabled !== false) paymentOptions.push("💳 PAY FROM WALLET");
@@ -486,7 +506,8 @@ export default function ChatPage() {
           rawPrice: rawPrice, 
           paymentPrice: discounted, 
           discountPct: disc,
-          isBulk: type === 'bulk'
+          isBulk: type === 'bulk',
+          prefilledLinks: type === 'bulk' ? currentOrder.tempLinks?.join('\n') : ''
         });
       } else {
         botReply(`⚠️ Error: Minimum ${minNeeded} required.`);
@@ -502,6 +523,7 @@ export default function ChatPage() {
       let rawPrice = 0;
       let serviceName = "";
       let qty = 0;
+      const numLinks = type === 'bulk' ? (currentOrder.tempLinks?.length || 1) : 1;
 
       if (type === 'combo') {
         rawPrice = currentOrder.items.reduce((acc, item) => acc + (item.quantity / 1000) * (item.service.pricePer1000 || 0), 0);
@@ -509,7 +531,7 @@ export default function ChatPage() {
         qty = currentOrder.items[0].quantity;
       } else {
         qty = currentOrder.items[0]?.quantity;
-        rawPrice = (qty / 1000) * (currentOrder.items[0].service.pricePer1000 || 0);
+        rawPrice = (qty / 1000) * (currentOrder.items[0].service.pricePer1000 || 0) * numLinks;
         serviceName = currentOrder.items[0].service.name;
       }
 
@@ -517,14 +539,15 @@ export default function ChatPage() {
 
       if (cleanText.includes("wallet")) {
         if (walletBalance >= discounted) {
-          botReply(type === 'bulk' ? `Paste your links below & Confirm Order.` : `Enter Link & Confirm Wallet Payment?`, [], { 
+          botReply(type === 'bulk' ? `Confirm Bulk Order for ${numLinks} links?` : `Enter Link & Confirm Wallet Payment?`, [], { 
             isWalletCard: true, 
             paymentPrice: discounted, 
             rawPrice: rawPrice, 
             discountPct: disc,
             serviceName: serviceName,
             quantity: qty,
-            isBulk: type === 'bulk'
+            isBulk: type === 'bulk',
+            prefilledLinks: type === 'bulk' ? currentOrder.tempLinks?.join('\n') : ''
           });
         } else {
           botReply("❌ Low Balance! Please refill your wallet.", ["💳 ADD FUNDS", "🏠 MENU"]);
@@ -537,7 +560,8 @@ export default function ChatPage() {
           discountPct: disc,
           serviceName: serviceName,
           quantity: qty,
-          isBulk: type === 'bulk'
+          isBulk: type === 'bulk',
+          prefilledLinks: type === 'bulk' ? currentOrder.tempLinks?.join('\n') : ''
         });
       }
     }
@@ -602,6 +626,7 @@ export default function ChatPage() {
             serviceName={m.serviceName}
             quantity={m.quantity}
             isBulk={m.isBulk}
+            prefilledLinks={m.prefilledLinks}
           />
         ))}
         {isTyping && <TypingIndicator />}

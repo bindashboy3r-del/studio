@@ -47,6 +47,7 @@ interface MessageBubbleProps {
   quantity?: number;
   isBulk?: boolean;
   dynamicServices?: SMMService[] | null;
+  prefilledLinks?: string;
 }
 
 export function MessageBubble({ 
@@ -64,12 +65,13 @@ export function MessageBubble({
   serviceName,
   quantity,
   isBulk,
-  dynamicServices
+  dynamicServices,
+  prefilledLinks = ""
 }: MessageBubbleProps) {
   const isUser = sender === 'user';
   const { toast } = useToast();
   
-  const [links, setLinks] = useState("");
+  const [links, setLinks] = useState(prefilledLinks);
   const [utr, setUtr] = useState("");
   const [mounted, setMounted] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -79,14 +81,25 @@ export function MessageBubble({
 
   useEffect(() => { setMounted(true); }, []);
 
-  // Initialize Combo Items
+  // Initialize Combo Items with Likes, Views, Comments if they exist
   useEffect(() => {
     if (isComboConfigCard && dynamicServices && comboItems.length === 0) {
-      const initial = dynamicServices.slice(0, 3).map(s => ({
-        service: s,
-        qty: ""
-      }));
-      setComboItems(initial);
+      // Look for typical service types
+      const likes = dynamicServices.find(s => s.name.toLowerCase().includes('like'));
+      const views = dynamicServices.find(s => s.name.toLowerCase().includes('view'));
+      const comments = dynamicServices.find(s => s.name.toLowerCase().includes('comment'));
+      
+      const initial = [];
+      if (likes) initial.push({ service: likes, qty: "" });
+      if (views) initial.push({ service: views, qty: "" });
+      if (comments) initial.push({ service: comments, qty: "" });
+      
+      // If none found, fallback to first 3
+      if (initial.length === 0) {
+        setComboItems(dynamicServices.slice(0, 3).map(s => ({ service: s, qty: "" })));
+      } else {
+        setComboItems(initial);
+      }
     }
   }, [isComboConfigCard, dynamicServices]);
 
@@ -277,13 +290,13 @@ export function MessageBubble({
             <div className="space-y-3">
               <div className="space-y-2">
                 <div className="space-y-1">
-                  <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-widest">{isBulk ? "Paste All Links (One per line)" : "Post/Profile Link"}</label>
+                  <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-widest">{isBulk ? "All Links Saved" : "Post/Profile Link"}</label>
                   {isBulk ? (
                     <Textarea 
                       placeholder="https://link1.com&#10;https://link2.com" 
                       value={links} 
-                      onChange={(e) => setLinks(e.target.value)} 
-                      className="min-h-[80px] rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-xs" 
+                      readOnly
+                      className="min-h-[80px] rounded-xl bg-slate-900 border-none shadow-3d-pressed font-bold text-[10px] text-slate-400 opacity-70" 
                     />
                   ) : (
                     <Input placeholder="Enter link here" value={links} onChange={(e) => setLinks(e.target.value)} className="h-10 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-xs" />
@@ -328,15 +341,14 @@ export function MessageBubble({
              </div>
              
              <div className="space-y-1">
-                <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-widest">{isBulk ? "Paste All Links (One per line)" : "Post/Profile Link"}</label>
+                <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-widest">{isBulk ? "Bulk Links Confirmed" : "Post/Profile Link"}</label>
                 <div className="relative">
                   <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={12} />
                   {isBulk ? (
                     <Textarea 
-                      placeholder="https://link1.com&#10;https://link2.com" 
                       value={links} 
-                      onChange={(e) => setLinks(e.target.value)} 
-                      className="min-h-[80px] rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-xs pl-8 pt-2.5" 
+                      readOnly
+                      className="min-h-[80px] rounded-xl bg-slate-900 border-none shadow-3d-pressed font-bold text-[10px] text-slate-400 opacity-70 pl-8 pt-2.5" 
                     />
                   ) : (
                     <Input 
