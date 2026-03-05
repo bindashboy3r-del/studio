@@ -31,6 +31,18 @@ export default function AuthPage() {
 
   const ADMIN_EMAIL = "chetanmadhav4@gmail.com";
 
+  // Automatic redirect if already logged in to provide a "Direct" experience
+  useEffect(() => {
+    if (!isUserLoading && user) {
+      const userEmail = user.email?.toLowerCase();
+      if (userEmail === ADMIN_EMAIL.toLowerCase()) {
+        router.replace("/admin");
+      } else {
+        router.replace("/chat");
+      }
+    }
+  }, [user, isUserLoading, router]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password || !auth) return;
@@ -63,7 +75,17 @@ export default function AuthPage() {
     }
   };
 
-  if (isUserLoading) return <div className="min-h-screen flex flex-col items-center justify-center bg-white"><Loader2 className="w-8 h-8 text-[#312ECB] animate-spin mb-4" /><p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Loading...</p></div>;
+  if (isUserLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-white">
+        <Loader2 className="w-8 h-8 text-[#312ECB] animate-spin mb-4" />
+        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Loading...</p>
+      </div>
+    );
+  }
+
+  // While redirecting, show nothing to avoid UI flickering
+  if (user) return null;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC] p-6 font-body overflow-x-hidden relative">
@@ -77,56 +99,66 @@ export default function AuthPage() {
 
         <div className="text-center space-y-2 mb-12">
           <h1 className="text-[28px] font-black tracking-tight text-[#111B21] uppercase leading-tight">
-            {user ? "WELCOME BACK" : "SOCIALBOOST"}
+            SOCIALBOOST
           </h1>
           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em]">
-            {user ? (user.displayName || user.email?.split('@')[0]) : "GET VIRAL IN JUST ONE CLICK 🚀"}
+            GET VIRAL IN JUST ONE CLICK 🚀
           </p>
         </div>
 
-        {user ? (
-          <div className="w-full space-y-6">
-            <Button 
-              onClick={() => user.email === ADMIN_EMAIL ? router.push("/admin") : router.push("/chat")} 
-              className="w-full h-16 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[12px] uppercase tracking-[0.2em] rounded-3xl shadow-lg gap-3 transition-all active:scale-95"
-            >
-              Go to Hub <ArrowRight size={18} />
-            </Button>
-            <div className="text-center">
-              <button 
-                onClick={() => signOut(auth!)} 
-                className="text-slate-300 font-black text-[10px] uppercase tracking-widest hover:text-[#312ECB] transition-colors"
-              >
-                Switch Profile
-              </button>
+        <form onSubmit={isLogin ? handleLogin : handleSignup} className="w-full space-y-4">
+          {!isLogin && (
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Name</label>
+              <Input 
+                type="text" 
+                placeholder="John Doe" 
+                value={displayName} 
+                onChange={e => setDisplayName(e.target.value)} 
+                className="h-12 bg-slate-50 border-none rounded-2xl px-5 text-sm font-bold shadow-inner" 
+                required 
+              />
             </div>
+          )}
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Email</label>
+            <Input 
+              type="email" 
+              placeholder="name@example.com" 
+              value={email} 
+              onChange={e => setEmail(e.target.value)} 
+              className="h-12 bg-slate-50 border-none rounded-2xl px-5 text-sm font-bold shadow-inner" 
+              required 
+            />
           </div>
-        ) : (
-          <form onSubmit={isLogin ? handleLogin : handleSignup} className="w-full space-y-4">
-            {!isLogin && (
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Name</label>
-                <Input type="text" placeholder="John Doe" value={displayName} onChange={e => setDisplayName(e.target.value)} className="h-12 bg-slate-50 border-none rounded-2xl px-5 text-sm font-bold shadow-inner" required />
-              </div>
-            )}
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Email</label>
-              <Input type="email" placeholder="name@example.com" value={email} onChange={e => setEmail(e.target.value)} className="h-12 bg-slate-50 border-none rounded-2xl px-5 text-sm font-bold shadow-inner" required />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Password</label>
-              <Input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} className="h-12 bg-slate-50 border-none rounded-2xl px-5 text-sm font-bold shadow-inner" required />
-            </div>
-            <Button type="submit" disabled={loading} className="w-full h-16 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[12px] uppercase tracking-[0.2em] rounded-3xl shadow-lg mt-6 active:scale-95 transition-all">
-              {loading ? <Loader2 className="animate-spin" size={20} /> : isLogin ? "LOG IN" : "REGISTER"}
-            </Button>
-            <div className="mt-6 text-center">
-              <button type="button" onClick={() => setIsLogin(!isLogin)} className="text-[11px] font-black text-[#312ECB] uppercase tracking-widest hover:opacity-80">
-                {isLogin ? "New Member? Create Free Account" : "Already a member? Login"}
-              </button>
-            </div>
-          </form>
-        )}
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Password</label>
+            <Input 
+              type="password" 
+              placeholder="••••••••" 
+              value={password} 
+              onChange={e => setPassword(e.target.value)} 
+              className="h-12 bg-slate-50 border-none rounded-2xl px-5 text-sm font-bold shadow-inner" 
+              required 
+            />
+          </div>
+          <Button 
+            type="submit" 
+            disabled={loading} 
+            className="w-full h-16 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[12px] uppercase tracking-[0.2em] rounded-3xl shadow-lg mt-6 active:scale-95 transition-all"
+          >
+            {loading ? <Loader2 className="animate-spin" size={20} /> : isLogin ? "LOG IN" : "REGISTER"}
+          </Button>
+          <div className="mt-6 text-center">
+            <button 
+              type="button" 
+              onClick={() => setIsLogin(!isLogin)} 
+              className="text-[11px] font-black text-[#312ECB] uppercase tracking-widest hover:opacity-80"
+            >
+              {isLogin ? "New Member? Create Free Account" : "Already a member? Login"}
+            </button>
+          </div>
+        </form>
       </div>
 
       {/* Footer / Created By Section */}
