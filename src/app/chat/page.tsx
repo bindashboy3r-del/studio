@@ -38,7 +38,8 @@ import {
   Package,
   Clock,
   Copy,
-  ChevronLeft
+  ChevronLeft,
+  Megaphone
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { SMMService, Platform } from "@/app/lib/constants";
@@ -95,6 +96,7 @@ export default function ChatPage() {
   const [isOrdersOpen, setIsOrdersOpen] = useState(false);
   const [isLogsOpen, setIsLogsOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
 
   const [activeBroadcast, setActiveBroadcast] = useState<any>(null);
   const [globalDiscounts, setGlobalDiscounts] = useState({ single: 0, combo: 0, bulk: 0 });
@@ -104,6 +106,7 @@ export default function ChatPage() {
   const [sessionStart, setSessionStart] = useState<Timestamp | null>(null);
   
   const hasInitialGreeted = useRef(false);
+  const hasBroadcastShown = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -146,23 +149,41 @@ export default function ChatPage() {
   // Global Sync
   useEffect(() => {
     if (!db || !currentUser) return; 
-    const unsubBroadcast = onSnapshot(query(collection(db, "globalAnnouncements"), where("active", "==", true), limit(1)), (snap) => {
-      if (!snap.empty) setActiveBroadcast(snap.docs[0].data());
-      else setActiveBroadcast(null);
-    });
+    
+    // Broadcast Listener
+    const unsubBroadcast = onSnapshot(
+      query(collection(db, "globalAnnouncements"), where("active", "==", true), orderBy("timestamp", "desc"), limit(1)), 
+      (snap) => {
+        if (!snap.empty) {
+          const data = snap.docs[0].data();
+          setActiveBroadcast(data);
+          // Show popup automatically on first load per session
+          if (!hasBroadcastShown.current) {
+            setIsBroadcastOpen(true);
+            hasBroadcastShown.current = true;
+          }
+        } else {
+          setActiveBroadcast(null);
+        }
+      }
+    );
+
     const unsubDiscounts = onSnapshot(doc(db, "globalSettings", "discounts"), (snap) => {
       if (snap.exists()) {
         const d = snap.data();
         setGlobalDiscounts({ single: Number(d.single) || 0, combo: Number(d.combo) || 0, bulk: Number(d.bulk) || 0 });
       }
     });
+
     const unsubSocial = onSnapshot(doc(db, "globalSettings", "social"), (snap) => {
       if (snap.exists()) setSocialLinks(snap.data());
     });
+
     const unsubNotifs = onSnapshot(query(collection(db, "users", currentUser.uid, "notifications"), orderBy("createdAt", "desc"), limit(50)), (snap) => {
       const items = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((n: any) => n.read === false);
       setNotifications(items);
     });
+
     return () => { unsubBroadcast(); unsubDiscounts(); unsubSocial(); unsubNotifs(); };
   }, [db, currentUser]);
 
@@ -376,7 +397,6 @@ export default function ChatPage() {
           <h1 className="text-[18px] font-black italic tracking-tighter text-white uppercase">SOCIALBOOST</h1>
         </div>
         <div className="flex items-center gap-3">
-          {/* Notification Dialog */}
           <button onClick={() => setIsNotifOpen(true)} className="relative p-2 text-slate-400 rounded-xl shadow-3d-sm active:shadow-3d-pressed">
             <Bell size={20} />
             {notifications.length > 0 && <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-slate-900" />}
@@ -465,6 +485,36 @@ export default function ChatPage() {
           </Button>
         </div>
       </footer>
+
+      {/* POPUP: Broadcast Announcement */}
+      <Dialog open={isBroadcastOpen} onOpenChange={setIsBroadcastOpen}>
+        <DialogContent className="max-w-[340px] rounded-[2.5rem] border-none shadow-3d bg-[#030712] p-0 overflow-hidden">
+          <header className="bg-gradient-to-r from-[#312ECB] to-purple-600 p-6 text-white relative">
+             <div className="flex flex-col items-center gap-2">
+                <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center border border-white/20 shadow-3d-sm animate-pulse">
+                  <Megaphone size={24} className="text-white fill-current" />
+                </div>
+                <DialogTitle className="text-white font-black uppercase text-[10px] tracking-[0.3em] mt-2">Special Update</DialogTitle>
+             </div>
+             <button onClick={() => setIsBroadcastOpen(false)} className="absolute top-4 right-4 text-white/60 hover:text-white transition-colors">
+               <X size={18} />
+             </button>
+          </header>
+          <div className="p-8 space-y-6 text-center">
+             <div className="bg-slate-900/50 p-6 rounded-[2rem] border border-white/5 shadow-3d-pressed">
+                <p className="text-[13px] font-bold text-slate-200 leading-relaxed italic">
+                  "{activeBroadcast?.text}"
+                </p>
+             </div>
+             <Button 
+               onClick={() => setIsBroadcastOpen(false)} 
+               className="w-full h-12 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-3d active:shadow-3d-pressed"
+             >
+               Got it! 🚀
+             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* POPUP: Notifications */}
       <Dialog open={isNotifOpen} onOpenChange={setIsNotifOpen}>

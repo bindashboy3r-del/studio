@@ -69,25 +69,14 @@ export default function BroadcastPage() {
     if (!db) return;
     setIsSending(true);
     
-    const batch = writeBatch(db);
+    const ref = doc(db, "globalAnnouncements", activeSlot);
     
-    // Set current slot as desired, and turn off ALL others to ensure only one is "Online"
-    SLOTS.forEach(slotId => {
-      const ref = doc(db, "globalAnnouncements", slotId);
-      if (slotId === activeSlot) {
-        batch.set(ref, {
-          text: currentData.text,
-          active: currentData.active,
-          timestamp: serverTimestamp(),
-          adminEmail: user?.email
-        }, { merge: true });
-      } else if (currentData.active) {
-        // If we are making current slot active, turn off others
-        batch.update(ref, { active: false });
-      }
-    });
-
-    batch.commit()
+    setDoc(ref, {
+      text: currentData.text,
+      active: currentData.active,
+      timestamp: serverTimestamp(),
+      adminEmail: user?.email
+    }, { merge: true })
       .then(() => {
         toast({
           title: currentData.active ? "Broadcast Published!" : "Draft Saved",
@@ -130,7 +119,7 @@ export default function BroadcastPage() {
       <main className="max-w-xl mx-auto p-6 space-y-6 mt-4">
         <header className="space-y-1">
           <h2 className="text-[32px] font-black text-[#111B21] tracking-tighter uppercase">Broadcast Slots</h2>
-          <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Manage 3 announcements. Only 1 can be "Online".</p>
+          <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Manage 3 announcements independently.</p>
         </header>
 
         {/* Slot Selector */}
