@@ -44,7 +44,6 @@ import { SMMService, Platform } from "@/app/lib/constants";
 import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { placeApiOrder } from "@/app/actions/smm-api";
 import { subDays } from "date-fns";
 import {
   Sheet,
@@ -101,12 +100,10 @@ export default function ChatPage() {
   const hasInitialGreeted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Auth Guard
   useEffect(() => {
     if (!isUserLoading && !currentUser) router.push("/");
   }, [currentUser, isUserLoading, router]);
 
-  // Session Management
   useEffect(() => {
     if (typeof window === "undefined") return;
     
@@ -133,7 +130,6 @@ export default function ChatPage() {
     router.push(path);
   };
 
-  // 7-Day Rolling Auto-Cleanup
   useEffect(() => {
     if (!db || !currentUser) return;
     const cleanup = async () => {
@@ -200,9 +196,16 @@ export default function ChatPage() {
     const unsubSocial = onSnapshot(doc(db, "globalSettings", "social"), (snap) => {
       if (snap.exists()) setSocialLinks(snap.data());
     });
-    const unsubNotifs = onSnapshot(query(collection(db, "users", currentUser.uid, "notifications"), where("read", "==", false), orderBy("createdAt", "desc"), limit(20)), (snap) => {
-      setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    
+    // Fixed: Simplified query to avoid "Index Required" error
+    const unsubNotifs = onSnapshot(query(collection(db, "users", currentUser.uid, "notifications"), orderBy("createdAt", "desc"), limit(50)), (snap) => {
+      // Filter unread client-side to ensure no errors
+      const items = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter((n: any) => n.read === false);
+      setNotifications(items);
     });
+    
     return () => { unsubBroadcast(); unsubDiscounts(); unsubSocial(); unsubNotifs(); };
   }, [db, currentUser]);
 
@@ -321,43 +324,147 @@ export default function ChatPage() {
           <button onClick={toggleTheme} className="text-slate-400 hover:text-[#312ECB] transition-colors p-1 rounded-lg active:shadow-3d-pressed">{theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}</button>
           
           <Sheet open={isNotifOpen} onOpenChange={setIsNotifOpen}>
-            <SheetTrigger asChild><div className="relative cursor-pointer"><button className="text-slate-400 p-1 rounded-lg active:shadow-3d-pressed"><Bell size={18} /></button>{notifications.length > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-white" />}</div></SheetTrigger>
+            <SheetTrigger asChild>
+              <div className="relative cursor-pointer">
+                <button className="text-slate-400 p-1 rounded-lg active:shadow-3d-pressed">
+                  <Bell size={18} />
+                </button>
+                {notifications.length > 0 && (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-white" />
+                )}
+              </div>
+            </SheetTrigger>
             <SheetContent side="right" className="w-[320px] p-0 rounded-l-[2rem] border-none shadow-3d">
-              <SheetHeader className="p-6 bg-[#312ECB] text-white rounded-tl-[2rem] shadow-3d-sm"><div className="flex items-center justify-between"><SheetTitle className="text-white font-black uppercase text-xs flex items-center gap-2"><Bell size={14} /> Notifications</SheetTitle>{notifications.length > 0 && <Button onClick={async () => { const batch = writeBatch(db!); notifications.forEach(n => batch.update(doc(db!, "users", currentUser!.uid, "notifications", n.id), { read: true })); await batch.commit(); }} variant="ghost" className="h-7 text-[8px] font-black uppercase bg-white/10 hover:bg-white/20 text-white rounded-lg px-2 gap-1 shadow-3d-sm active:shadow-3d-pressed"><CheckCheck size={10} /> Clear</Button>}</div></SheetHeader>
-              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 dark:bg-slate-950 h-full">{notifications.length > 0 ? notifications.map(n => <div key={n.id} onClick={() => updateDoc(doc(db!, "users", currentUser!.uid, "notifications", n.id), { read: true })} className="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-3d-sm border border-slate-100 dark:border-slate-800 flex items-start gap-3 active:shadow-3d-pressed transition-all"><div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900 flex items-center justify-center text-emerald-600 shrink-0 shadow-inner"><Zap size={14} /></div><div className="space-y-0.5"><p className="text-[11px] font-black leading-tight">{n.title}</p><p className="text-[10px] font-bold text-slate-400 leading-relaxed">{n.message}</p></div></div>) : <div className="flex flex-col items-center justify-center py-20 opacity-20"><Bell size={40} /><p className="text-[10px] font-black uppercase mt-4">Inbox Clear</p></div>}</div>
+              <SheetHeader className="p-6 bg-[#312ECB] text-white rounded-tl-[2rem] shadow-3d-sm">
+                <div className="flex items-center justify-between">
+                  <SheetTitle className="text-white font-black uppercase text-xs flex items-center gap-2">
+                    <Bell size={14} /> Notifications
+                  </SheetTitle>
+                  {notifications.length > 0 && (
+                    <Button 
+                      onClick={async () => { 
+                        const batch = writeBatch(db!); 
+                        notifications.forEach(n => batch.update(doc(db!, "users", currentUser!.uid, "notifications", n.id), { read: true })); 
+                        await batch.commit(); 
+                      }} 
+                      variant="ghost" 
+                      className="h-7 text-[8px] font-black uppercase bg-white/10 hover:bg-white/20 text-white rounded-lg px-2 gap-1 shadow-3d-sm active:shadow-3d-pressed"
+                    >
+                      <CheckCheck size={10} /> Clear
+                    </Button>
+                  )}
+                </div>
+              </SheetHeader>
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 dark:bg-slate-950 h-full">
+                {notifications.length > 0 ? (
+                  notifications.map(n => (
+                    <div 
+                      key={n.id} 
+                      onClick={() => updateDoc(doc(db!, "users", currentUser!.uid, "notifications", n.id), { read: true })} 
+                      className="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-3d-sm border border-slate-100 dark:border-slate-800 flex items-start gap-3 active:shadow-3d-pressed transition-all"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900 flex items-center justify-center text-emerald-600 shrink-0 shadow-inner">
+                        <Zap size={14} />
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-[11px] font-black leading-tight">{n.title}</p>
+                        <p className="text-[10px] font-bold text-slate-400 leading-relaxed">{n.message}</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-20 opacity-20">
+                    <Bell size={40} />
+                    <p className="text-[10px] font-black uppercase mt-4">Inbox Clear</p>
+                  </div>
+                )}
+              </div>
             </SheetContent>
           </Sheet>
 
-          <button onClick={() => navigateWithSession('/profile', false)} className="w-8 h-8 rounded-full bg-[#312ECB] text-white font-black text-[11px] shadow-3d-sm active:shadow-3d-pressed transition-transform">{currentUser?.displayName?.[0] || 'U'}</button>
+          <button onClick={() => navigateWithSession('/profile', false)} className="w-8 h-8 rounded-full bg-[#312ECB] text-white font-black text-[11px] shadow-3d-sm active:shadow-3d-pressed transition-transform">
+            {currentUser?.displayName?.[0] || 'U'}
+          </button>
         </div>
       </header>
 
       <div className="bg-white dark:bg-slate-900 px-4 py-2 flex items-center justify-between border-b dark:border-slate-800 z-40 shadow-sm">
-        <button onClick={() => navigateWithSession('/add-funds', false)} className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-900/50 shadow-3d-sm active:shadow-3d-pressed transition-all"><Wallet size={12} /><span className="text-[10px] font-black">₹{walletBalance.toFixed(0)}</span><PlusCircle size={12} /></button>
+        <button onClick={() => navigateWithSession('/add-funds', false)} className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-900/50 shadow-3d-sm active:shadow-3d-pressed transition-all">
+          <Wallet size={12} /><span className="text-[10px] font-black">₹{walletBalance.toFixed(0)}</span><PlusCircle size={12} />
+        </button>
         <div className="flex items-center gap-4">
-          <button onClick={() => navigateWithSession('/orders', true)} className="text-[9px] font-black uppercase text-[#312ECB] flex items-center gap-1.5 active:shadow-3d-pressed rounded-lg px-2 py-1"><History size={12} /> ORDERS</button>
-          <button onClick={() => navigateWithSession('/chat-logs', true)} className="text-[9px] font-black uppercase text-pink-500 flex items-center gap-1.5 active:shadow-3d-pressed rounded-lg px-2 py-1"><MessageSquareText size={12} /> CHATS</button>
+          <button onClick={() => navigateWithSession('/orders', true)} className="text-[9px] font-black uppercase text-[#312ECB] flex items-center gap-1.5 active:shadow-3d-pressed rounded-lg px-2 py-1">
+            <History size={12} /> ORDERS
+          </button>
+          <button onClick={() => navigateWithSession('/chat-logs', true)} className="text-[9px] font-black uppercase text-pink-500 flex items-center gap-1.5 active:shadow-3d-pressed rounded-lg px-2 py-1">
+            <MessageSquareText size={12} /> CHATS
+          </button>
         </div>
       </div>
 
       <main className="flex-1 overflow-y-auto p-4 flex flex-col whatsapp-bg relative pb-20">
-        {messages?.map(m => <MessageBubble key={m.id} sender={m.sender} text={m.text} options={m.options} onOptionClick={handleSend} isPaymentCard={m.isPaymentCard} paymentPrice={m.paymentPrice} isSuccessCard={m.isSuccessCard} successDetails={m.successDetails} isBulkLinkCard={m.isBulkLinkCard} isComboCard={m.isComboCard} isWalletCard={m.isWalletCard} timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} dynamicServices={dynamicServices} discountPct={m.discountPct ?? 0} />)}
+        {messages?.map(m => (
+          <MessageBubble 
+            key={m.id} 
+            sender={m.sender} 
+            text={m.text} 
+            options={m.options} 
+            onOptionClick={handleSend} 
+            isPaymentCard={m.isPaymentCard} 
+            paymentPrice={m.paymentPrice} 
+            isSuccessCard={m.isSuccessCard} 
+            successDetails={m.successDetails} 
+            isBulkLinkCard={m.isBulkLinkCard} 
+            isComboCard={m.isComboCard} 
+            isWalletCard={m.isWalletCard} 
+            timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} 
+            dynamicServices={dynamicServices} 
+            discountPct={m.discountPct ?? 0} 
+          />
+        ))}
         {isTyping && <TypingIndicator />}
         <div ref={scrollRef} />
 
         <div className="fixed bottom-20 left-4 z-50 flex flex-col items-start gap-3">
-          {showSocialMenu && <div className="flex flex-col gap-3 mb-2 animate-in slide-in-from-bottom-5 duration-300">
-            {socialLinks?.instagram && <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="w-8 h-8 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 rounded-full flex items-center justify-center text-white shadow-3d-sm active:shadow-3d-pressed"><Instagram size={16} /></a>}
-            {socialLinks?.whatsapp && <a href={socialLinks.whatsapp} target="_blank" rel="noopener noreferrer" className="w-8 h-8 bg-[#25D366] rounded-full flex items-center justify-center text-white shadow-3d-sm active:shadow-3d-pressed"><MessageCircle size={16} /></a>}
-          </div>}
-          <button onClick={() => setShowSocialMenu(!showSocialMenu)} className={cn("w-10 h-10 rounded-full flex items-center justify-center text-white shadow-3d transition-all active:shadow-3d-pressed", showSocialMenu ? "bg-red-500 rotate-90" : "bg-[#312ECB]")}>{showSocialMenu ? <X size={20} /> : <Share2 size={20} />}</button>
+          {showSocialMenu && (
+            <div className="flex flex-col gap-3 mb-2 animate-in slide-in-from-bottom-5 duration-300">
+              {socialLinks?.instagram && (
+                <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="w-8 h-8 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 rounded-full flex items-center justify-center text-white shadow-3d-sm active:shadow-3d-pressed transition-all">
+                  <Instagram size={16} />
+                </a>
+              )}
+              {socialLinks?.whatsapp && (
+                <a href={socialLinks.whatsapp} target="_blank" rel="noopener noreferrer" className="w-8 h-8 bg-[#25D366] rounded-full flex items-center justify-center text-white shadow-3d-sm active:shadow-3d-pressed transition-all">
+                  <MessageCircle size={16} />
+                </a>
+              )}
+            </div>
+          )}
+          <button 
+            onClick={() => setShowSocialMenu(!showSocialMenu)} 
+            className={cn("w-10 h-10 rounded-full flex items-center justify-center text-white shadow-3d transition-all active:shadow-3d-pressed", showSocialMenu ? "bg-red-500 rotate-90" : "bg-[#312ECB]")}
+          >
+            {showSocialMenu ? <X size={20} /> : <Share2 size={20} />}
+          </button>
         </div>
       </main>
 
       <footer className="p-3 bg-white dark:bg-slate-900 border-t dark:border-slate-800 z-50 shadow-3d-sm">
         <div className="flex items-center gap-3 bg-[#F0F2F5] dark:bg-slate-800 rounded-[1.5rem] p-1 pr-2 shadow-3d-pressed">
-          <Input value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSend()} placeholder="Type something..." className="flex-1 bg-transparent border-none font-bold text-sm h-10 focus-visible:ring-0 shadow-none" />
-          <Button onClick={() => handleSend()} size="icon" className="rounded-xl h-9 w-9 bg-[#312ECB] hover:bg-[#2825A6] shadow-3d-sm active:shadow-3d-pressed transition-transform"><Send size={16} /></Button>
+          <Input 
+            value={inputValue} 
+            onChange={e => setInputValue(e.target.value)} 
+            onKeyDown={e => e.key === "Enter" && handleSend()} 
+            placeholder="Type something..." 
+            className="flex-1 bg-transparent border-none font-bold text-sm h-10 focus-visible:ring-0 shadow-none" 
+          />
+          <Button 
+            onClick={() => handleSend()} 
+            size="icon" 
+            className="rounded-xl h-9 w-9 bg-[#312ECB] hover:bg-[#2825A6] shadow-3d-sm active:shadow-3d-pressed transition-transform"
+          >
+            <Send size={16} />
+          </Button>
         </div>
       </footer>
     </div>
