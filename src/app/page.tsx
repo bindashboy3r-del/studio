@@ -100,83 +100,82 @@ export default function AuthPage() {
   if (isUserLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#F0F2F5] dark:bg-slate-950">
-        <Loader2 className="w-10 h-10 text-[#312ECB] animate-spin mb-4" />
-        <p className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-400">Verifying Session...</p>
+        <Loader2 className="w-8 h-8 text-[#312ECB] animate-spin mb-3" />
+        <p className="text-[8px] font-black uppercase tracking-[0.3em] text-slate-400">Verifying Session...</p>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#F0F2F5] dark:bg-slate-950 p-4 font-body overflow-x-hidden">
-      <div className="w-full max-w-[380px] bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-[0_15px_40px_rgba(0,0,0,0.06)] p-8 pb-10 flex flex-col items-center relative overflow-hidden border border-white/50 dark:border-slate-800">
+      <div className="w-full max-w-[340px] bg-white dark:bg-slate-900 rounded-[2rem] shadow-[0_15px_40px_rgba(0,0,0,0.06)] p-6 pb-8 flex flex-col items-center relative overflow-hidden border border-white/50 dark:border-slate-800">
         
-        <div className="absolute top-0 right-0 w-24 h-24 bg-[#312ECB]/5 rounded-full -mr-12 -mt-12 blur-3xl" />
+        <div className="absolute top-0 right-0 w-20 h-20 bg-[#312ECB]/5 rounded-full -mr-10 -mt-10 blur-3xl" />
 
-        <div className="w-16 h-16 bg-[#312ECB] rounded-2xl flex items-center justify-center shadow-[0_10px_20px_rgba(49,46,203,0.2)] mb-6 relative z-10">
-          <Zap className="text-white fill-current" size={28} />
+        <div className="w-12 h-12 bg-[#312ECB] rounded-xl flex items-center justify-center shadow-[0_10px_20px_rgba(49,46,203,0.2)] mb-5 relative z-10">
+          <Zap className="text-white fill-current" size={24} />
         </div>
 
-        <div className="text-center space-y-1 mb-8 relative z-10">
-          <h1 className="text-[24px] font-black tracking-tighter text-[#111B21] dark:text-white uppercase leading-tight">
+        <div className="text-center space-y-1 mb-6 relative z-10">
+          <h1 className="text-[20px] font-black tracking-tighter text-[#111B21] dark:text-white uppercase leading-tight">
             {user ? "WELCOME BACK" : "SOCIALBOOST"}
           </h1>
-          <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-relaxed">
+          <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-relaxed">
             {user ? user.displayName || user.email : "The most powerful SMM automation."}
           </p>
         </div>
 
         {user ? (
-          <div className="w-full space-y-4 relative z-10">
+          <div className="w-full space-y-3 relative z-10">
             <Button 
               onClick={handleContinue}
-              className="w-full h-14 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[11px] uppercase tracking-[0.2em] rounded-xl shadow-lg gap-3"
+              className="w-full h-12 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[10px] uppercase tracking-[0.2em] rounded-xl shadow-lg gap-2"
             >
-              Continue to Dashboard <ArrowRight size={16} />
+              Continue to Chat <ArrowRight size={14} />
             </Button>
-            <Button 
+            <button 
               onClick={handleLogoutExisting}
-              variant="outline"
-              className="w-full h-12 border-slate-100 dark:border-slate-800 text-slate-400 font-black text-[10px] uppercase tracking-widest rounded-xl gap-2"
+              className="w-full text-slate-400 font-black text-[9px] uppercase tracking-widest hover:text-red-500 transition-colors"
             >
-              <LogOut size={14} /> Switch Account
-            </Button>
+              Switch Account
+            </button>
           </div>
         ) : (
-          <form onSubmit={isLogin ? handleLogin : handleSignup} className="w-full space-y-4 relative z-10">
+          <form onSubmit={isLogin ? handleLogin : handleSignup} className="w-full space-y-3.5 relative z-10">
             {!isLogin && (
               <div className="space-y-1">
-                <label className="text-[9px] font-black text-[#111B21] dark:text-slate-300 uppercase tracking-widest ml-1">Full Name</label>
+                <label className="text-[8px] font-black text-[#111B21] dark:text-slate-300 uppercase tracking-widest ml-1">Full Name</label>
                 <Input 
                   type="text" 
                   placeholder="Ex. Chetan Nagani" 
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  className="h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-5 text-xs font-bold shadow-inner"
+                  className="h-10 bg-slate-50 dark:bg-slate-800 border-none rounded-lg px-4 text-[11px] font-bold shadow-inner"
                   required
                 />
               </div>
             )}
 
             <div className="space-y-1">
-              <label className="text-[9px] font-black text-[#111B21] dark:text-slate-300 uppercase tracking-widest ml-1">Email Address</label>
+              <label className="text-[8px] font-black text-[#111B21] dark:text-slate-300 uppercase tracking-widest ml-1">Email Address</label>
               <Input 
                 type="email" 
                 placeholder="name@example.com" 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-5 text-xs font-bold shadow-inner"
+                className="h-10 bg-slate-50 dark:bg-slate-800 border-none rounded-lg px-4 text-[11px] font-bold shadow-inner"
                 required
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-[9px] font-black text-[#111B21] dark:text-slate-300 uppercase tracking-widest ml-1">Password</label>
+              <label className="text-[8px] font-black text-[#111B21] dark:text-slate-300 uppercase tracking-widest ml-1">Password</label>
               <Input 
                 type="password" 
                 placeholder="••••••••" 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-5 text-xs font-bold shadow-inner"
+                className="h-10 bg-slate-50 dark:bg-slate-800 border-none rounded-lg px-4 text-[11px] font-bold shadow-inner"
                 required
               />
             </div>
@@ -184,18 +183,18 @@ export default function AuthPage() {
             <Button 
               type="submit"
               disabled={loading}
-              className="w-full h-14 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[11px] uppercase tracking-[0.2em] rounded-xl shadow-md transition-all active:scale-95 mt-2"
+              className="w-full h-12 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[10px] uppercase tracking-[0.2em] rounded-xl shadow-md transition-all active:scale-95 mt-1"
             >
-              {loading ? <Loader2 className="animate-spin" size={16} /> : isLogin ? "ACCESS PORTAL" : "CREATE ACCOUNT"}
+              {loading ? <Loader2 className="animate-spin" size={14} /> : isLogin ? "ACCESS PORTAL" : "CREATE ACCOUNT"}
             </Button>
           </form>
         )}
 
         {!user && (
-          <div className="mt-8 text-center relative z-10">
+          <div className="mt-6 text-center relative z-10">
             <button 
               onClick={() => setIsLogin(!isLogin)}
-              className="text-[11px] font-black text-[#312ECB] uppercase tracking-widest hover:opacity-80 transition-opacity"
+              className="text-[10px] font-black text-[#312ECB] uppercase tracking-widest hover:opacity-80 transition-opacity"
             >
               {isLogin ? "CREATE FREE ACCOUNT" : "SIGN IN TO DASHBOARD"}
             </button>
@@ -203,14 +202,14 @@ export default function AuthPage() {
         )}
       </div>
 
-      <div className="mt-8 flex flex-col items-center space-y-3 opacity-40">
-        <p className="text-[9px] font-black text-[#111B21] dark:text-slate-500 uppercase tracking-[0.3em]">
+      <div className="mt-6 flex flex-col items-center space-y-2.5 opacity-30">
+        <p className="text-[8px] font-black text-[#111B21] dark:text-slate-500 uppercase tracking-[0.3em]">
           CREATED BY CHETAN NAGANI
         </p>
-        <div className="flex gap-4">
-          <ShieldCheck size={14} />
-          <Rocket size={14} />
-          <Globe size={14} />
+        <div className="flex gap-3">
+          <ShieldCheck size={12} />
+          <Rocket size={12} />
+          <Globe size={12} />
         </div>
       </div>
     </div>

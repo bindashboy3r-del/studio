@@ -9,7 +9,6 @@ import {
   Zap,
   Loader2,
   AlertCircle,
-  CreditCard,
   History,
   ShieldCheck,
   ChevronRight,
@@ -36,7 +35,7 @@ export default function AddFundsPage() {
   const [paymentConfig, setPaymentConfig] = useState<any>(null);
 
   useEffect(() => {
-    if (!db) return;
+    if (!db || !user) return; // Fixed: Wait for user to prevent permission errors
     const unsubFinance = onSnapshot(doc(db, "globalSettings", "finance"), (snap) => {
       if (snap.exists()) setGlobalBonus(snap.data().bonusPercentage || 0);
     });
@@ -47,7 +46,7 @@ export default function AddFundsPage() {
       unsubFinance();
       unsubPayment();
     };
-  }, [db]);
+  }, [db, user]);
 
   const upiId = paymentConfig?.upiId || "smmxpressbot@slc";
   const merchantName = paymentConfig?.merchantName || "SocialBoost";
@@ -100,76 +99,76 @@ export default function AddFundsPage() {
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] font-body text-[#111B21] pb-10">
-      <header className="bg-white px-4 py-3 flex items-center justify-between border-b border-gray-100 sticky top-0 z-50 shadow-sm">
+      <header className="bg-white px-4 py-2.5 flex items-center justify-between border-b border-gray-100 sticky top-0 z-50 shadow-sm">
         <button onClick={() => router.back()} className="flex items-center gap-1 text-[#312ECB] font-black uppercase text-[9px] tracking-widest">
-          <ChevronLeft size={16} /> Back
+          <ChevronLeft size={14} /> Back
         </button>
-        <h1 className="text-[10px] font-black uppercase tracking-[0.2em]">Add Funds</h1>
+        <h1 className="text-[9px] font-black uppercase tracking-[0.2em]">Add Funds</h1>
         <div className="w-10" />
       </header>
 
-      <main className="max-w-md mx-auto p-4 space-y-3 mt-1">
-        <div className="bg-[#312ECB] rounded-[1.5rem] p-5 text-white shadow-lg relative overflow-hidden">
+      <main className="max-w-md mx-auto p-3 space-y-2.5 mt-1">
+        <div className="bg-[#312ECB] rounded-[1.2rem] p-4 text-white shadow-lg relative overflow-hidden">
           <div className="relative z-10 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center">
-              <QrCode size={20} />
+            <div className="w-8 h-8 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center">
+              <QrCode size={16} />
             </div>
             <div>
-              <p className="text-[8px] font-black uppercase tracking-[0.3em] text-white/60">Wallet Refill</p>
-              <h2 className="text-lg font-black uppercase tracking-tight">Scan & Pay</h2>
+              <p className="text-[7px] font-black uppercase tracking-[0.3em] text-white/60">Wallet Refill</p>
+              <h2 className="text-[15px] font-black uppercase tracking-tight">Scan & Pay</h2>
             </div>
           </div>
         </div>
 
         {globalBonus > 0 && (
-          <div className="bg-emerald-500 rounded-xl p-3 text-white flex items-center gap-3 shadow-md">
-            <Zap className="fill-current animate-pulse" size={16} />
-            <p className="text-[10px] font-black uppercase">Get {globalBonus}% Extra Bonus!</p>
+          <div className="bg-emerald-500 rounded-lg p-2 text-white flex items-center gap-2 shadow-md">
+            <Zap className="fill-current animate-pulse" size={12} />
+            <p className="text-[9px] font-black uppercase">Get {globalBonus}% Extra Bonus!</p>
           </div>
         )}
 
-        <div className="bg-white rounded-[1.5rem] p-5 shadow-sm border border-gray-50 flex flex-col items-center space-y-3">
+        <div className="bg-white rounded-[1.2rem] p-4 shadow-sm border border-gray-50 flex flex-col items-center space-y-2.5">
           <div className="text-center">
-            <h3 className="text-[9px] font-black uppercase tracking-widest text-slate-400">Step 1: Pay via QR</h3>
-            <p className="text-[9px] font-bold text-slate-800 uppercase mt-0.5">{merchantName}</p>
+            <h3 className="text-[8px] font-black uppercase tracking-widest text-slate-400">Step 1: Pay via QR</h3>
+            <p className="text-[8px] font-bold text-slate-800 uppercase mt-0.5">{merchantName}</p>
           </div>
 
-          <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 shadow-inner">
+          <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 shadow-inner">
             <img 
               src={finalQrUrl} 
               alt="Payment QR" 
-              className="w-32 h-32 object-contain rounded-lg"
+              className="w-28 h-28 object-contain rounded-md"
             />
           </div>
 
           <button 
             onClick={copyUpi}
-            className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-full border border-slate-100"
+            className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-50 rounded-full border border-slate-100"
           >
-            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{upiId}</span>
-            <Copy size={10} className="text-[#312ECB]" />
+            <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">{upiId}</span>
+            <Copy size={8} className="text-[#312ECB]" />
           </button>
         </div>
 
-        <div className="bg-white rounded-[1.5rem] p-5 shadow-sm border border-gray-50 space-y-4">
+        <div className="bg-white rounded-[1.2rem] p-4 shadow-sm border border-gray-50 space-y-3">
           <div className="text-center">
-            <h3 className="text-[9px] font-black uppercase tracking-widest text-slate-400">Step 2: Submit Details</h3>
+            <h3 className="text-[8px] font-black uppercase tracking-widest text-slate-400">Step 2: Submit Details</h3>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             <div className="space-y-1">
-              <label className="text-[8px] font-black uppercase text-slate-400 tracking-widest ml-1">Amount (₹)</label>
+              <label className="text-[7px] font-black uppercase text-slate-400 tracking-widest ml-1">Amount (₹)</label>
               <Input 
                 type="number" 
                 placeholder="0.00" 
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="h-11 bg-slate-50 border-none rounded-xl px-4 text-sm font-black"
+                className="h-10 bg-slate-50 border-none rounded-lg px-3 text-xs font-black"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-[9px] font-black uppercase text-red-500 tracking-tight ml-1 leading-none">
+              <label className="text-[8px] font-black uppercase text-red-500 tracking-tight ml-1 leading-none">
                 Shi utr dalo varna payment verify nhi hoga
               </label>
               <Input 
@@ -178,7 +177,7 @@ export default function AddFundsPage() {
                 value={utrId}
                 maxLength={12}
                 onChange={(e) => setUtrId(e.target.value.replace(/[^0-9]/g, ''))}
-                className="h-11 bg-slate-50 border-none rounded-xl px-4 text-sm font-black tracking-widest"
+                className="h-10 bg-slate-50 border-none rounded-lg px-3 text-xs font-black tracking-widest"
               />
             </div>
           </div>
@@ -186,22 +185,22 @@ export default function AddFundsPage() {
           <Button 
             onClick={handleManualSubmit}
             disabled={loading || !amount || utrId.length !== 12}
-            className="w-full h-12 bg-[#312ECB] hover:bg-[#2825A6] text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md gap-2"
+            className="w-full h-11 bg-[#312ECB] hover:bg-[#2825A6] text-white rounded-lg font-black text-[9px] uppercase tracking-widest shadow-md gap-2"
           >
-            {loading ? <Loader2 className="animate-spin" size={14} /> : "Submit Request"}
-            <CheckCircle2 size={14} />
+            {loading ? <Loader2 className="animate-spin" size={12} /> : "Submit Request"}
+            <CheckCircle2 size={12} />
           </Button>
         </div>
 
         <button 
           onClick={() => router.push('/orders')}
-          className="w-full bg-white rounded-xl p-3 flex items-center justify-between border border-gray-100"
+          className="w-full bg-white rounded-lg p-2.5 flex items-center justify-between border border-gray-100"
         >
           <div className="flex items-center gap-2">
-            <History className="text-slate-400" size={16} />
-            <span className="text-[9px] font-black uppercase tracking-widest">History</span>
+            <History className="text-slate-400" size={14} />
+            <span className="text-[8px] font-black uppercase tracking-widest">History</span>
           </div>
-          <ChevronRight className="text-slate-300" size={14} />
+          <ChevronRight className="text-slate-300" size={12} />
         </button>
       </main>
     </div>
