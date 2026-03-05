@@ -2,13 +2,13 @@
 "use client";
 
 import { useMemo, useEffect, useState } from "react";
-import { query, collection, doc, updateDoc, getDoc, writeBatch, increment, serverTimestamp } from "firebase/firestore";
+import { query, collection, doc, updateDoc, getDoc, writeBatch, increment, serverTimestamp, getDocs, where } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { History, X, Clock, Copy, RefreshCw, Wallet, AlertCircle, ChevronLeft } from "lucide-react";
-import { format, isValid, isAfter, subMinutes } from "date-fns";
+import { History, X, Clock, Copy, RefreshCw, Wallet, AlertCircle, ChevronLeft, Package } from "lucide-react";
+import { format, isValid, isAfter, subMinutes, subDays } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { getApiOrdersStatus } from "@/app/actions/smm-api";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,30 @@ export default function OrdersHistoryPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // 90-Day Auto-Cleanup for Orders
+  useEffect(() => {
+    if (!db || !user) return;
+    const cleanupOldOrders = async () => {
+      try {
+        const ninetyDaysAgo = subDays(new Date(), 90);
+        const qClean = query(
+          collection(db, "users", user.uid, "orders"), 
+          where("createdAt", "<", ninetyDaysAgo)
+        );
+        const snap = await getDocs(qClean);
+        if (!snap.empty) {
+          const batch = writeBatch(db);
+          snap.docs.forEach(d => batch.delete(d.ref));
+          await batch.commit();
+          console.log(`Auto-cleaned ${snap.size} old order records.`);
+        }
+      } catch (e) {
+        console.error("Orders cleanup failed", e);
+      }
+    };
+    cleanupOldOrders();
+  }, [db, user]);
 
   const ordersQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
@@ -58,7 +82,7 @@ export default function OrdersHistoryPage() {
     return processed.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }, [rawOrdersData]);
 
-  // Real-time API Status Sync Logic (Auto-trigger when viewing)
+  // Real-time API Status Sync Logic
   useEffect(() => {
     if (!db || !user || !orders.length || isSyncing) return;
 
@@ -111,7 +135,6 @@ export default function OrdersHistoryPage() {
       }
     };
 
-    // Delay a bit to let initial render finish
     const timer = setTimeout(() => syncApiOrders(), 1500);
     return () => clearTimeout(timer);
   }, [db, user, orders.length, isSyncing]);
@@ -123,7 +146,7 @@ export default function OrdersHistoryPage() {
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] dark:bg-slate-950 font-body pb-10">
-      <header className="bg-white dark:bg-slate-900 px-4 py-2.5 flex items-center justify-between border-b border-gray-100 dark:border-slate-800 sticky top-0 z-50">
+      <header className="bg-white dark:bg-slate-900 px-4 py-2.5 flex items-center justify-between border-b border-gray-100 dark:border-slate-800 sticky top-0 z-50 shadow-sm">
         <button onClick={() => router.back()} className="flex items-center gap-1 text-[#312ECB] font-black uppercase text-[9px] tracking-widest">
           <ChevronLeft size={14} /> Back
         </button>
@@ -132,6 +155,11 @@ export default function OrdersHistoryPage() {
       </header>
 
       <main className="max-w-md mx-auto p-3 space-y-3 mt-1">
+        <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-xl border border-blue-100 dark:border-blue-900/30 flex items-center gap-2">
+          <Package className="text-[#312ECB]" size={14} />
+          <p className="text-[8px] font-black text-[#312ECB] uppercase tracking-widest">Orders are kept for 90 days</p>
+        </div>
+
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <div className="w-8 h-8 border-2 border-[#312ECB] border-t-transparent rounded-full animate-spin" />
@@ -165,9 +193,8 @@ export default function OrdersHistoryPage() {
                   <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase">
                     ₹{order.price?.toFixed(2)}
                   </span>
-                  <span className="text-slate-200 dark:text-slate-700 ml-auto" />
                   <Badge className={cn(
-                    "text-[8px] h-4.5 font-black px-2 border-none rounded-md",
+                    "ml-auto text-[8px] h-4.5 font-black px-2 border-none rounded-md",
                     order.effectiveStatus === 'Processing' || order.effectiveStatus === 'In progress' ? 'bg-blue-50 text-blue-600' :
                     order.effectiveStatus === 'Completed' ? 'bg-emerald-50 text-emerald-600' :
                     order.effectiveStatus === 'Refunded' ? 'bg-amber-100 text-amber-700' :
@@ -195,16 +222,8 @@ export default function OrdersHistoryPage() {
             <div className="w-16 h-16 bg-white dark:bg-slate-900 rounded-3xl flex items-center justify-center mx-auto shadow-sm">
               <History size={32} className="text-slate-200" />
             </div>
-            <div>
-              <p className="text-[10px] font-black text-[#111B21] dark:text-white uppercase tracking-[0.2em]">No Activity Yet</p>
-              <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">Your orders will appear here</p>
-            </div>
-            <Button 
-              onClick={() => router.push('/chat')}
-              className="rounded-xl bg-[#312ECB] hover:bg-[#2825A6] text-white uppercase font-black text-[9px] tracking-widest px-8 h-10 shadow-md"
-            >
-              Start Ordering
-            </Button>
+            <p className="text-[10px] font-black text-[#111B21] dark:text-white uppercase tracking-[0.2em]">No Activity Yet</p>
+            <Button onClick={() => router.push('/chat')} className="rounded-xl bg-[#312ECB] text-white font-black text-[9px] px-8 h-10">Start Ordering</Button>
           </div>
         )}
       </main>

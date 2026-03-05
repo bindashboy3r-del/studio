@@ -16,7 +16,8 @@ import {
   increment,
   getDoc,
   updateDoc,
-  deleteDoc
+  deleteDoc,
+  getDocs
 } from "firebase/firestore";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
@@ -40,7 +41,8 @@ import {
   Loader2,
   Bell,
   Trash2,
-  CheckCheck
+  CheckCheck,
+  MessageSquareText
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { SMMService, Platform } from "@/app/lib/constants";
@@ -48,6 +50,7 @@ import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from "@
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { placeApiOrder } from "@/app/actions/smm-api";
+import { subDays } from "date-fns";
 import {
   Sheet,
   SheetContent,
@@ -82,7 +85,8 @@ interface OrderInProgress {
 }
 
 export default function ChatPage() {
-  const { user, isUserLoading } = useUser();
+  const { user, isUserLoading } = userHook();
+  const { user: currentUser } = useUser();
   const db = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
@@ -106,11 +110,38 @@ export default function ChatPage() {
   const hasInitialGreeted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Helper hook to handle auth redirection safely
+  function userHook() {
+    const { user, isUserLoading } = useUser();
+    useEffect(() => {
+      if (!isUserLoading && !user) router.push("/");
+    }, [user, isUserLoading]);
+    return { user, isUserLoading };
+  }
+
+  // 7-Day Auto-Cleanup for Chats
   useEffect(() => {
-    if (!isUserLoading && !user) {
-      router.push("/");
-    }
-  }, [user, isUserLoading, router]);
+    if (!db || !currentUser) return;
+    const cleanupOldChats = async () => {
+      try {
+        const sevenDaysAgo = subDays(new Date(), 7);
+        const qClean = query(
+          collection(db, "users", currentUser.uid, "chatMessages"), 
+          where("timestamp", "<", sevenDaysAgo)
+        );
+        const snap = await getDocs(qClean);
+        if (!snap.empty) {
+          const batch = writeBatch(db);
+          snap.docs.forEach(d => batch.delete(d.ref));
+          await batch.commit();
+          console.log(`Auto-cleaned ${snap.size} old chat messages.`);
+        }
+      } catch (e) {
+        console.error("Cleanup failed", e);
+      }
+    };
+    cleanupOldChats();
+  }, [db, currentUser]);
 
   const servicesQuery = useMemoFirebase(() => {
     if (!db) return null;
@@ -124,9 +155,9 @@ export default function ChatPage() {
   }, [rawDynamicServices]);
 
   const userDocRef = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return doc(db, "users", user.uid);
-  }, [db, user]);
+    if (!db || !currentUser) return null;
+    return doc(db, "users", currentUser.uid);
+  }, [db, currentUser]);
   const { data: userData } = useDoc(userDocRef);
   const walletBalance = userData?.balance || 0;
 
@@ -147,7 +178,7 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
-    if (!db || !user) return; 
+    if (!db || !currentUser) return; 
     
     const unsubBroadcast = onSnapshot(query(collection(db, "globalAnnouncements"), where("active", "==", true), limit(1)), (snap) => {
       if (!snap.empty) setActiveBroadcast(snap.docs[0].data());
@@ -169,7 +200,7 @@ export default function ChatPage() {
       if (snap.exists()) setSocialLinks(snap.data());
     });
 
-    const unsubNotifs = onSnapshot(query(collection(db, "users", user.uid, "notifications"), where("read", "==", false), orderBy("createdAt", "desc"), limit(20)), (snap) => {
+    const unsubNotifs = onSnapshot(query(collection(db, "users", currentUser.uid, "notifications"), where("read", "==", false), orderBy("createdAt", "desc"), limit(20)), (snap) => {
       setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
@@ -179,12 +210,12 @@ export default function ChatPage() {
       unsubSocial();
       unsubNotifs();
     };
-  }, [db, user]);
+  }, [db, currentUser]);
 
   const messagesQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return query(collection(db, "users", user.uid, "chatMessages"), orderBy("timestamp", "asc"));
-  }, [db, user]);
+    if (!db || !currentUser) return null;
+    return query(collection(db, "users", currentUser.uid, "chatMessages"), orderBy("timestamp", "asc"));
+  }, [db, currentUser]);
 
   const { data: messages, isLoading: isMessagesLoading } = useCollection(messagesQuery);
 
@@ -193,9 +224,9 @@ export default function ChatPage() {
   }, [messages, isTyping, activeBroadcast]);
 
   const addMessage = async (sender: 'user' | 'bot', text: string, options?: string[], extraData?: any) => {
-    if (!user || !db) return;
-    addDoc(collection(db, "users", user.uid, "chatMessages"), {
-      userId: user.uid,
+    if (!currentUser || !db) return;
+    addDoc(collection(db, "users", currentUser.uid, "chatMessages"), {
+      userId: currentUser.uid,
       sender,
       text,
       options: options || [],
@@ -213,14 +244,14 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
-    if (user && !isMessagesLoading && !hasInitialGreeted.current) {
+    if (currentUser && !isMessagesLoading && !hasInitialGreeted.current) {
       hasInitialGreeted.current = true;
       if (!messages || messages.length === 0) {
         setChatState('initial');
         botReply("👋 Welcome to SocialBoost! Send 'Hi' to see our Instagram growth menu. 🚀");
       }
     }
-  }, [user, isMessagesLoading, messages]);
+  }, [currentUser, isMessagesLoading, messages]);
 
   const calculateRawPrice = (itemsOverride?: OrderItem[], typeOverride?: string) => {
     const items = itemsOverride || currentOrder.items;
@@ -251,7 +282,7 @@ export default function ChatPage() {
   };
 
   const handleBundlePaymentSubmit = async (utr: string, linkOverride?: string) => {
-    if (!db || !user || currentOrder.items.length === 0) return;
+    if (!db || !currentUser || currentOrder.items.length === 0) return;
     const totalPrice = calculateTotalPrice();
     const targets = (currentOrder.type === 'bulk' && currentOrder.bulkLinks) ? currentOrder.bulkLinks : [linkOverride || currentOrder.items[0].link];
 
@@ -269,12 +300,12 @@ export default function ChatPage() {
     for (const link of targets) {
       for (const item of currentOrder.items) {
         const orderId = `SB-B-${Math.floor(100000 + Math.random() * 900000)}`;
-        const orderRef = doc(collection(db, "users", user.uid, "orders"));
+        const orderRef = doc(collection(db, "users", currentUser.uid, "orders"));
         let itemPrice = (item.quantity / 1000) * (item.service?.pricePer1000 || 0);
         if (discPct > 0) itemPrice *= (1 - discPct / 100);
 
         const orderData = {
-          userId: user.uid, orderId, platform: 'Instagram', service: item.service?.name || "Service", link,
+          userId: currentUser.uid, orderId, platform: 'Instagram', service: item.service?.name || "Service", link,
           quantity: item.quantity, price: itemPrice, utrId: utr, status: 'Pending', paymentMethod: 'UPI', createdAt: serverTimestamp()
         };
         batch.set(orderRef, orderData);
@@ -299,7 +330,7 @@ export default function ChatPage() {
   };
 
   const handleBundleWalletSubmit = async (linkOverride?: string) => {
-    if (!db || !user || currentOrder.items.length === 0) return;
+    if (!db || !currentUser || currentOrder.items.length === 0) return;
     const totalPrice = calculateTotalPrice();
     if (walletBalance < totalPrice) {
       botReply("❌ Insufficient balance!", ["💳 ADD FUNDS", "🏠 MAIN MENU"]);
@@ -338,15 +369,15 @@ export default function ChatPage() {
         if (discPct > 0) itemPrice *= (1 - discPct / 100);
 
         const orderData = {
-          userId: user.uid, orderId, platform: 'Instagram', service: item.service?.name, link,
+          userId: currentUser.uid, orderId, platform: 'Instagram', service: item.service?.name, link,
           quantity: item.quantity, price: itemPrice, status: finalStatus, paymentMethod: 'Wallet', apiOrderId, providerId, createdAt: serverTimestamp()
         };
-        batch.set(doc(collection(db, "users", user.uid, "orders")), orderData);
+        batch.set(doc(collection(db, "users", currentUser.uid, "orders")), orderData);
         orderResults.push(orderData);
       }
     }
 
-    batch.update(doc(db, "users", user.uid), { balance: increment(-totalPrice) });
+    batch.update(doc(db, "users", currentUser.uid), { balance: increment(-totalPrice) });
     await batch.commit().then(() => {
       setChatState('idle');
       const successServiceName = currentOrder.type === 'combo' 
@@ -362,7 +393,7 @@ export default function ChatPage() {
 
   const handleSend = async (manualText?: string) => {
     const text = manualText || inputValue.trim();
-    if (!text || !db || !user) return;
+    if (!text || !db || !currentUser) return;
     if (!manualText) setInputValue("");
     await addMessage('user', text);
     const cleanText = text.toLowerCase();
@@ -448,11 +479,11 @@ export default function ChatPage() {
   };
 
   const clearAllNotifications = async () => {
-    if (!db || !user) return;
+    if (!db || !currentUser) return;
     try {
       const batch = writeBatch(db);
       notifications.forEach(n => {
-        batch.update(doc(db, "users", user.uid, "notifications", n.id), { read: true });
+        batch.update(doc(db, "users", currentUser.uid, "notifications", n.id), { read: true });
       });
       await batch.commit();
       toast({ title: "Notifications Cleared" });
@@ -462,11 +493,11 @@ export default function ChatPage() {
   };
 
   const markNotifRead = async (id: string) => {
-    if (!db || !user) return;
-    await updateDoc(doc(db, "users", user.uid, "notifications", id), { read: true });
+    if (!db || !currentUser) return;
+    await updateDoc(doc(db, "users", currentUser.uid, "notifications", id), { read: true });
   };
 
-  if (isUserLoading || (!user && !isUserLoading)) {
+  if (isUserLoading || (!currentUser && !isUserLoading)) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-white dark:bg-slate-950">
         <Loader2 className="w-8 h-8 text-[#312ECB] animate-spin mb-3" />
@@ -536,7 +567,7 @@ export default function ChatPage() {
             </SheetContent>
           </Sheet>
 
-          <button onClick={() => router.push('/profile')} className="w-7 h-7 rounded-full bg-[#312ECB] text-white font-black text-[10px]">{user?.displayName?.[0] || 'U'}</button>
+          <button onClick={() => router.push('/profile')} className="w-7 h-7 rounded-full bg-[#312ECB] text-white font-black text-[10px]">{currentUser?.displayName?.[0] || 'U'}</button>
         </div>
       </header>
 
@@ -544,7 +575,10 @@ export default function ChatPage() {
         <button onClick={() => router.push('/add-funds')} className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 px-2 py-1 rounded-full border border-emerald-100 dark:border-emerald-800">
           <Wallet size={10} /> <span className="text-[9px] font-black">₹{walletBalance.toFixed(0)}</span> <PlusCircle size={10} />
         </button>
-        <button onClick={() => router.push('/orders')} className="text-[9px] font-black uppercase text-[#312ECB] dark:text-blue-400 flex items-center gap-1"><History size={12} /> HISTORY</button>
+        <div className="flex items-center gap-3">
+          <button onClick={() => router.push('/orders')} className="text-[8px] font-black uppercase text-[#312ECB] dark:text-blue-400 flex items-center gap-1"><History size={10} /> ORDERS</button>
+          <button onClick={() => router.push('/chat-logs')} className="text-[8px] font-black uppercase text-pink-500 dark:text-pink-400 flex items-center gap-1"><MessageSquareText size={10} /> CHATS</button>
+        </div>
       </div>
 
       <main className="flex-1 overflow-y-auto p-2.5 flex flex-col whatsapp-bg relative pb-16">
