@@ -280,102 +280,12 @@ export default function ChatPage() {
 
     const cleanText = text.toLowerCase();
 
-    if (cleanText === 'open_orders') {
+    // --- 1. CRITICAL: Technical/Internal Command Handlers (Priority) ---
+    if (cleanText === 'open_orders' || cleanText === 'OPEN_ORDERS') {
       setIsOrdersOpen(true);
       return;
     }
 
-    // 1. HI / MENU Check
-    if (cleanText === 'hi' || cleanText === 'menu') {
-      await cleanupIntermediateChats();
-      await addMessage('user', text, [], { isPermanent: true });
-      
-      if (availablePlatforms.length > 1) {
-        setChatState('choosing_platform');
-        botReply("Choose your platform:", availablePlatforms.map((p, i) => `${i + 1}. ${PLATFORMS[p]}`), { isPermanent: true });
-      } else {
-        const platform = availablePlatforms[0] || 'instagram';
-        setCurrentOrder(p => ({ ...p, platform }));
-        setChatState('choosing_order_type');
-        botReply(`Choose your boost style for ${PLATFORMS[platform]}:`, [
-          `1. SINGLE ORDER (${globalDiscounts.single}% OFF)`, 
-          `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)`, 
-          `3. BULK ORDER (${globalDiscounts.bulk}% OFF)`
-        ], { isPermanent: true });
-      }
-      return;
-    }
-
-    // 2. Global Platform Intent Detection (Generic for all categories)
-    const platformMatchByName = availablePlatforms.find(p => cleanText.includes(PLATFORMS[p].toLowerCase()));
-    const platformMatchByIndex = (chatState === 'choosing_platform' || chatState === 'initial') 
-      ? availablePlatforms.find((p, i) => cleanText === (i + 1).toString()) 
-      : null;
-    const platformMatch = platformMatchByName || platformMatchByIndex;
-
-    if (platformMatch) {
-      // If we are in the middle of a different flow, cleanup
-      if (chatState !== 'choosing_platform' && chatState !== 'initial') {
-        await cleanupIntermediateChats();
-      }
-      await addMessage('user', PLATFORMS[platformMatch]);
-      setCurrentOrder(p => ({ ...p, platform: platformMatch }));
-      setChatState('choosing_order_type');
-      botReply(`Great! Choose your boost style for ${PLATFORMS[platformMatch]}:`, [
-        `1. SINGLE ORDER (${globalDiscounts.single}% OFF)`, 
-        `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)`, 
-        `3. BULK ORDER (${globalDiscounts.bulk}% OFF)`
-      ], { isPermanent: true });
-      return;
-    }
-
-    // 3. Order Type Selection
-    if (cleanText.includes("single order") || cleanText.includes("combo order") || cleanText.includes("bulk order")) {
-      await cleanupIntermediateChats(); 
-      await addMessage('user', text, [], { isPermanent: true }); 
-      
-      const filteredServices = activeServices.filter(s => s.platform === currentOrder.platform);
-
-      if (cleanText.includes("single order")) {
-        setChatState('choosing_service'); 
-        setCurrentOrder(p => ({ ...p, type: 'single', items: [] }));
-        botReply(`Pick a Service. You get ${globalDiscounts.single}% OFF!`, filteredServices.map((s, i) => `${i + 1}. ${s.name}`));
-      } else if (cleanText.includes("combo order")) {
-        setChatState('configuring_combo'); 
-        setCurrentOrder(p => ({ ...p, type: 'combo', items: [] }));
-        botReply("Configure your custom combo bundle:", [], { 
-          isComboConfigCard: true, 
-          discountPct: globalDiscounts.combo,
-          dynamicServices: filteredServices
-        });
-      } else if (cleanText.includes("bulk order")) {
-        setChatState('bulk_adding_links'); 
-        setCurrentOrder(p => ({ ...p, type: 'bulk', items: [], tempLinks: [] }));
-        botReply(`🚀 BULK MODE: Add links one by one. Click SUBMIT when finished!`, [], { isBulkLinkCard: true });
-      }
-      return;
-    }
-
-    // 4. Global Service Intent Detection (Generic for all platforms)
-    const filteredServices = activeServices.filter(s => s.platform === currentOrder.platform);
-    const serviceMatchByName = filteredServices.find(s => cleanText.includes(s.name.toLowerCase()));
-    const serviceMatchByIndex = (chatState === 'choosing_service') 
-      ? filteredServices.find((s, i) => cleanText === (i + 1).toString()) 
-      : null;
-    const serviceMatch = serviceMatchByName || serviceMatchByIndex;
-
-    if (serviceMatch) {
-      // If user types a service name while in quantity or payment, cleanup and switch
-      if (chatState === 'entering_quantity' || chatState === 'choosing_payment_method') {
-        await cleanupIntermediateChats();
-      }
-      setCurrentOrder(p => ({ ...p, items: [{ service: serviceMatch, quantity: 0, link: '' }] }));
-      setChatState('entering_quantity');
-      botReply(`📊 Enter Quantity for ${serviceMatch.name}?\n(Minimum: ${serviceMatch.minQuantity})`);
-      return;
-    }
-
-    // Handlers for specific complex states
     if (text.startsWith("SUBMIT_BULK_LINKS:")) {
       const linksStr = text.replace("SUBMIT_BULK_LINKS:", "");
       const linksArr = linksStr.split('|').filter(l => l.trim());
@@ -536,7 +446,97 @@ export default function ChatPage() {
       return;
     }
 
-    // Default Fallback logic
+    // --- 2. Basic Triggers ---
+    if (cleanText === 'hi' || cleanText === 'menu') {
+      await cleanupIntermediateChats();
+      await addMessage('user', text, [], { isPermanent: true });
+      
+      if (availablePlatforms.length > 1) {
+        setChatState('choosing_platform');
+        botReply("Choose your platform:", availablePlatforms.map((p, i) => `${i + 1}. ${PLATFORMS[p]}`), { isPermanent: true });
+      } else {
+        const platform = availablePlatforms[0] || 'instagram';
+        setCurrentOrder(p => ({ ...p, platform }));
+        setChatState('choosing_order_type');
+        botReply(`Choose your boost style for ${PLATFORMS[platform]}:`, [
+          `1. SINGLE ORDER (${globalDiscounts.single}% OFF)`, 
+          `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)`, 
+          `3. BULK ORDER (${globalDiscounts.bulk}% OFF)`
+        ], { isPermanent: true });
+      }
+      return;
+    }
+
+    // --- 3. Intent Detection (Order Type, Platform, Service) ---
+    
+    // Order Type Selection
+    if (cleanText.includes("single order") || cleanText.includes("combo order") || cleanText.includes("bulk order")) {
+      await cleanupIntermediateChats(); 
+      await addMessage('user', text, [], { isPermanent: true }); 
+      
+      const filteredServices = activeServices.filter(s => s.platform === currentOrder.platform);
+
+      if (cleanText.includes("single order")) {
+        setChatState('choosing_service'); 
+        setCurrentOrder(p => ({ ...p, type: 'single', items: [] }));
+        botReply(`Pick a Service. You get ${globalDiscounts.single}% OFF!`, filteredServices.map((s, i) => `${i + 1}. ${s.name}`));
+      } else if (cleanText.includes("combo order")) {
+        setChatState('configuring_combo'); 
+        setCurrentOrder(p => ({ ...p, type: 'combo', items: [] }));
+        botReply("Configure your custom combo bundle:", [], { 
+          isComboConfigCard: true, 
+          discountPct: globalDiscounts.combo,
+          dynamicServices: filteredServices
+        });
+      } else if (cleanText.includes("bulk order")) {
+        setChatState('bulk_adding_links'); 
+        setCurrentOrder(p => ({ ...p, type: 'bulk', items: [], tempLinks: [] }));
+        botReply(`🚀 BULK MODE: Add links one by one. Click SUBMIT when finished!`, [], { isBulkLinkCard: true });
+      }
+      return;
+    }
+
+    // Global Platform Intent Detection
+    const platformMatchByName = availablePlatforms.find(p => cleanText.includes(PLATFORMS[p].toLowerCase()));
+    const platformMatchByIndex = (chatState === 'choosing_platform' || chatState === 'initial') 
+      ? availablePlatforms.find((p, i) => cleanText === (i + 1).toString()) 
+      : null;
+    const platformMatch = platformMatchByName || platformMatchByIndex;
+
+    if (platformMatch) {
+      if (chatState !== 'choosing_platform' && chatState !== 'initial') {
+        await cleanupIntermediateChats();
+      }
+      await addMessage('user', PLATFORMS[platformMatch]);
+      setCurrentOrder(p => ({ ...p, platform: platformMatch }));
+      setChatState('choosing_order_type');
+      botReply(`Great! Choose your boost style for ${PLATFORMS[platformMatch]}:`, [
+        `1. SINGLE ORDER (${globalDiscounts.single}% OFF)`, 
+        `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)`, 
+        `3. BULK ORDER (${globalDiscounts.bulk}% OFF)`
+      ], { isPermanent: true });
+      return;
+    }
+
+    // Global Service Intent Detection
+    const filteredServices = activeServices.filter(s => s.platform === currentOrder.platform);
+    const serviceMatchByName = filteredServices.find(s => cleanText.includes(s.name.toLowerCase()));
+    const serviceMatchByIndex = (chatState === 'choosing_service') 
+      ? filteredServices.find((s, i) => cleanText === (i + 1).toString()) 
+      : null;
+    const serviceMatch = serviceMatchByName || serviceMatchByIndex;
+
+    if (serviceMatch) {
+      if (chatState === 'entering_quantity' || chatState === 'choosing_payment_method') {
+        await cleanupIntermediateChats();
+      }
+      setCurrentOrder(p => ({ ...p, items: [{ service: serviceMatch, quantity: 0, link: '' }] }));
+      setChatState('entering_quantity');
+      botReply(`📊 Enter Quantity for ${serviceMatch.name}?\n(Minimum: ${serviceMatch.minQuantity})`);
+      return;
+    }
+
+    // --- 4. State-Based Fallbacks ---
     await addMessage('user', text);
 
     if (chatState === 'entering_quantity') {
