@@ -445,7 +445,7 @@ export function MessageBubble({
               </div>
               
               <div className="flex flex-col gap-3">
-                <Button onClick={() => onOptionClick?.(`SUBMIT_PAYMENT###${links || prefilledLinks}###${utr}`)} disabled={( !isCombo && !links) || utr.length !== 12} className="w-full h-14 bg-[#312ECB] font-black text-[11px] uppercase tracking-[0.2em] rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10">
+                <Button onClick={() => onOptionClick?.(`SUBMIT_PAYMENT###${links || prefilledLinks}###${utr}`)} disabled={(!isCombo && !links) || utr.length !== 12} className="w-full h-14 bg-[#312ECB] font-black text-[11px] uppercase tracking-[0.2em] rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10">
                   VERIFY & SUBMIT
                 </Button>
               </div>
