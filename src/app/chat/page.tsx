@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -237,7 +238,7 @@ export default function ChatPage() {
   };
 
   /**
-   * Smart Cleanup: Removes intermediate messages but PRESERVES order confirmations.
+   * Smart Cleanup: Removes intermediate messages but PRESERVES order confirmations and mode headers.
    */
   const cleanupIntermediateChats = async () => {
     if (!db || !currentUser) return;
@@ -247,7 +248,7 @@ export default function ChatPage() {
     
     snap.docs.forEach(d => {
       const data = d.data();
-      // Logic: Only delete if it's NOT an order confirmation or marked permanent
+      // Logic: Only delete if it's NOT an order confirmation or marked permanent (Main Menu / Selections)
       const isPersistent = data.orderId || data.isInitialGreeting || data.isPermanent;
       if (!isPersistent) {
         batch.delete(d.ref);
@@ -261,7 +262,7 @@ export default function ChatPage() {
       hasInitialGreeted.current = true;
       if (!messages || messages.length === 0) {
         setChatState('initial');
-        botReply("👋 Welcome to SocialBoost! Automation Active. Type 'Hi' to begin. 🚀", [], { isInitialGreeting: true });
+        botReply("👋 Welcome to SocialBoost! Automation Active. Type 'Hi' to begin. 🚀", [], { isInitialGreeting: true, isPermanent: true });
       }
     }
   }, [currentUser, isMessagesLoading, messages, sessionStart]);
@@ -273,10 +274,11 @@ export default function ChatPage() {
 
     const cleanText = text.toLowerCase();
 
-    // GLOBAL INTERRUPTS: Switching modes triggers cleanup
+    // GLOBAL INTERRUPTS: Switching modes triggers cleanup but preserves selection messages
     if (cleanText.includes("single order") || cleanText.includes("combo order") || cleanText.includes("bulk order")) {
       await cleanupIntermediateChats(); 
-      await addMessage('user', text, [], { isPermanent: true }); // Make the mode selection permanent
+      // Add the user selection as permanent
+      await addMessage('user', text, [], { isPermanent: true }); 
       
       if (cleanText.includes("single order")) {
         setChatState('choosing_service'); 
@@ -330,10 +332,10 @@ export default function ChatPage() {
       return;
     }
 
-    // 1. PAYMENT SUBMISSION (MANUAL/UPI)
+    // 1. PAYMENT SUBMISSION (MANUAL/UPI) - Make user confirmation permanent
     if (text.startsWith("SUBMIT_PAYMENT:")) {
       const [, linksInput, utr] = text.split(":");
-      await addMessage('user', `Payment Submitted (UTR: ${utr})`);
+      await addMessage('user', `Payment Submitted (UTR: ${utr})`, [], { isPermanent: true });
       
       const type = currentOrder.type || 'single';
       const disc = globalDiscounts[type] || 0;
@@ -369,15 +371,15 @@ export default function ChatPage() {
         createdAt: serverTimestamp()
       });
 
-      botReply(`✅ Details Submitted!\n\n🔢 Order ID: #${orderId}\n💰 Amount: ₹${totalPrice.toFixed(2)}\n\nAdmin 30-60 mins mein verify karke order start kar denge. Status check karte rahein. 🚀`, [], { orderId });
+      botReply(`✅ Details Submitted!\n\n🔢 Order ID: #${orderId}\n💰 Amount: ₹${totalPrice.toFixed(2)}\n\nAdmin 30-60 mins mein verify karke order start kar denge. Status check karte rahein. 🚀`, [], { orderId, isPermanent: true });
       setChatState('idle');
       return;
     }
 
-    // 2. WALLET CONFIRMATION
+    // 2. WALLET CONFIRMATION - Make user confirmation permanent
     if (text.startsWith("CONFIRM_WALLET:")) {
       const [, linksInput] = text.split(":");
-      await addMessage('user', "Confirming Wallet Payment...");
+      await addMessage('user', "Confirming Wallet Payment...", [], { isPermanent: true });
       
       const type = currentOrder.type || 'single';
       const disc = globalDiscounts[type] || 0;
@@ -449,7 +451,7 @@ export default function ChatPage() {
           });
           
           await batch.commit();
-          botReply(`🎉 Order Placed Successfully!\n\n🆔 Order ID: ${orderId}\n💰 Paid: ₹${totalPrice.toFixed(2)}\n\nOrder process ho raha hai. Check 'Orders' for updates.`, [], { orderId });
+          botReply(`🎉 Order Placed Successfully!\n\n🆔 Order ID: ${orderId}\n💰 Paid: ₹${totalPrice.toFixed(2)}\n\nOrder process ho raha hai. Check 'Orders' for updates.`, [], { orderId, isPermanent: true });
           setChatState('idle');
         } catch (e) {
           botReply("❌ Kuch technical issue hua. Admin ko contact karein.");
@@ -462,18 +464,19 @@ export default function ChatPage() {
       return;
     }
 
-    await addMessage('user', text);
-
-    // MENU PRIORITY
+    // MENU PRIORITY - Keep main menu permanent
     if (cleanText === 'hi' || cleanText === 'menu') {
+      await addMessage('user', text, [], { isPermanent: true });
       setChatState('choosing_order_type');
       botReply("Choose your boost style:", [
         `1. SINGLE ORDER (${globalDiscounts.single}% OFF)`, 
         `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)`, 
         `3. BULK ORDER (${globalDiscounts.bulk}% OFF)`
-      ]);
+      ], { isPermanent: true });
       return;
     }
+
+    await addMessage('user', text);
 
     // Service Selection
     const serviceMatch = dynamicServices.find((s, i) => cleanText === (i + 1).toString() || cleanText.includes(s.name.toLowerCase()));
