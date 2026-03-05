@@ -11,9 +11,12 @@ import {
   Percent,
   MessageCircle,
   Link as LinkIcon,
-  Layers
+  Layers,
+  Trash2,
+  Plus,
+  Rocket
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,6 +24,12 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { SMMService } from "@/app/lib/constants";
 import { useUser } from "@/firebase";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface MessageBubbleProps {
   sender: 'user' | 'bot';
@@ -32,12 +41,12 @@ interface MessageBubbleProps {
   paymentPrice?: number;
   rawPrice?: number;
   isWalletCard?: boolean;
-  onWalletSubmit?: (link: string) => void;
-  dynamicServices?: SMMService[] | null;
+  isComboConfigCard?: boolean;
   discountPct?: number;
   serviceName?: string;
   quantity?: number;
   isBulk?: boolean;
+  dynamicServices?: SMMService[] | null;
 }
 
 export function MessageBubble({ 
@@ -50,13 +59,14 @@ export function MessageBubble({
   paymentPrice,
   rawPrice,
   isWalletCard,
+  isComboConfigCard,
   discountPct = 0,
   serviceName,
   quantity,
-  isBulk
+  isBulk,
+  dynamicServices
 }: MessageBubbleProps) {
   const isUser = sender === 'user';
-  const { user } = useUser();
   const { toast } = useToast();
   
   const [links, setLinks] = useState("");
@@ -64,7 +74,21 @@ export function MessageBubble({
   const [mounted, setMounted] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
+  // Combo Config State
+  const [comboItems, setComboItems] = useState<{service: SMMService, qty: string}[]>([]);
+
   useEffect(() => { setMounted(true); }, []);
+
+  // Initialize Combo Items
+  useEffect(() => {
+    if (isComboConfigCard && dynamicServices && comboItems.length === 0) {
+      const initial = dynamicServices.slice(0, 3).map(s => ({
+        service: s,
+        qty: ""
+      }));
+      setComboItems(initial);
+    }
+  }, [isComboConfigCard, dynamicServices]);
 
   const price = paymentPrice || 0;
   const finalRawPrice = rawPrice || 0;
@@ -100,6 +124,29 @@ export function MessageBubble({
     window.open(`https://wa.me/${adminNumber}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
+  // Combo Logic
+  const comboSubtotal = useMemo(() => {
+    return comboItems.reduce((acc, item) => {
+      const q = parseInt(item.qty) || 0;
+      return acc + (q / 1000) * (item.service.pricePer1000 || 0);
+    }, 0);
+  }, [comboItems]);
+
+  const comboTotal = comboSubtotal * (1 - (discountPct / 100));
+
+  const addServiceToCombo = (s: SMMService) => {
+    if (comboItems.find(i => i.service.id === s.id)) return;
+    setComboItems([...comboItems, { service: s, qty: "" }]);
+  };
+
+  const removeServiceFromCombo = (id: string) => {
+    setComboItems(comboItems.filter(i => i.service.id !== id));
+  };
+
+  const updateComboQty = (id: string, val: string) => {
+    setComboItems(comboItems.map(i => i.service.id === id ? { ...i, qty: val.replace(/[^0-9]/g, '') } : i));
+  };
+
   if (!mounted) return null;
 
   return (
@@ -109,7 +156,97 @@ export function MessageBubble({
         isUser ? "bubble-user" : "bubble-bot"
       )}>
         
-        {isPaymentCard ? (
+        {isComboConfigCard ? (
+          <div className="space-y-5 min-w-[280px] py-2">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-8 h-8 rounded-lg bg-[#312ECB]/20 flex items-center justify-center text-[#312ECB]">
+                <Rocket size={16} />
+              </div>
+              <div>
+                <h3 className="text-[13px] font-black uppercase tracking-tight">Configure Combo</h3>
+                <Badge className="bg-emerald-500/10 text-emerald-400 border-none font-black text-[7px] px-2 mt-0.5">
+                  % {discountPct}% DISCOUNT ACTIVE
+                </Badge>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {comboItems.map((item) => (
+                <div key={item.service.id} className="bg-slate-950 p-4 rounded-[1.2rem] border border-white/5 shadow-3d-pressed relative">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-black uppercase text-[#312ECB] tracking-widest">{item.service.name}</span>
+                    <button onClick={() => removeServiceFromCombo(item.service.id)} className="text-red-500/50 hover:text-red-500 transition-colors">
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                  <Input 
+                    placeholder={`Qty (Min ${item.service.minQuantity})`}
+                    value={item.qty}
+                    onChange={(e) => updateComboQty(item.service.id, e.target.value)}
+                    className="h-9 bg-slate-900 border-none rounded-xl text-xs font-bold text-white shadow-inner"
+                  />
+                </div>
+              ))}
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="w-full h-10 border-dashed border-white/10 bg-transparent text-slate-500 font-black text-[9px] uppercase tracking-widest rounded-xl hover:bg-white/5">
+                    <Plus size={14} className="mr-2" /> Add Service
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-slate-900 border-white/10 rounded-xl max-h-[200px] overflow-y-auto custom-scrollbar">
+                  {dynamicServices?.filter(s => !comboItems.find(i => i.service.id === s.id)).map(s => (
+                    <DropdownMenuItem key={s.id} onClick={() => addServiceToCombo(s)} className="text-[9px] font-black uppercase text-slate-300 focus:bg-[#312ECB] focus:text-white">
+                      {s.name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            <div className="space-y-3 pt-2">
+              <div className="space-y-1">
+                <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-widest">Target Link</label>
+                <div className="relative">
+                  <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={12} />
+                  <Input 
+                    placeholder="Instagram link for combo" 
+                    value={links}
+                    onChange={(e) => setLinks(e.target.value)}
+                    className="h-10 bg-slate-950 border-none rounded-xl pl-9 text-xs font-bold text-white shadow-3d-pressed"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-slate-950/50 p-4 rounded-2xl space-y-1.5 border border-white/5 shadow-inner">
+                <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase">
+                  <span>Subtotal:</span>
+                  <span>₹{comboSubtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center text-[12px] font-black text-emerald-400 uppercase">
+                  <span>Combo Total ({discountPct}% OFF):</span>
+                  <span>₹{comboTotal.toFixed(2)}</span>
+                </div>
+              </div>
+
+              <Button 
+                onClick={() => {
+                  const valid = comboItems.every(i => parseInt(i.qty) >= i.service.minQuantity);
+                  if (!valid || !links) {
+                    toast({ variant: "destructive", title: "Wait!", description: "Link aur sahi quantity dalna jaruri hai." });
+                    return;
+                  }
+                  // Send a hidden message to trigger payment choosing
+                  const itemsStr = comboItems.map(i => `${i.service.id},${i.qty}`).join('|');
+                  onOptionClick?.(`SUBMIT_COMBO_CONFIG:${itemsStr}:${links}:${comboTotal}`);
+                }}
+                className="w-full h-12 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-3d active:shadow-3d-pressed"
+              >
+                Proceed to Payment
+              </Button>
+            </div>
+          </div>
+        ) : isPaymentCard ? (
           <div className="space-y-4 min-w-[220px]">
             <div className="text-center space-y-1">
               <div className="flex items-center justify-center gap-2 mb-1">
@@ -226,7 +363,7 @@ export function MessageBubble({
           </div>
         )}
 
-        {options && !isPaymentCard && !isWalletCard && (
+        {options && !isPaymentCard && !isWalletCard && !isComboConfigCard && (
           <div className="mt-4 space-y-2">
             {options.map((opt, i) => (
               <button key={i} onClick={() => onOptionClick?.(opt)} className="w-full bg-slate-900 border border-white/5 p-3 rounded-2xl flex items-center justify-between group shadow-3d active:shadow-3d-pressed transition-all">

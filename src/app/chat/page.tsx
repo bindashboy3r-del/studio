@@ -58,7 +58,7 @@ type ChatState =
   | 'choosing_order_type'
   | 'choosing_service' 
   | 'entering_quantity' 
-  | 'entering_bulk_links'
+  | 'configuring_combo'
   | 'choosing_payment_method';
 
 interface OrderItem {
@@ -71,7 +71,6 @@ interface OrderInProgress {
   type: 'single' | 'combo' | 'bulk';
   platform: Platform;
   items: OrderItem[];
-  bulkLinks?: string[];
 }
 
 export default function ChatPage() {
@@ -259,6 +258,28 @@ export default function ChatPage() {
 
     const cleanText = text.toLowerCase();
 
+    // COMBO CONFIG SUBMISSION
+    if (text.startsWith("SUBMIT_COMBO_CONFIG:")) {
+      const [, itemsStr, linksInput, total] = text.split(":");
+      await addMessage('user', "Proceeding with Combo Bundle...");
+      
+      const items = itemsStr.split('|').map(s => {
+        const [id, q] = s.split(',');
+        const service = dynamicServices.find(ds => ds.id === id)!;
+        return { service, quantity: parseInt(q), link: linksInput };
+      });
+
+      setCurrentOrder({ type: 'combo', platform: 'instagram', items });
+      setChatState('choosing_payment_method');
+
+      const paymentOptions: string[] = [];
+      if (paymentConfig?.walletEnabled !== false) paymentOptions.push("💳 PAY FROM WALLET");
+      if (paymentConfig?.upiEnabled !== false) paymentOptions.push("📲 PAY VIA UPI QR");
+
+      botReply(`✅ COMBO BUNDLE READY\n───────────────\nFinal Price: ₹${parseFloat(total).toFixed(2)}\n───────────────\nChoose Payment:`, paymentOptions);
+      return;
+    }
+
     // 1. PAYMENT SUBMISSION (MANUAL/UPI)
     if (text.startsWith("SUBMIT_PAYMENT:")) {
       const [, linksInput, utr] = text.split(":");
@@ -266,18 +287,16 @@ export default function ChatPage() {
       
       const type = currentOrder.type || 'single';
       const disc = globalDiscounts[type] || 0;
-      const links = linksInput.split('\n').filter(l => l.trim());
-      const numLinks = links.length;
+      const linksArr = linksInput.split('\n').filter(l => l.trim());
+      const numLinks = linksArr.length;
 
-      // Logic for Multi-Link or Combo
       let totalPrice = 0;
       let serviceNames = "";
 
       if (type === 'combo') {
-        const qty = currentOrder.items[0]?.quantity;
-        const basePrice = currentOrder.items.reduce((acc, item) => acc + (qty / 1000) * (item.service.pricePer1000 || 0), 0);
+        const basePrice = currentOrder.items.reduce((acc, item) => acc + (item.quantity / 1000) * (item.service.pricePer1000 || 0), 0);
         totalPrice = basePrice * (1 - disc / 100);
-        serviceNames = "Combo (Likes+Views+Comments)";
+        serviceNames = "Combo Bundle";
       } else {
         const s = currentOrder.items[0]?.service;
         const qty = currentOrder.items[0]?.quantity;
@@ -294,7 +313,7 @@ export default function ChatPage() {
         price: totalPrice,
         status: 'Pending',
         type: 'Manual',
-        links: links,
+        links: linksArr,
         utrId: utr,
         platform: 'instagram',
         createdAt: serverTimestamp()
@@ -312,13 +331,12 @@ export default function ChatPage() {
       
       const type = currentOrder.type || 'single';
       const disc = globalDiscounts[type] || 0;
-      const links = linksInput.split('\n').filter(l => l.trim());
-      const numLinks = links.length;
+      const linksArr = linksInput.split('\n').filter(l => l.trim());
+      const numLinks = linksArr.length;
 
       let totalPrice = 0;
       if (type === 'combo') {
-        const qty = currentOrder.items[0]?.quantity;
-        const basePrice = currentOrder.items.reduce((acc, item) => acc + (qty / 1000) * (item.service.pricePer1000 || 0), 0);
+        const basePrice = currentOrder.items.reduce((acc, item) => acc + (item.quantity / 1000) * (item.service.pricePer1000 || 0), 0);
         totalPrice = basePrice * (1 - disc / 100);
       } else {
         const s = currentOrder.items[0]?.service;
@@ -334,10 +352,7 @@ export default function ChatPage() {
           const batch = writeBatch(db);
           const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}`;
 
-          // For each item and each link, create an order record
-          // In Combo, we place 3 separate API orders
           if (type === 'combo') {
-            const qty = currentOrder.items[0].quantity;
             for (const item of currentOrder.items) {
               const mapping = apiData?.mappings?.[item.service.id];
               const provider = apiData?.providers?.find((p: any) => p.id === mapping?.providerId);
@@ -346,15 +361,15 @@ export default function ChatPage() {
                   apiUrl: provider.url,
                   apiKey: provider.key,
                   serviceId: mapping.remoteServiceId,
-                  link: links[0],
-                  quantity: qty
+                  link: linksArr[0],
+                  quantity: item.quantity
                 });
               }
             }
           } else {
             const s = currentOrder.items[0].service;
             const qty = currentOrder.items[0].quantity;
-            for (const l of links) {
+            for (const l of linksArr) {
               const mapping = apiData?.mappings?.[s.id];
               const provider = apiData?.providers?.find((p: any) => p.id === mapping?.providerId);
               if (provider && mapping?.remoteServiceId) {
@@ -378,7 +393,7 @@ export default function ChatPage() {
             price: totalPrice,
             status: 'Processing',
             type: 'API',
-            links: links,
+            links: linksArr,
             platform: 'instagram',
             createdAt: serverTimestamp()
           });
@@ -399,7 +414,7 @@ export default function ChatPage() {
 
     await addMessage('user', text);
 
-    // 3. MENU PRIORITY
+    // MENU PRIORITY
     if (cleanText === 'hi' || cleanText === 'menu') {
       setChatState('choosing_order_type');
       botReply("Choose your boost style:", [
@@ -410,7 +425,7 @@ export default function ChatPage() {
       return;
     }
 
-    // 4. FLOW HANDLERS
+    // FLOW HANDLERS
     if (cleanText.includes("single order") && chatState === 'choosing_order_type') {
       setChatState('choosing_service'); 
       setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
@@ -419,25 +434,12 @@ export default function ChatPage() {
     }
 
     if (cleanText.includes("combo order") && chatState === 'choosing_order_type') {
-      const likes = dynamicServices.find(s => s.name.toLowerCase().includes('likes'));
-      const views = dynamicServices.find(s => s.name.toLowerCase().includes('views'));
-      const comments = dynamicServices.find(s => s.name.toLowerCase().includes('comments'));
-
-      if (likes && views && comments) {
-        setChatState('entering_quantity'); 
-        setCurrentOrder({ 
-          type: 'combo', 
-          platform: 'instagram', 
-          items: [
-            { service: likes, quantity: 0, link: '' },
-            { service: views, quantity: 0, link: '' },
-            { service: comments, quantity: 0, link: '' }
-          ] 
-        });
-        botReply(`🎁 COMBO BUNDLE: Get Likes + Views + Comments at ${globalDiscounts.combo}% OFF!\n\n📊 Enter Quantity for the bundle (Min: 100).`);
-      } else {
-        botReply("⚠️ Combo services currently unavailable.");
-      }
+      setChatState('configuring_combo'); 
+      setCurrentOrder({ type: 'combo', platform: 'instagram', items: [] });
+      botReply("Configure your custom combo bundle:", [], { 
+        isComboConfigCard: true, 
+        discountPct: globalDiscounts.combo 
+      });
       return;
     }
 
@@ -463,24 +465,18 @@ export default function ChatPage() {
       if (isNaN(qty)) return;
 
       const type = currentOrder.type || 'single';
-      const minNeeded = type === 'combo' ? 100 : currentOrder.items[0]?.service.minQuantity;
+      const minNeeded = currentOrder.items[0]?.service.minQuantity;
 
       if (qty >= minNeeded) {
         const updatedItems = currentOrder.items.map(item => ({ ...item, quantity: qty }));
         setCurrentOrder(p => ({ ...p, items: updatedItems }));
         setChatState('choosing_payment_method');
         
-        let rawPrice = 0;
-        if (type === 'combo') {
-          rawPrice = currentOrder.items.reduce((acc, item) => acc + (qty / 1000) * (item.service.pricePer1000 || 0), 0);
-        } else {
-          rawPrice = (qty / 1000) * (currentOrder.items[0].service.pricePer1000 || 0);
-        }
-
+        const rawPrice = (qty / 1000) * (currentOrder.items[0].service.pricePer1000 || 0);
         const disc = globalDiscounts[type] || 0;
         const discounted = rawPrice * (1 - disc / 100);
         
-        const summary = `✅ ${type.toUpperCase()} SUMMARY\n───────────────\n${type === 'combo' ? 'Bundle: Likes+Views+Comments' : 'Service: ' + currentOrder.items[0].service.name}\nQuantity: ${qty}\nPrice: ₹${rawPrice.toFixed(2)}\nDiscount: ${disc}%\nFinal Price: ₹${discounted.toFixed(2)}\n───────────────\n💳 Wallet: ₹${walletBalance.toFixed(0)}`;
+        const summary = `✅ ${type.toUpperCase()} SUMMARY\n───────────────\nService: ${currentOrder.items[0].service.name}\nQuantity: ${qty}\nPrice: ₹${rawPrice.toFixed(2)}\nDiscount: ${disc}%\nFinal Price: ₹${discounted.toFixed(2)}\n───────────────\n💳 Wallet: ₹${walletBalance.toFixed(0)}`;
         
         const paymentOptions: string[] = [];
         if (paymentConfig?.walletEnabled !== false) paymentOptions.push("💳 PAY FROM WALLET");
@@ -501,19 +497,22 @@ export default function ChatPage() {
     // Payment Selection
     if (chatState === 'choosing_payment_method') {
       const type = currentOrder.type || 'single';
-      const qty = currentOrder.items[0]?.quantity;
+      const disc = globalDiscounts[type] || 0;
+      
       let rawPrice = 0;
       let serviceName = "";
+      let qty = 0;
 
       if (type === 'combo') {
-        rawPrice = currentOrder.items.reduce((acc, item) => acc + (qty / 1000) * (item.service.pricePer1000 || 0), 0);
+        rawPrice = currentOrder.items.reduce((acc, item) => acc + (item.quantity / 1000) * (item.service.pricePer1000 || 0), 0);
         serviceName = "Combo Bundle";
+        qty = currentOrder.items[0].quantity;
       } else {
+        qty = currentOrder.items[0]?.quantity;
         rawPrice = (qty / 1000) * (currentOrder.items[0].service.pricePer1000 || 0);
         serviceName = currentOrder.items[0].service.name;
       }
 
-      const disc = globalDiscounts[type] || 0;
       const discounted = rawPrice * (1 - disc / 100);
 
       if (cleanText.includes("wallet")) {
@@ -596,6 +595,7 @@ export default function ChatPage() {
             paymentPrice={m.paymentPrice} 
             rawPrice={m.rawPrice}
             isWalletCard={m.isWalletCard} 
+            isComboConfigCard={m.isComboConfigCard}
             timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} 
             dynamicServices={dynamicServices} 
             discountPct={m.discountPct ?? 0} 
