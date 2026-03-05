@@ -30,6 +30,8 @@ import {
   orderBy,
   writeBatch
 } from "firebase/firestore";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 import {
   Dialog,
   DialogContent,
@@ -66,7 +68,8 @@ export default function ServiceManagerPage() {
   const { toast } = useToast();
 
   const ADMIN_EMAIL = "chetanmadhav4@gmail.com";
-  const isActuallyAdmin = user?.email === ADMIN_EMAIL || user?.uid === "s55uL0f8PmcypR75usVYOLwVs7O2";
+  const ADMIN_UID = "s55uL0f8PmcypR75usVYOLwVs7O2";
+  const isActuallyAdmin = user?.email === ADMIN_EMAIL || user?.uid === ADMIN_UID;
 
   const servicesQuery = useMemoFirebase(() => {
     if (!db || !isActuallyAdmin) return null;
@@ -117,51 +120,68 @@ export default function ServiceManagerPage() {
     }
   };
 
-  const handleAddService = async () => {
+  const handleAddService = () => {
     if (!db || !newService.name || !newService.id || !isActuallyAdmin) {
       toast({ variant: "destructive", title: "Missing Fields", description: "Name and ID are required." });
       return;
     }
 
-    try {
-      const docId = newService.id.toLowerCase().replace(/\s+/g, '_');
-      const docRef = doc(db, "services", docId);
-      await setDoc(docRef, {
-        ...newService,
-        id: docId,
-        order: Number(newService.order) || (services?.length || 0) + 1,
-        updatedAt: serverTimestamp()
+    const docId = newService.id.toLowerCase().replace(/\s+/g, '_');
+    const docRef = doc(db, "services", docId);
+    const data = {
+      ...newService,
+      id: docId,
+      order: Number(newService.order) || (services?.length || 0) + 1,
+      updatedAt: serverTimestamp()
+    };
+
+    setDoc(docRef, data)
+      .then(() => {
+        toast({ title: "Service Added", description: `${newService.name} is now available.` });
+        setIsAdding(false);
+        setNewService({ id: "", name: "", platform: 'instagram', isActive: true, pricePer1000: 0, minQuantity: 100, order: (services?.length || 0) + 1 });
+      })
+      .catch((err) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: docRef.path,
+          operation: 'create',
+          requestResourceData: data
+        }));
       });
-      toast({ title: "Service Added", description: `${newService.name} is now available.` });
-      setIsAdding(false);
-      setNewService({ id: "", name: "", platform: 'instagram', isActive: true, pricePer1000: 0, minQuantity: 100, order: (services?.length || 0) + 1 });
-    } catch (e) {
-      toast({ variant: "destructive", title: "Error", description: "Failed to add service." });
-    }
   };
 
-  const handleUpdateField = async (service: Service, field: keyof Service, value: string) => {
+  const handleUpdateField = (service: Service, field: keyof Service, value: string) => {
     if (!db || !isActuallyAdmin) return;
     const numValue = parseFloat(value);
     if (isNaN(numValue)) return;
 
-    try {
-      const docRef = doc(db, "services", service.id);
-      await setDoc(docRef, { [field]: numValue }, { merge: true });
-    } catch (e) {
-      toast({ variant: "destructive", title: "Sync Failed" });
-    }
+    const docRef = doc(db, "services", service.id);
+    const data = { [field]: numValue };
+
+    setDoc(docRef, data, { merge: true })
+      .catch((err) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: docRef.path,
+          operation: 'update',
+          requestResourceData: data
+        }));
+      });
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (!db || !isActuallyAdmin) return;
     if (confirm("Are you sure? Users will no longer see this service.")) {
-      try {
-        await deleteDoc(doc(db, "services", id));
-        toast({ title: "Service Deleted" });
-      } catch (e) {
-        toast({ variant: "destructive", title: "Delete Failed" });
-      }
+      const docRef = doc(db, "services", id);
+      deleteDoc(docRef)
+        .then(() => {
+          toast({ title: "Service Deleted", description: "Item removed from database." });
+        })
+        .catch((err) => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: docRef.path,
+            operation: 'delete'
+          }));
+        });
     }
   };
 
@@ -312,7 +332,7 @@ export default function ServiceManagerPage() {
               </div>
             ))}
 
-            {services?.length === 0 && (
+            {services?.length === 0 && !isServicesLoading && (
               <div className="py-20 text-center space-y-4">
                 <Layers size={48} className="mx-auto text-slate-200" />
                 <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">No services added yet</p>
