@@ -45,15 +45,15 @@ export default function AdminHub() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-950 font-body transition-colors pb-20">
-      <header className="glass-header px-6 py-4 flex items-center justify-between">
+      <header className="glass-header px-6 py-4 flex items-center justify-between shadow-3d-sm">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-[#312ECB] rounded-2xl flex items-center justify-center text-white shadow-xl shadow-blue-500/20"><ShieldCheck size={22} /></div>
+          <div className="w-10 h-10 bg-[#312ECB] rounded-2xl flex items-center justify-center text-white shadow-3d"><ShieldCheck size={22} /></div>
           <div>
             <h1 className="text-lg font-black italic tracking-tighter text-[#312ECB] dark:text-white uppercase">ADMIN HUB</h1>
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Management Console</p>
           </div>
         </div>
-        <button onClick={() => router.push("/profile")} className="w-10 h-10 rounded-2xl bg-[#312ECB]/10 dark:bg-white/5 flex items-center justify-center text-[#312ECB] dark:text-white font-black text-sm transition-all active:scale-90 border border-[#312ECB]/10">{user.displayName?.[0] || 'A'}</button>
+        <button onClick={() => router.push("/profile")} className="w-10 h-10 rounded-2xl bg-[#312ECB]/10 dark:bg-white/5 flex items-center justify-center text-[#312ECB] dark:text-white font-black text-sm transition-all active:shadow-3d-pressed border border-[#312ECB]/10 shadow-3d-sm">{user.displayName?.[0] || 'A'}</button>
       </header>
 
       <main className="max-w-xl mx-auto p-6 space-y-6">
@@ -62,9 +62,9 @@ export default function AdminHub() {
             <button
               key={idx}
               onClick={() => router.push(item.path)}
-              className="bg-white dark:bg-slate-900 rounded-[2rem] p-5 text-left flex flex-col gap-4 shadow-[0_10px_30px_rgba(0,0,0,0.03)] dark:shadow-none border border-slate-50 dark:border-slate-800 transition-all active:scale-95 group relative overflow-hidden"
+              className="bg-white dark:bg-slate-900 rounded-[2rem] p-5 text-left flex flex-col gap-4 shadow-3d border border-slate-50 dark:border-slate-800 transition-all active:shadow-3d-pressed group relative overflow-hidden"
             >
-              <div className={`${item.color} w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-${item.color.split('-')[1]}-500/20`}>
+              <div className={`${item.color} w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-3d-sm group-hover:scale-110 transition-transform`}>
                 {item.icon}
               </div>
               <div>
@@ -80,7 +80,7 @@ export default function AdminHub() {
           <Button 
             variant="ghost" 
             onClick={() => auth?.signOut()}
-            className="w-full h-14 rounded-3xl text-slate-400 dark:text-slate-500 hover:text-red-500 font-black text-[11px] uppercase tracking-[0.2em] gap-3 border-none bg-white dark:bg-slate-900 shadow-sm active:scale-95 transition-all"
+            className="w-full h-14 rounded-3xl text-slate-400 dark:text-slate-500 hover:text-red-500 font-black text-[11px] uppercase tracking-[0.2em] gap-3 border-none bg-white dark:bg-slate-900 shadow-3d active:shadow-3d-pressed transition-all"
           >
             <LogOut size={16} /> Close Management Session
           </Button>

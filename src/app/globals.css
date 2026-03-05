@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%; /* Softer clean background */
+    --background: 210 40% 98%;
     --foreground: 222 47% 11%;
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
@@ -27,7 +27,7 @@
   }
 
   .dark {
-    --background: 222 47% 6%; /* Deeper, more modern dark */
+    --background: 222 47% 6%;
     --foreground: 210 40% 98%;
     --card: 222 47% 8%;
     --card-foreground: 210 40% 98%;
@@ -58,9 +58,35 @@
   }
 }
 
+/* 3D Neumorphic Shadow Classes */
+.shadow-3d {
+  box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.05), -8px -8px 16px rgba(255, 255, 255, 0.8);
+}
+
+.dark .shadow-3d {
+  box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.4), -4px -4px 12px rgba(255, 255, 255, 0.02);
+}
+
+.shadow-3d-sm {
+  box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.05), -4px -4px 8px rgba(255, 255, 255, 0.8);
+}
+
+.dark .shadow-3d-sm {
+  box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.4), -2px -2px 6px rgba(255, 255, 255, 0.02);
+}
+
+.shadow-3d-pressed {
+  box-shadow: inset 4px 4px 8px rgba(0, 0, 0, 0.05), inset -4px -4px 8px rgba(255, 255, 255, 0.8);
+}
+
+.dark .shadow-3d-pressed {
+  box-shadow: inset 4px 4px 8px rgba(0, 0, 0, 0.4), inset -2px -2px 6px rgba(255, 255, 255, 0.02);
+}
+
 /* Glassmorphism Classes */
 .glass-header {
   @apply bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-white/20 dark:border-slate-800/20 sticky top-0 z-50;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
 }
 
 .whatsapp-bg {
@@ -70,13 +96,15 @@
   opacity: 0.9;
 }
 
-/* Modern Message Bubbles */
+/* Modern Message Bubbles with 3D feel */
 .bubble-bot {
-  @apply bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-[1.8rem] rounded-tl-none shadow-[0_4px_12px_rgba(0,0,0,0.03)] dark:shadow-none border border-slate-50 dark:border-slate-800;
+  @apply bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-[1.8rem] rounded-tl-none border border-slate-50 dark:border-slate-800;
+  box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.03);
 }
 
 .bubble-user {
-  @apply bg-[#E7F8F2] dark:bg-[#064E3B] text-slate-800 dark:text-emerald-50 rounded-[1.8rem] rounded-tr-none shadow-[0_4px_12px_rgba(37,211,102,0.05)] border border-emerald-100/50 dark:border-emerald-900/30;
+  @apply bg-[#E7F8F2] dark:bg-[#064E3B] text-slate-800 dark:text-emerald-50 rounded-[1.8rem] rounded-tr-none border border-emerald-100/50 dark:border-emerald-900/30;
+  box-shadow: -4px 4px 12px rgba(37, 211, 102, 0.05);
 }
 
 @keyframes typing {
