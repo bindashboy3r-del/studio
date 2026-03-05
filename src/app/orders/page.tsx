@@ -69,7 +69,8 @@ export default function OrdersHistoryPage() {
       const normalized = effectiveStatus.charAt(0).toUpperCase() + effectiveStatus.slice(1).toLowerCase();
       effectiveStatus = (normalized === 'In progress' || normalized === 'In-progress') ? 'Processing' : normalized;
 
-      if (effectiveStatus === 'Processing' && order.autoCompleteAt) {
+      // Virtual Auto-Completion Logic (45 minutes)
+      if (effectiveStatus !== 'Completed' && effectiveStatus !== 'Cancelled' && order.autoCompleteAt) {
         const completeTime = order.autoCompleteAt.toDate ? order.autoCompleteAt.toDate() : new Date(order.autoCompleteAt);
         if (isAfter(new Date(), completeTime)) {
           effectiveStatus = 'Completed';

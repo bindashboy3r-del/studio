@@ -260,7 +260,7 @@ export default function ChatPage() {
       hasInitialGreeted.current = true;
       if (!messages || messages.length === 0) {
         setChatState('initial');
-        botReply("👋 Welcome to SocialBoost! Automation Active. Type 'Hi' to begin. 🚀", [], { isInitialGreeting: true, isPermanent: true });
+        botReply("Send 'Hi' to grow your social media! 🚀", [], { isInitialGreeting: true, isPermanent: true });
       }
     }
   }, [currentUser, isMessagesLoading, messages, sessionStart]);
@@ -354,9 +354,14 @@ export default function ChatPage() {
       }
 
       const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}`;
+      // Set auto-complete time to 45 mins from now
+      const autoCompleteAt = new Date(Date.now() + 45 * 60 * 1000);
+
       await addDoc(collection(db, "users", currentUser.uid, "orders"), {
         orderId, service: serviceNames, quantity: currentOrder.items[0]?.quantity || 0, price: totalPrice,
-        status: 'Pending', type: 'Manual', links: linksArr, utrId: utr, platform: 'instagram', createdAt: serverTimestamp()
+        status: 'Pending', type: 'Manual', links: linksArr, utrId: utr, platform: 'instagram', 
+        createdAt: serverTimestamp(),
+        autoCompleteAt: Timestamp.fromDate(autoCompleteAt)
       });
 
       botReply(`✅ Details Submitted!\n\n🔢 Order ID: #${orderId}\n💰 Amount: ₹${totalPrice.toFixed(2)}\n\nAdmin 30-60 mins mein verify karke order start kar denge. 🚀`, [], { orderId, isPermanent: true });
@@ -389,6 +394,8 @@ export default function ChatPage() {
           const apiData = apiSnap.data();
           const batch = writeBatch(db);
           const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}`;
+          // Set auto-complete time to 45 mins from now
+          const autoCompleteAt = new Date(Date.now() + 45 * 60 * 1000);
 
           if (type === 'combo') {
             for (const item of currentOrder.items) {
@@ -415,7 +422,8 @@ export default function ChatPage() {
           batch.set(userOrderRef, {
             orderId, service: type === 'combo' ? "Combo Bundle" : currentOrder.items[0].service.name,
             quantity: currentOrder.items[0].quantity, price: totalPrice, status: 'Processing', type: 'API',
-            links: linksArr, platform: 'instagram', createdAt: serverTimestamp()
+            links: linksArr, platform: 'instagram', createdAt: serverTimestamp(),
+            autoCompleteAt: Timestamp.fromDate(autoCompleteAt)
           });
           await batch.commit();
           botReply(`🎉 Order Placed Successfully!\n\n🆔 Order ID: ${orderId}\n💰 Paid: ₹${totalPrice.toFixed(2)}`, [], { orderId, isPermanent: true });

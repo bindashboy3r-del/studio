@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { 
   collectionGroup, 
   query, 
@@ -9,7 +9,8 @@ import {
   updateDoc, 
   doc,
   serverTimestamp,
-  getDoc
+  getDoc,
+  writeBatch
 } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { 
@@ -30,8 +31,8 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format, isValid } from "date-fns";
-import { ChevronLeft, RefreshCw, Globe, Clock } from "lucide-react";
+import { format, isValid, isAfter } from "date-fns";
+import { ChevronLeft, RefreshCw, Globe, Clock, CheckCircle2, Play } from "lucide-react";
 import { useFirestore, useUser } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { getApiOrdersStatus } from "@/app/actions/smm-api";
@@ -44,6 +45,7 @@ export default function TrackerPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isProcessingBulk, setIsProcessingBulk] = useState(false);
   const router = useRouter();
 
   const ADMIN_EMAIL = "chetanmadhav4@gmail.com";
@@ -66,11 +68,20 @@ export default function TrackerPage() {
         let createdAt = new Date();
         if (data.createdAt?.toDate) createdAt = data.createdAt.toDate();
         
+        let effectiveStatus = data.status || 'Pending';
+        if (effectiveStatus !== 'Completed' && effectiveStatus !== 'Cancelled' && data.autoCompleteAt) {
+          const completeTime = data.autoCompleteAt.toDate ? data.autoCompleteAt.toDate() : new Date(data.autoCompleteAt);
+          if (isAfter(new Date(), completeTime)) {
+            effectiveStatus = 'Completed';
+          }
+        }
+
         return {
           id: doc.id,
           path: doc.ref.path,
           ...data,
-          createdAt
+          createdAt,
+          effectiveStatus
         };
       });
 
@@ -140,6 +151,33 @@ export default function TrackerPage() {
     }
   };
 
+  const handleBulkAction = async (targetStatus: 'Processing' | 'Completed') => {
+    if (!db || isProcessingBulk) return;
+    
+    const targetOrders = targetStatus === 'Processing' 
+      ? orders.filter(o => o.effectiveStatus === 'Pending')
+      : orders.filter(o => o.effectiveStatus === 'Processing');
+
+    if (targetOrders.length === 0) {
+      toast({ title: "No Orders", description: `No ${targetStatus === 'Processing' ? 'Pending' : 'Processing'} orders found.` });
+      return;
+    }
+
+    setIsProcessingBulk(true);
+    try {
+      const batch = writeBatch(db);
+      targetOrders.forEach(o => {
+        batch.update(doc(db, o.path), { status: targetStatus });
+      });
+      await batch.commit();
+      toast({ title: "Bulk Action Success", description: `${targetOrders.length} orders marked as ${targetStatus}.` });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Action Failed" });
+    } finally {
+      setIsProcessingBulk(false);
+    }
+  };
+
   const updateStatus = async (order: any, newStatus: string) => {
     if (!db || !isActuallyAdmin) return;
     updateDoc(doc(db, order.path), { status: newStatus })
@@ -181,12 +219,12 @@ export default function TrackerPage() {
               <TableCell>
                 <Badge className={cn(
                   "text-[8px] h-5 font-black px-2 border-none rounded-lg",
-                  order.status === 'Pending' ? 'bg-yellow-500/10 text-yellow-600' : 
-                  order.status === 'Processing' ? 'bg-blue-500/10 text-blue-600' :
-                  order.status === 'Cancelled' ? 'bg-red-500/10 text-red-600' :
+                  order.effectiveStatus === 'Pending' ? 'bg-yellow-500/10 text-yellow-600' : 
+                  order.effectiveStatus === 'Processing' ? 'bg-blue-500/10 text-blue-600' :
+                  order.effectiveStatus === 'Cancelled' ? 'bg-red-500/10 text-red-600' :
                   'bg-emerald-500/10 text-emerald-600'
                 )}>
-                  {order.status}
+                  {order.effectiveStatus}
                 </Badge>
               </TableCell>
               <TableCell className="text-right">
@@ -212,18 +250,41 @@ export default function TrackerPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-body pb-10">
-      <header className="bg-white px-4 py-3 flex items-center justify-between border-b border-slate-100 sticky top-0 z-50">
+      <header className="bg-white px-4 py-3 flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 sticky top-0 z-50 gap-3">
         <div className="flex items-center gap-2">
           <button onClick={() => router.push("/admin")} className="p-1.5 hover:bg-slate-50 rounded-lg text-slate-400"><ChevronLeft size={18} /></button>
           <h1 className="text-sm font-black tracking-tight text-[#111B21] uppercase">Live Tracker</h1>
         </div>
-        <Button onClick={syncAllWithApi} disabled={isSyncing} className="bg-[#312ECB] rounded-lg h-8 px-3 font-black uppercase text-[8px] gap-1.5">
-          {isSyncing ? <RefreshCw className="animate-spin" size={12} /> : <Globe size={12} />}
-          Sync API
-        </Button>
+        
+        <div className="flex flex-wrap items-center gap-2">
+          <Button 
+            onClick={() => handleBulkAction('Processing')} 
+            disabled={isProcessingBulk}
+            className="bg-blue-600 hover:bg-blue-700 rounded-lg h-8 px-3 font-black uppercase text-[8px] gap-1.5"
+          >
+            <Play size={12} /> Approve All Pending
+          </Button>
+          <Button 
+            onClick={() => handleBulkAction('Completed')} 
+            disabled={isProcessingBulk}
+            className="bg-emerald-600 hover:bg-emerald-700 rounded-lg h-8 px-3 font-black uppercase text-[8px] gap-1.5"
+          >
+            <CheckCircle2 size={12} /> Complete All Processing
+          </Button>
+          <Button onClick={syncAllWithApi} disabled={isSyncing} className="bg-[#312ECB] rounded-lg h-8 px-3 font-black uppercase text-[8px] gap-1.5">
+            {isSyncing ? <RefreshCw className="animate-spin" size={12} /> : <Globe size={12} />}
+            Sync API
+          </Button>
+        </div>
       </header>
 
       <main className="max-w-4xl mx-auto p-3 space-y-4">
+        <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 mb-2">
+          <p className="text-[10px] font-bold text-blue-700 uppercase leading-relaxed">
+            💡 Automation Note: Orders automatically complete 45 minutes after being placed or processed.
+          </p>
+        </div>
+
         <div className="bg-white rounded-[1.5rem] shadow-sm border border-slate-100 overflow-hidden">
           <Tabs defaultValue="all" className="w-full">
             <div className="px-4 pt-4 border-b border-slate-50">
@@ -233,7 +294,7 @@ export default function TrackerPage() {
               </TabsList>
             </div>
             <TabsContent value="all" className="mt-0"><OrderTable data={orders} /></TabsContent>
-            <TabsContent value="manual" className="mt-0"><OrderTable data={orders.filter(o => o.type === 'Manual' && o.status === 'Pending')} /></TabsContent>
+            <TabsContent value="manual" className="mt-0"><OrderTable data={orders.filter(o => o.type === 'Manual' && o.effectiveStatus === 'Pending')} /></TabsContent>
           </Tabs>
         </div>
       </main>
