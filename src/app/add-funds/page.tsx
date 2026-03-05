@@ -181,10 +181,12 @@ export default function AddFundsPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">12-Digit UTR ID</label>
+              <label className="text-[10px] font-black uppercase text-red-500 tracking-widest ml-1 leading-tight">
+                Shi utr dalo agar utr se payment verify nhi hoga
+              </label>
               <Input 
                 type="text" 
-                placeholder="Enter Transaction ID" 
+                placeholder="Enter 12-Digit UTR ID" 
                 value={utrId}
                 maxLength={12}
                 onChange={(e) => setUtrId(e.target.value.replace(/[^0-9]/g, ''))}
