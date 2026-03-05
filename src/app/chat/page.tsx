@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -284,7 +285,7 @@ export default function ChatPage() {
       return;
     }
 
-    // HI / MENU Logic
+    // 1. HI / MENU Check
     if (cleanText === 'hi' || cleanText === 'menu') {
       await cleanupIntermediateChats();
       await addMessage('user', text, [], { isPermanent: true });
@@ -305,9 +306,18 @@ export default function ChatPage() {
       return;
     }
 
-    // Platform Selection Logic
-    const platformMatch = availablePlatforms.find((p, i) => cleanText === (i + 1).toString() || cleanText.includes(PLATFORMS[p].toLowerCase()));
-    if (platformMatch && chatState === 'choosing_platform') {
+    // 2. Global Platform Intent Detection (Generic for all categories)
+    const platformMatchByName = availablePlatforms.find(p => cleanText.includes(PLATFORMS[p].toLowerCase()));
+    const platformMatchByIndex = (chatState === 'choosing_platform' || chatState === 'initial') 
+      ? availablePlatforms.find((p, i) => cleanText === (i + 1).toString()) 
+      : null;
+    const platformMatch = platformMatchByName || platformMatchByIndex;
+
+    if (platformMatch) {
+      // If we are in the middle of a different flow, cleanup
+      if (chatState !== 'choosing_platform' && chatState !== 'initial') {
+        await cleanupIntermediateChats();
+      }
       await addMessage('user', PLATFORMS[platformMatch]);
       setCurrentOrder(p => ({ ...p, platform: platformMatch }));
       setChatState('choosing_order_type');
@@ -319,7 +329,7 @@ export default function ChatPage() {
       return;
     }
 
-    // Order Type Selection
+    // 3. Order Type Selection
     if (cleanText.includes("single order") || cleanText.includes("combo order") || cleanText.includes("bulk order")) {
       await cleanupIntermediateChats(); 
       await addMessage('user', text, [], { isPermanent: true }); 
@@ -346,6 +356,26 @@ export default function ChatPage() {
       return;
     }
 
+    // 4. Global Service Intent Detection (Generic for all platforms)
+    const filteredServices = activeServices.filter(s => s.platform === currentOrder.platform);
+    const serviceMatchByName = filteredServices.find(s => cleanText.includes(s.name.toLowerCase()));
+    const serviceMatchByIndex = (chatState === 'choosing_service') 
+      ? filteredServices.find((s, i) => cleanText === (i + 1).toString()) 
+      : null;
+    const serviceMatch = serviceMatchByName || serviceMatchByIndex;
+
+    if (serviceMatch) {
+      // If user types a service name while in quantity or payment, cleanup and switch
+      if (chatState === 'entering_quantity' || chatState === 'choosing_payment_method') {
+        await cleanupIntermediateChats();
+      }
+      setCurrentOrder(p => ({ ...p, items: [{ service: serviceMatch, quantity: 0, link: '' }] }));
+      setChatState('entering_quantity');
+      botReply(`📊 Enter Quantity for ${serviceMatch.name}?\n(Minimum: ${serviceMatch.minQuantity})`);
+      return;
+    }
+
+    // Handlers for specific complex states
     if (text.startsWith("SUBMIT_BULK_LINKS:")) {
       const linksStr = text.replace("SUBMIT_BULK_LINKS:", "");
       const linksArr = linksStr.split('|').filter(l => l.trim());
@@ -506,16 +536,8 @@ export default function ChatPage() {
       return;
     }
 
+    // Default Fallback logic
     await addMessage('user', text);
-
-    const filteredServices = activeServices.filter(s => s.platform === currentOrder.platform);
-    const serviceMatch = filteredServices.find((s, i) => cleanText === (i + 1).toString() || cleanText.includes(s.name.toLowerCase()));
-    if (serviceMatch && chatState === 'choosing_service') {
-      setCurrentOrder(p => ({ ...p, items: [{ service: serviceMatch, quantity: 0, link: '' }] }));
-      setChatState('entering_quantity');
-      botReply(`📊 Enter Quantity for ${serviceMatch.name}?\n(Minimum: ${serviceMatch.minQuantity})`);
-      return;
-    }
 
     if (chatState === 'entering_quantity') {
       const qty = parseInt(text);
