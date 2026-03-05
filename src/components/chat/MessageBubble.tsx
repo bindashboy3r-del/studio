@@ -423,19 +423,21 @@ export function MessageBubble({
 
             <div className="space-y-4 px-1">
               <div className="space-y-2">
-                <div className="space-y-1">
-                  <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-[0.2em]">{isBulk ? "Bulk Links Saved" : "Target Profile/Post Link"}</label>
-                  {isBulk ? (
-                    <div className="bg-slate-900/50 p-3 rounded-xl border border-white/5 shadow-inner">
-                       <p className="text-[9px] font-bold text-slate-400 leading-tight italic">{linkCount} links submitted in this batch.</p>
-                    </div>
-                  ) : (
-                    <div className="relative">
-                      <LinkIcon size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
-                      <Input placeholder="Enter link here" value={links} onChange={(e) => setLinks(e.target.value)} className="h-11 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-xs pl-9 text-white" />
-                    </div>
-                  )}
-                </div>
+                {!isCombo && (
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-[0.2em]">{isBulk ? "Bulk Links Saved" : "Target Profile/Post Link"}</label>
+                    {isBulk ? (
+                      <div className="bg-slate-900/50 p-3 rounded-xl border border-white/5 shadow-inner">
+                         <p className="text-[9px] font-bold text-slate-400 leading-tight italic">{linkCount} links submitted in this batch.</p>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <LinkIcon size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
+                        <Input placeholder="Enter link here" value={links} onChange={(e) => setLinks(e.target.value)} className="h-11 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-xs pl-9 text-white" />
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="space-y-1 pt-1">
                   <label className="text-[9px] font-black uppercase text-red-500 ml-1 leading-none animate-pulse tracking-tighter">Shi utr dalo varna payment verify nhi hoga</label>
                   <Input placeholder="Enter 12-Digit UTR ID" value={utr} maxLength={12} onChange={(e) => setUtr(e.target.value.replace(/[^0-9]/g, ''))} className="h-11 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-black tracking-[0.3em] text-xs text-center text-white" />
@@ -443,7 +445,7 @@ export function MessageBubble({
               </div>
               
               <div className="flex flex-col gap-3">
-                <Button onClick={() => onOptionClick?.(`SUBMIT_PAYMENT###${links}###${utr}`)} disabled={!links || utr.length !== 12} className="w-full h-14 bg-[#312ECB] font-black text-[11px] uppercase tracking-[0.2em] rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10">
+                <Button onClick={() => onOptionClick?.(`SUBMIT_PAYMENT###${links || prefilledLinks}###${utr}`)} disabled={( !isCombo && !links) || utr.length !== 12} className="w-full h-14 bg-[#312ECB] font-black text-[11px] uppercase tracking-[0.2em] rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10">
                   VERIFY & SUBMIT
                 </Button>
               </div>
@@ -461,29 +463,31 @@ export function MessageBubble({
              <OrderSummaryBreakdown />
              
              <div className="space-y-3 px-1">
-                <div className="space-y-1">
-                  <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-[0.2em]">{isBulk ? "Bulk Links Confirmed" : "Target Profile/Post Link"}</label>
-                  {isBulk ? (
-                    <div className="bg-slate-900/50 p-3 rounded-xl border border-white/5 shadow-inner">
-                       <p className="text-[9px] font-bold text-slate-400 leading-tight italic">{linkCount} links submitted in this batch.</p>
-                    </div>
-                  ) : (
-                    <div className="relative">
-                      <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={12} />
-                      <Input 
-                        placeholder="Enter link here" 
-                        value={links} 
-                        onChange={(e) => setLinks(e.target.value)} 
-                        className="h-11 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-xs pl-9 text-white" 
-                      />
-                    </div>
-                  )}
-                </div>
+                {!isCombo && (
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-[0.2em]">{isBulk ? "Bulk Links Confirmed" : "Target Profile/Post Link"}</label>
+                    {isBulk ? (
+                      <div className="bg-slate-900/50 p-3 rounded-xl border border-white/5 shadow-inner">
+                         <p className="text-[9px] font-bold text-slate-400 leading-tight italic">{linkCount} links submitted in this batch.</p>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={12} />
+                        <Input 
+                          placeholder="Enter link here" 
+                          value={links} 
+                          onChange={(e) => setLinks(e.target.value)} 
+                          className="h-11 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-xs pl-9 text-white" 
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="pt-2">
                   <Button 
-                    onClick={() => onOptionClick?.(`CONFIRM_WALLET###${links}`)} 
-                    disabled={!links || walletBalance < price}
+                    onClick={() => onOptionClick?.(`CONFIRM_WALLET###${links || prefilledLinks}`)} 
+                    disabled={(!isCombo && !links) || walletBalance < price}
                     className={cn(
                       "w-full h-14 font-black text-[11px] uppercase tracking-[0.2em] rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10 transition-all",
                       walletBalance >= price ? "bg-[#312ECB] text-white" : "bg-red-500/20 text-red-400 cursor-not-allowed border-red-500/20"

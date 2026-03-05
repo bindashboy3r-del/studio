@@ -528,16 +528,18 @@ export default function ChatPage() {
           botReply(type === 'bulk' ? `Confirm Bulk Order?` : `Enter Link & Confirm?`, [], { 
             isWalletCard: true, paymentPrice: discounted, rawPrice, discountPct: disc,
             serviceName, quantity: qty, isBulk: type === 'bulk',
-            prefilledLinks: type === 'bulk' ? currentOrder.tempLinks?.join('\n') : '',
-            walletBalance: walletBalance
+            prefilledLinks: type === 'combo' ? currentOrder.items[0]?.link : (type === 'bulk' ? currentOrder.tempLinks?.join('\n') : ''),
+            walletBalance: walletBalance,
+            isCombo: type === 'combo'
           });
         } else { botReply("❌ Low Balance!", ["💳 ADD FUNDS", "🏠 MENU"]); }
       } else if (cleanText.includes("upi")) {
         botReply(`Scan QR:`, [], { 
           isPaymentCard: true, paymentPrice: discounted, rawPrice, discountPct: disc,
           serviceName, quantity: qty, isBulk: type === 'bulk',
-          prefilledLinks: type === 'bulk' ? currentOrder.tempLinks?.join('\n') : '',
-          walletBalance: walletBalance
+          prefilledLinks: type === 'combo' ? currentOrder.items[0]?.link : (type === 'bulk' ? currentOrder.tempLinks?.join('\n') : ''),
+          walletBalance: walletBalance,
+          isCombo: type === 'combo'
         });
       }
     }
@@ -593,6 +595,7 @@ export default function ChatPage() {
             timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} dynamicServices={dynamicServices} 
             discountPct={m.discountPct ?? 0} serviceName={m.serviceName} quantity={m.quantity}
             isBulk={m.isBulk} prefilledLinks={m.prefilledLinks} walletBalance={m.walletBalance || walletBalance}
+            isCombo={m.isCombo}
           />
         ))}
         {isTyping && <TypingIndicator />}
