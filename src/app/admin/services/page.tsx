@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -15,7 +14,11 @@ import {
   AlertCircle,
   Zap,
   ArrowUpDown,
-  Loader2
+  Loader2,
+  Globe,
+  Youtube,
+  Facebook,
+  Twitter
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,11 +45,19 @@ import {
   DialogFooter
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { PLATFORMS, Platform } from "@/app/lib/constants";
 
 interface Service {
   id: string;
   name: string;
-  platform: 'instagram';
+  platform: Platform;
   pricePer1000: number;
   minQuantity: number;
   order: number;
@@ -57,9 +68,6 @@ const DEFAULT_SERVICES: Service[] = [
   { id: 'ig_followers', name: 'Followers', platform: 'instagram', pricePer1000: 89, minQuantity: 100, order: 1, isActive: true },
   { id: 'ig_likes', name: 'Likes', platform: 'instagram', pricePer1000: 18, minQuantity: 100, order: 2, isActive: true },
   { id: 'ig_views', name: 'Views', platform: 'instagram', pricePer1000: 0.60, minQuantity: 500, order: 3, isActive: true },
-  { id: 'ig_comments', name: 'Comments', platform: 'instagram', pricePer1000: 260, minQuantity: 50, order: 4, isActive: true },
-  { id: 'ig_shares', name: 'Shares', platform: 'instagram', pricePer1000: 7, minQuantity: 100, order: 5, isActive: true },
-  { id: 'ig_profile_visit', name: 'Profile Visit', platform: 'instagram', pricePer1000: 25, minQuantity: 100, order: 6, isActive: true },
 ];
 
 export default function ServiceManagerPage() {
@@ -152,13 +160,11 @@ export default function ServiceManagerPage() {
       });
   };
 
-  const handleUpdateField = (service: Service, field: keyof Service, value: string) => {
+  const handleUpdateField = (service: Service, field: keyof Service, value: any) => {
     if (!db || !isActuallyAdmin) return;
-    const numValue = parseFloat(value);
-    if (isNaN(numValue)) return;
-
+    
     const docRef = doc(db, "services", service.id);
-    const data = { [field]: numValue };
+    const data = { [field]: value };
 
     setDoc(docRef, data, { merge: true })
       .catch((err) => {
@@ -189,6 +195,16 @@ export default function ServiceManagerPage() {
       .finally(() => {
         setDeletingId(null);
       });
+  };
+
+  const getPlatformIcon = (platform: Platform) => {
+    switch(platform) {
+      case 'instagram': return <Instagram size={16} className="text-pink-500" />;
+      case 'youtube': return <Youtube size={16} className="text-red-600" />;
+      case 'facebook': return <Facebook size={16} className="text-blue-600" />;
+      case 'twitter': return <Twitter size={16} className="text-sky-500" />;
+      default: return <Globe size={16} className="text-slate-400" />;
+    }
   };
 
   if (isUserLoading || (!user && !isUserLoading)) {
@@ -230,10 +246,26 @@ export default function ServiceManagerPage() {
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Platform</label>
+                  <Select 
+                    value={newService.platform} 
+                    onValueChange={(val: Platform) => setNewService({...newService, platform: val})}
+                  >
+                    <SelectTrigger className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900">
+                      <SelectValue placeholder="Select Platform" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border-slate-100 rounded-xl">
+                      {Object.entries(PLATFORMS).map(([val, label]) => (
+                        <SelectItem key={val} value={val} className="text-xs font-bold uppercase">{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Unique ID</label>
-                    <Input placeholder="ig_followers" value={newService.id || ""} onChange={e => setNewService({...newService, id: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
+                    <Input placeholder="yt_subscribers" value={newService.id || ""} onChange={e => setNewService({...newService, id: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Order (Position)</label>
@@ -242,7 +274,7 @@ export default function ServiceManagerPage() {
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Display Name</label>
-                  <Input placeholder="e.g. Followers (High Quality)" value={newService.name || ""} onChange={e => setNewService({...newService, name: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
+                  <Input placeholder="e.g. Subs (Non-Drop)" value={newService.name || ""} onChange={e => setNewService({...newService, name: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
@@ -268,11 +300,11 @@ export default function ServiceManagerPage() {
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
-                <Instagram size={24} />
+                <Layers size={24} />
               </div>
               <div>
                 <h2 className="text-xl font-black uppercase tracking-tight text-slate-900">Services List</h2>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ordered by your preference</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Organized by Platform & Order</p>
               </div>
             </div>
             <Badge className="bg-blue-50 text-[#312ECB] border-none font-black text-[10px] uppercase">{services?.length || 0} Total</Badge>
@@ -290,7 +322,10 @@ export default function ServiceManagerPage() {
                     <span className="text-[14px] font-black text-[#111B21]">{service.name}</span>
                     <Badge variant="outline" className="text-[8px] font-black uppercase opacity-50 border-slate-200">{service.id}</Badge>
                   </div>
-                  <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Instagram Hub</p>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    {getPlatformIcon(service.platform)}
+                    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{PLATFORMS[service.platform] || 'Global'}</p>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-3 w-full md:w-auto">
@@ -301,7 +336,7 @@ export default function ServiceManagerPage() {
                       <Input 
                         type="number" 
                         defaultValue={service.order} 
-                        onBlur={(e) => handleUpdateField(service, 'order', e.target.value)}
+                        onBlur={(e) => handleUpdateField(service, 'order', parseInt(e.target.value))}
                         className="h-10 w-16 bg-white border-none rounded-xl pl-8 text-xs font-black text-slate-900 shadow-sm" 
                       />
                     </div>
@@ -313,7 +348,7 @@ export default function ServiceManagerPage() {
                       <Input 
                         type="number" 
                         defaultValue={service.pricePer1000} 
-                        onBlur={(e) => handleUpdateField(service, 'pricePer1000', e.target.value)}
+                        onBlur={(e) => handleUpdateField(service, 'pricePer1000', parseFloat(e.target.value))}
                         className="h-10 w-20 bg-white border-none rounded-xl pl-6 text-xs font-black text-emerald-700 shadow-sm" 
                       />
                     </div>
@@ -325,7 +360,7 @@ export default function ServiceManagerPage() {
                       <Input 
                         type="number" 
                         defaultValue={service.minQuantity} 
-                        onBlur={(e) => handleUpdateField(service, 'minQuantity', e.target.value)}
+                        onBlur={(e) => handleUpdateField(service, 'minQuantity', parseInt(e.target.value))}
                         className="h-10 w-20 bg-white border-none rounded-xl pl-6 text-xs font-black text-blue-700 shadow-sm" 
                       />
                     </div>

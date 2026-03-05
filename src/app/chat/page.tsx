@@ -39,7 +39,7 @@ import {
   Gift
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { SMMService, Platform } from "@/app/lib/constants";
+import { SMMService, Platform, PLATFORMS } from "@/app/lib/constants";
 import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -57,6 +57,7 @@ import { placeApiOrder } from "@/app/actions/smm-api";
 type ChatState = 
   | 'idle' 
   | 'initial'
+  | 'choosing_platform'
   | 'choosing_order_type'
   | 'bulk_adding_links'
   | 'choosing_service' 
@@ -94,7 +95,6 @@ export default function ChatPage() {
   
   // Dialog States
   const [isOrdersOpen, setIsOrdersOpen] = useState(false);
-  const [isLogsOpen, setIsLogsOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
 
@@ -127,10 +127,19 @@ export default function ChatPage() {
   }, [db, currentUser]);
   const { data: rawDynamicServices } = useCollection<SMMService>(servicesQuery);
 
-  const dynamicServices = useMemo(() => {
+  const activeServices = useMemo(() => {
     if (!rawDynamicServices) return [];
     return [...rawDynamicServices].filter(s => s.isActive !== false).sort((a, b) => (a.order || 0) - (b.order || 0));
   }, [rawDynamicServices]);
+
+  // Unique Platforms derived from active services
+  const availablePlatforms = useMemo(() => {
+    const platforms = new Set<Platform>();
+    activeServices.forEach(s => {
+      if (s.platform) platforms.add(s.platform);
+    });
+    return Array.from(platforms);
+  }, [activeServices]);
 
   const userDocRef = useMemoFirebase(() => {
     if (!db || !currentUser) return null;
@@ -202,12 +211,6 @@ export default function ChatPage() {
       return { ...o, createdAt };
     }).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }, [rawOrders]);
-
-  const chatLogsQuery = useMemoFirebase(() => {
-    if (!db || !currentUser || !isLogsOpen) return null;
-    return query(collection(db, "users", currentUser.uid, "chatMessages"), orderBy("timestamp", "desc"), limit(100));
-  }, [db, currentUser, isLogsOpen]);
-  const { data: rawLogs } = useCollection(chatLogsQuery);
 
   const messagesQuery = useMemoFirebase(() => {
     if (!db || !currentUser || !sessionStart) return null;
@@ -281,24 +284,63 @@ export default function ChatPage() {
       return;
     }
 
+    // HI / MENU Logic
+    if (cleanText === 'hi' || cleanText === 'menu') {
+      await cleanupIntermediateChats();
+      await addMessage('user', text, [], { isPermanent: true });
+      
+      if (availablePlatforms.length > 1) {
+        setChatState('choosing_platform');
+        botReply("Choose your platform:", availablePlatforms.map((p, i) => `${i + 1}. ${PLATFORMS[p]}`), { isPermanent: true });
+      } else {
+        const platform = availablePlatforms[0] || 'instagram';
+        setCurrentOrder(p => ({ ...p, platform }));
+        setChatState('choosing_order_type');
+        botReply(`Choose your boost style for ${PLATFORMS[platform]}:`, [
+          `1. SINGLE ORDER (${globalDiscounts.single}% OFF)`, 
+          `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)`, 
+          `3. BULK ORDER (${globalDiscounts.bulk}% OFF)`
+        ], { isPermanent: true });
+      }
+      return;
+    }
+
+    // Platform Selection Logic
+    const platformMatch = availablePlatforms.find((p, i) => cleanText === (i + 1).toString() || cleanText.includes(PLATFORMS[p].toLowerCase()));
+    if (platformMatch && chatState === 'choosing_platform') {
+      await addMessage('user', PLATFORMS[platformMatch]);
+      setCurrentOrder(p => ({ ...p, platform: platformMatch }));
+      setChatState('choosing_order_type');
+      botReply(`Great! Choose your boost style for ${PLATFORMS[platformMatch]}:`, [
+        `1. SINGLE ORDER (${globalDiscounts.single}% OFF)`, 
+        `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)`, 
+        `3. BULK ORDER (${globalDiscounts.bulk}% OFF)`
+      ], { isPermanent: true });
+      return;
+    }
+
+    // Order Type Selection
     if (cleanText.includes("single order") || cleanText.includes("combo order") || cleanText.includes("bulk order")) {
       await cleanupIntermediateChats(); 
       await addMessage('user', text, [], { isPermanent: true }); 
       
+      const filteredServices = activeServices.filter(s => s.platform === currentOrder.platform);
+
       if (cleanText.includes("single order")) {
         setChatState('choosing_service'); 
-        setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
-        botReply(`Pick a Service. You get ${globalDiscounts.single}% OFF!`, dynamicServices.map((s, i) => `${i + 1}. ${s.name}`));
+        setCurrentOrder(p => ({ ...p, type: 'single', items: [] }));
+        botReply(`Pick a Service. You get ${globalDiscounts.single}% OFF!`, filteredServices.map((s, i) => `${i + 1}. ${s.name}`));
       } else if (cleanText.includes("combo order")) {
         setChatState('configuring_combo'); 
-        setCurrentOrder({ type: 'combo', platform: 'instagram', items: [] });
+        setCurrentOrder(p => ({ ...p, type: 'combo', items: [] }));
         botReply("Configure your custom combo bundle:", [], { 
           isComboConfigCard: true, 
-          discountPct: globalDiscounts.combo 
+          discountPct: globalDiscounts.combo,
+          dynamicServices: filteredServices
         });
       } else if (cleanText.includes("bulk order")) {
         setChatState('bulk_adding_links'); 
-        setCurrentOrder({ type: 'bulk', platform: 'instagram', items: [], tempLinks: [] });
+        setCurrentOrder(p => ({ ...p, type: 'bulk', items: [], tempLinks: [] }));
         botReply(`🚀 BULK MODE: Add links one by one. Click SUBMIT when finished!`, [], { isBulkLinkCard: true });
       }
       return;
@@ -310,7 +352,8 @@ export default function ChatPage() {
       await addMessage('user', `Submitted ${linksArr.length} links for bulk order.`);
       setCurrentOrder(p => ({ ...p, tempLinks: linksArr }));
       setChatState('choosing_service');
-      botReply(`✅ ${linksArr.length} links saved! Now pick a service for these links:`, dynamicServices.map((s, i) => `${i + 1}. ${s.name}`));
+      const filteredServices = activeServices.filter(s => s.platform === currentOrder.platform);
+      botReply(`✅ ${linksArr.length} links saved! Now pick a service for these links:`, filteredServices.map((s, i) => `${i + 1}. ${s.name}`));
       return;
     }
 
@@ -319,10 +362,10 @@ export default function ChatPage() {
       await addMessage('user', "Proceeding with Combo Bundle...");
       const items = itemsStr.split('|').map(s => {
         const [id, q] = s.split(',');
-        const service = dynamicServices.find(ds => ds.id === id)!;
+        const service = activeServices.find(ds => ds.id === id)!;
         return { service, quantity: parseInt(q), link: linksInput };
       });
-      setCurrentOrder({ type: 'combo', platform: 'instagram', items });
+      setCurrentOrder(p => ({ ...p, type: 'combo', items }));
       setChatState('choosing_payment_method');
       const paymentOptions: string[] = [];
       if (paymentConfig?.walletEnabled !== false) paymentOptions.push("💳 PAY FROM WALLET");
@@ -367,7 +410,7 @@ export default function ChatPage() {
 
       await addDoc(collection(db, "users", currentUser.uid, "orders"), {
         orderId, service: serviceNames, quantity: currentOrder.items[0]?.quantity || 0, price: totalPrice,
-        status: 'Pending', type: 'Manual', links: linksArr, utrId: utr, platform: 'instagram', 
+        status: 'Pending', type: 'Manual', links: linksArr, utrId: utr, platform: currentOrder.platform, 
         createdAt: serverTimestamp(),
         autoCompleteAt: Timestamp.fromDate(autoCompleteAt)
       });
@@ -442,7 +485,7 @@ export default function ChatPage() {
           batch.set(userOrderRef, {
             orderId, service: serviceNames,
             quantity: currentOrder.items[0].quantity, price: totalPrice, status: 'Processing', type: 'API',
-            links: linksArr, platform: 'instagram', createdAt: serverTimestamp(),
+            links: linksArr, platform: currentOrder.platform, createdAt: serverTimestamp(),
             autoCompleteAt: Timestamp.fromDate(autoCompleteAt)
           });
           await batch.commit();
@@ -463,20 +506,10 @@ export default function ChatPage() {
       return;
     }
 
-    if (cleanText === 'hi' || cleanText === 'menu') {
-      await addMessage('user', text, [], { isPermanent: true });
-      setChatState('choosing_order_type');
-      botReply("Choose your boost style:", [
-        `1. SINGLE ORDER (${globalDiscounts.single}% OFF)`, 
-        `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)`, 
-        `3. BULK ORDER (${globalDiscounts.bulk}% OFF)`
-      ], { isPermanent: true });
-      return;
-    }
-
     await addMessage('user', text);
 
-    const serviceMatch = dynamicServices.find((s, i) => cleanText === (i + 1).toString() || cleanText.includes(s.name.toLowerCase()));
+    const filteredServices = activeServices.filter(s => s.platform === currentOrder.platform);
+    const serviceMatch = filteredServices.find((s, i) => cleanText === (i + 1).toString() || cleanText.includes(s.name.toLowerCase()));
     if (serviceMatch && chatState === 'choosing_service') {
       setCurrentOrder(p => ({ ...p, items: [{ service: serviceMatch, quantity: 0, link: '' }] }));
       setChatState('entering_quantity');
@@ -590,9 +623,6 @@ export default function ChatPage() {
           <button onClick={() => setIsOrdersOpen(true)} className="text-[10px] font-black uppercase text-[#312ECB] flex items-center gap-1.5 shadow-3d-sm rounded-xl px-3 py-1.5 active:shadow-3d-pressed">
             <Package size={14} /> ORDERS
           </button>
-          <button onClick={() => setIsLogsOpen(true)} className="text-[10px] font-black uppercase text-pink-500 flex items-center gap-1.5 shadow-3d-sm rounded-xl px-3 py-1.5 active:shadow-3d-pressed">
-            <MessageSquareText size={14} /> HISTORY
-          </button>
         </div>
       </div>
 
@@ -603,7 +633,8 @@ export default function ChatPage() {
             isPaymentCard={m.isPaymentCard} paymentPrice={m.paymentPrice} rawPrice={m.rawPrice}
             isWalletCard={m.isWalletCard} isComboConfigCard={m.isComboConfigCard} isBulkLinkCard={m.isBulkLinkCard}
             isSuccessCard={m.isSuccessCard} showWhatsAppSuccess={m.showWhatsAppSuccess} utrId={m.utrId} orderId={m.orderId}
-            timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} dynamicServices={dynamicServices} 
+            timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} 
+            dynamicServices={m.dynamicServices || activeServices.filter(s => s.platform === currentOrder.platform)} 
             discountPct={m.discountPct ?? 0} serviceName={m.serviceName} quantity={m.quantity}
             isBulk={m.isBulk} prefilledLinks={m.prefilledLinks} walletBalance={m.walletBalance || walletBalance}
             isCombo={m.isCombo}
@@ -690,7 +721,10 @@ export default function ChatPage() {
              <div className="space-y-3">
                 {userOrders.length > 0 ? userOrders.map((order: any) => (
                   <div key={order.id} className="bg-slate-900 p-4 rounded-[1.2rem] border border-white/5">
-                     <h3 className="text-[11px] font-black uppercase text-[#312ECB]">{order.service}</h3>
+                     <div className="flex items-center justify-between">
+                        <h3 className="text-[11px] font-black uppercase text-[#312ECB]">{order.service}</h3>
+                        <Badge className="text-[8px] uppercase bg-white/5 border-white/10 text-slate-400">{order.platform}</Badge>
+                     </div>
                      <div className="flex items-center gap-2.5 mt-1 text-[9px] font-bold text-slate-400">
                         <span>Qty: {order.quantity}</span>
                         <span className="text-emerald-600">₹{order.price?.toFixed(2)}</span>
@@ -698,23 +732,6 @@ export default function ChatPage() {
                      </div>
                   </div>
                 )) : <p className="text-center py-20 text-slate-600 uppercase text-[10px] font-black">No Orders</p>}
-             </div>
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isLogsOpen} onOpenChange={setIsLogsOpen}>
-        <DialogContent className="max-w-[360px] rounded-[2.5rem] border-none shadow-3d bg-[#030712] p-0 overflow-hidden">
-          <header className="bg-slate-900 px-6 py-4 border-b border-white/5">
-             <DialogTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-white">Chat Logs</DialogTitle>
-          </header>
-          <ScrollArea className="h-[500px] p-4">
-             <div className="space-y-3">
-                {rawLogs?.map((log: any) => (
-                  <div key={log.id} className={cn("p-3 rounded-2xl border", log.sender === 'bot' ? "bg-slate-900 mr-8" : "bg-emerald-950/20 ml-8")}>
-                     <p className="text-[10px] font-bold text-slate-200">{log.text}</p>
-                  </div>
-                ))}
              </div>
           </ScrollArea>
         </DialogContent>

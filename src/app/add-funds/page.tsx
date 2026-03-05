@@ -16,12 +16,15 @@ import {
   CheckCircle2,
   MessageCircle,
   Download,
-  Send
+  Send,
+  Clock,
+  CheckCircle,
+  XCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useUser, useFirestore } from "@/firebase";
-import { doc, onSnapshot, collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
+import { doc, onSnapshot, collection, addDoc, serverTimestamp, query, where, orderBy } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -30,6 +33,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
 
 export default function AddFundsPage() {
   const { user } = useUser();
@@ -47,6 +52,17 @@ export default function AddFundsPage() {
   // Popup States
   const [showConfirmPopup, setShowConfirmPopup] = useState(false);
   const [whatsappMsg, setWhatsappMsg] = useState("");
+
+  // History Query
+  const historyQuery = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return query(
+      collection(db, "fundRequests"), 
+      where("userId", "==", user.uid),
+      orderBy("createdAt", "desc")
+    );
+  }, [db, user]);
+  const { data: fundHistory, isLoading: isHistoryLoading } = useCollection(historyQuery);
 
   useEffect(() => {
     if (!db || !user) return;
@@ -143,7 +159,6 @@ export default function AddFundsPage() {
     const adminNumber = "919116399517";
     window.open(`https://wa.me/${adminNumber}?text=${encodeURIComponent(whatsappMsg)}`, '_blank');
     setShowConfirmPopup(false);
-    router.push('/chat');
   };
 
   const copyUpi = () => {
@@ -152,7 +167,7 @@ export default function AddFundsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F0F2F5] font-body text-[#111B21] pb-10">
+    <div className="min-h-screen bg-[#F0F2F5] font-body text-[#111B21] pb-20">
       <header className="bg-white px-4 py-2.5 flex items-center justify-between border-b border-gray-100 sticky top-0 z-50 shadow-sm">
         <button onClick={() => router.back()} className="flex items-center gap-1 text-[#312ECB] font-black uppercase text-[9px] tracking-widest">
           <ChevronLeft size={14} /> Back
@@ -180,7 +195,7 @@ export default function AddFundsPage() {
               <Zap className="fill-current animate-pulse" size={12} />
               <p className="text-[9px] font-black uppercase">Mega Offer: Get {globalBonus}% Extra Bonus!</p>
             </div>
-            <Badge className="bg-white text-emerald-600 border-none text-[8px] font-black">ACTIVE</Badge>
+            <Badge className="bg-white text-emerald-600 border-none text-[8px] font-black px-2">ACTIVE</Badge>
           </div>
         )}
 
@@ -261,12 +276,68 @@ export default function AddFundsPage() {
           </div>
         </div>
 
+        {/* Recent Deposits History */}
+        <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-50 space-y-4">
+          <div className="flex items-center gap-2">
+            <History className="text-[#312ECB]" size={16} />
+            <h3 className="text-[10px] font-black uppercase tracking-widest">Recent Deposits</h3>
+          </div>
+
+          <div className="space-y-3">
+            {isHistoryLoading ? (
+              <div className="py-10 flex flex-col items-center gap-2">
+                <Loader2 className="animate-spin text-[#312ECB]" size={20} />
+                <p className="text-[8px] font-black uppercase text-slate-400">Loading History...</p>
+              </div>
+            ) : fundHistory && fundHistory.length > 0 ? (
+              fundHistory.slice(0, 10).map((req: any) => (
+                <div key={req.id} className="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "w-8 h-8 rounded-lg flex items-center justify-center",
+                      req.status === 'Approved' ? "bg-emerald-100 text-emerald-600" :
+                      req.status === 'Rejected' ? "bg-red-100 text-red-600" :
+                      "bg-amber-100 text-amber-600"
+                    )}>
+                      {req.status === 'Approved' ? <CheckCircle size={16} /> : 
+                       req.status === 'Rejected' ? <XCircle size={16} /> : 
+                       <Clock size={16} />}
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-black text-slate-800">₹{req.amount}</p>
+                      <p className="text-[8px] font-bold text-slate-400 uppercase">{req.utrId}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <Badge variant="outline" className={cn(
+                      "text-[7px] font-black uppercase border-none px-2 h-4",
+                      req.status === 'Approved' ? "bg-emerald-50 text-emerald-600" :
+                      req.status === 'Rejected' ? "bg-red-50 text-red-600" :
+                      "bg-amber-50 text-amber-600"
+                    )}>
+                      {req.status}
+                    </Badge>
+                    <p className="text-[7px] font-bold text-slate-300 mt-1 uppercase">
+                      {req.createdAt?.toDate ? format(req.createdAt.toDate(), "dd MMM HH:mm") : ""}
+                    </p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="py-10 text-center text-slate-300">
+                <AlertCircle className="mx-auto mb-2 opacity-20" size={32} />
+                <p className="text-[9px] font-black uppercase tracking-widest">No Recent Deposits</p>
+              </div>
+            )}
+          </div>
+        </div>
+
         <button 
           onClick={() => router.push('/chat')}
           className="w-full bg-white rounded-2xl p-3.5 flex items-center justify-between border border-gray-100 shadow-sm active:bg-slate-50"
         >
           <div className="flex items-center gap-2">
-            <History className="text-slate-400" size={16} />
+            <MessageCircle className="text-slate-400" size={16} />
             <span className="text-[9px] font-black uppercase tracking-widest">Back to Chat</span>
           </div>
           <ChevronRight className="text-slate-300" size={14} />

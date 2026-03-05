@@ -1,23 +1,19 @@
 export interface SMMService {
   id: string;
   name: string;
-  pricePer1000: number; // -1 indicates unavailable/Coming Soon
+  platform: Platform;
+  pricePer1000: number; 
   minQuantity: number;
+  order?: number;
+  isActive?: boolean;
 }
 
-export type Platform = 'instagram';
+export type Platform = 'instagram' | 'youtube' | 'facebook' | 'tiktok' | 'twitter';
 
 export const PLATFORMS: Record<Platform, string> = {
   instagram: 'Instagram',
-};
-
-export const SERVICES: Record<Platform, SMMService[]> = {
-  instagram: [
-    { id: 'followers', name: 'Followers', pricePer1000: 89.0, minQuantity: 100 },
-    { id: 'likes', name: 'Likes', pricePer1000: 18.0, minQuantity: 100 },
-    { id: 'views', name: 'Views', pricePer1000: 0.60, minQuantity: 500 },
-    { id: 'comments', name: 'Comments', pricePer1000: 260.0, minQuantity: 50 },
-    { id: 'shares', name: 'Shares', pricePer1000: 7.0, minQuantity: 100 },
-    { id: 'story_views', name: 'Story Views', pricePer1000: 65.0, minQuantity: 100 },
-  ],
+  youtube: 'YouTube',
+  facebook: 'Facebook',
+  tiktok: 'TikTok',
+  twitter: 'Twitter'
 };
