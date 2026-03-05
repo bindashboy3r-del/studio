@@ -158,7 +158,7 @@ export function MessageBubble({
   const handleWhatsAppConfirmation = () => {
     const adminNumber = "919116399517";
     const finalLinks = links || prefilledLinks;
-    const message = `🚀 *NEW ORDER PLACED!*\n\n🆔 *Order ID:* #${orderId || "N/A"}\n📊 *Service:* ${serviceName || "Instagram Service"}\n🔢 *Quantity:* ${quantity || "N/A"}\n💰 *Amount:* ₹${price.toFixed(2)}\n🔗 *Links:* ${finalLinks || "N/A"}\n💳 *UTR ID:* ${propUtr || utr || "N/A"}\n\nPlease process my order ASAP!`;
+    const message = `🚀 *NEW ORDER PLACED!*\n\n🆔 *Order ID:* #${orderId || "N/A"}\n📊 *Service:* ${serviceName || "Service"}\n🔢 *Quantity:* ${quantity || "N/A"}\n💰 *Amount:* ₹${price.toFixed(2)}\n🔗 *Links:* ${finalLinks || "N/A"}\n💳 *UTR ID:* ${propUtr || utr || "N/A"}\n\nPlease process my order ASAP!`;
     window.open(`https://wa.me/${adminNumber}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
@@ -277,7 +277,7 @@ export function MessageBubble({
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Input 
-                  placeholder="Paste Instagram link here"
+                  placeholder="Enter target link here"
                   value={currentBulkLink}
                   onChange={(e) => setCurrentBulkLink(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && addBulkLink()}
@@ -370,7 +370,7 @@ export function MessageBubble({
                 <div className="relative">
                   <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={12} />
                   <Input 
-                    placeholder="Instagram link for combo" 
+                    placeholder="Enter target link here" 
                     value={links}
                     onChange={(e) => setLinks(e.target.value)}
                     className="h-10 bg-slate-950 border-none rounded-xl pl-9 text-xs font-bold text-white shadow-3d-pressed"
@@ -425,7 +425,7 @@ export function MessageBubble({
               <div className="space-y-2">
                 {!isCombo && (
                   <div className="space-y-1">
-                    <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-[0.2em]">{isBulk ? "Bulk Links Saved" : "Target Profile/Post Link"}</label>
+                    <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-[0.2em]">{isBulk ? "Bulk Links Saved" : "Target Link"}</label>
                     {isBulk ? (
                       <div className="bg-slate-900/50 p-3 rounded-xl border border-white/5 shadow-inner">
                          <p className="text-[9px] font-bold text-slate-400 leading-tight italic">{linkCount} links submitted in this batch.</p>
@@ -433,7 +433,7 @@ export function MessageBubble({
                     ) : (
                       <div className="relative">
                         <LinkIcon size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
-                        <Input placeholder="Enter link here" value={links} onChange={(e) => setLinks(e.target.value)} className="h-11 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-xs pl-9 text-white" />
+                        <Input placeholder="Enter target link here" value={links} onChange={(e) => setLinks(e.target.value)} className="h-11 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-xs pl-9 text-white" />
                       </div>
                     )}
                   </div>
@@ -465,7 +465,7 @@ export function MessageBubble({
              <div className="space-y-3 px-1">
                 {!isCombo && (
                   <div className="space-y-1">
-                    <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-[0.2em]">{isBulk ? "Bulk Links Confirmed" : "Target Profile/Post Link"}</label>
+                    <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-[0.2em]">{isBulk ? "Bulk Links Confirmed" : "Target Link"}</label>
                     {isBulk ? (
                       <div className="bg-slate-900/50 p-3 rounded-xl border border-white/5 shadow-inner">
                          <p className="text-[9px] font-bold text-slate-400 leading-tight italic">{linkCount} links submitted in this batch.</p>
@@ -474,7 +474,7 @@ export function MessageBubble({
                       <div className="relative">
                         <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={12} />
                         <Input 
-                          placeholder="Enter link here" 
+                          placeholder="Enter target link here" 
                           value={links} 
                           onChange={(e) => setLinks(e.target.value)} 
                           className="h-11 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-xs pl-9 text-white" 
