@@ -9,7 +9,8 @@ import {
   Copy,
   Download,
   Percent,
-  MessageCircle
+  MessageCircle,
+  Link as LinkIcon
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -175,7 +176,27 @@ export function MessageBubble({
                   </div>
                 </div>
              </div>
-             <Button onClick={() => onOptionClick?.(`CONFIRM_WALLET:${link}`)} className="w-full h-12 bg-[#312ECB] font-black text-[10px] uppercase rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10">CONFIRM ORDER</Button>
+             
+             <div className="space-y-1">
+                <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-widest">Post/Profile Link</label>
+                <div className="relative">
+                  <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={12} />
+                  <Input 
+                    placeholder="Enter link here" 
+                    value={link} 
+                    onChange={(e) => setLink(e.target.value)} 
+                    className="h-10 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-xs pl-8" 
+                  />
+                </div>
+             </div>
+
+             <Button 
+               onClick={() => onOptionClick?.(`CONFIRM_WALLET:${link}`)} 
+               disabled={!link}
+               className="w-full h-12 bg-[#312ECB] font-black text-[10px] uppercase rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10"
+             >
+               CONFIRM ORDER
+             </Button>
           </div>
         ) : (
           <div className="space-y-1">

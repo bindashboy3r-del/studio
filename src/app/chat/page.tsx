@@ -254,7 +254,6 @@ export default function ChatPage() {
       const [, link, utr] = text.split(":");
       await addMessage('user', `Payment Submitted (UTR: ${utr})`);
       
-      // Save Pending Manual Order
       const s = currentOrder.items[0]?.service;
       const qty = currentOrder.items[0]?.quantity;
       const price = (qty / 1000) * (s.pricePer1000 || 0) * (1 - globalDiscounts.single / 100);
@@ -279,6 +278,7 @@ export default function ChatPage() {
     }
 
     if (text.startsWith("CONFIRM_WALLET:")) {
+      const [, link] = text.split(":");
       await addMessage('user', "Confirming Wallet Payment...");
       const s = currentOrder.items[0]?.service;
       const qty = currentOrder.items[0]?.quantity;
@@ -287,7 +287,6 @@ export default function ChatPage() {
       if (walletBalance >= price) {
         setIsTyping(true);
         try {
-          // Check API Config
           const apiSnap = await getDoc(doc(db, "globalSettings", "api"));
           const apiData = apiSnap.data();
           const mapping = apiData?.mappings?.[s.id];
@@ -301,7 +300,7 @@ export default function ChatPage() {
               apiUrl: provider.url,
               apiKey: provider.key,
               serviceId: mapping.remoteServiceId,
-              link: currentOrder.items[0].link || 'manual_entry_needed',
+              link: link || 'manual_entry_needed',
               quantity: qty
             });
             if (apiRes.success) {
@@ -324,6 +323,7 @@ export default function ChatPage() {
             price,
             status,
             type: 'API',
+            link: link,
             platform: 'instagram',
             createdAt: serverTimestamp()
           });
@@ -403,7 +403,7 @@ export default function ChatPage() {
       const discounted = raw * (1 - globalDiscounts.single / 100);
 
       if (cleanText.includes("wallet")) {
-        if (walletBalance >= discounted) botReply(`Confirm Wallet Payment of ₹${discounted.toFixed(2)}?`, [], { 
+        if (walletBalance >= discounted) botReply(`Enter Link & Confirm Wallet Payment of ₹${discounted.toFixed(2)}?`, [], { 
           isWalletCard: true, 
           paymentPrice: discounted, 
           rawPrice: raw, 
