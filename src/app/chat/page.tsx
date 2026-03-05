@@ -14,7 +14,9 @@ import {
   doc,
   writeBatch,
   increment,
-  getDoc
+  getDoc,
+  updateDoc,
+  deleteDoc
 } from "firebase/firestore";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
@@ -36,7 +38,9 @@ import {
   Facebook,
   MessageCircle,
   Loader2,
-  Bell
+  Bell,
+  Trash2,
+  CheckCheck
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { SMMService, Platform } from "@/app/lib/constants";
@@ -44,6 +48,13 @@ import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from "@
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { placeApiOrder } from "@/app/actions/smm-api";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 type ChatState = 
   | 'idle' 
@@ -90,8 +101,8 @@ export default function ChatPage() {
   const [socialLinks, setSocialLinks] = useState<any>(null);
   const [showSocialMenu, setShowSocialMenu] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
   
-  const [sessionStartTime] = useState(() => Date.now());
   const hasInitialGreeted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -158,7 +169,7 @@ export default function ChatPage() {
       if (snap.exists()) setSocialLinks(snap.data());
     });
 
-    const unsubNotifs = onSnapshot(query(collection(db, "users", user.uid, "notifications"), where("read", "==", false), limit(10)), (snap) => {
+    const unsubNotifs = onSnapshot(query(collection(db, "users", user.uid, "notifications"), where("read", "==", false), orderBy("createdAt", "desc"), limit(20)), (snap) => {
       setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
@@ -175,16 +186,7 @@ export default function ChatPage() {
     return query(collection(db, "users", user.uid, "chatMessages"), orderBy("timestamp", "asc"));
   }, [db, user]);
 
-  const { data: messagesData, isLoading: isMessagesLoading } = useCollection(messagesQuery);
-
-  const messages = useMemo(() => {
-    if (!messagesData) return [];
-    return messagesData.filter((m: any) => {
-      if (!m.timestamp) return true;
-      const msgTime = m.timestamp.toDate ? m.timestamp.toDate().getTime() : new Date(m.timestamp).getTime();
-      return msgTime >= sessionStartTime;
-    });
-  }, [messagesData, sessionStartTime]);
+  const { data: messages, isLoading: isMessagesLoading } = useCollection(messagesQuery);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollIntoView({ behavior: "smooth" });
@@ -213,10 +215,12 @@ export default function ChatPage() {
   useEffect(() => {
     if (user && !isMessagesLoading && !hasInitialGreeted.current) {
       hasInitialGreeted.current = true;
-      setChatState('initial');
-      botReply("👋 Welcome to SocialBoost! Send 'Hi' to see our Instagram growth menu. 🚀");
+      if (!messages || messages.length === 0) {
+        setChatState('initial');
+        botReply("👋 Welcome to SocialBoost! Send 'Hi' to see our Instagram growth menu. 🚀");
+      }
     }
-  }, [user, isMessagesLoading]);
+  }, [user, isMessagesLoading, messages]);
 
   const calculateRawPrice = (itemsOverride?: OrderItem[], typeOverride?: string) => {
     const items = itemsOverride || currentOrder.items;
@@ -443,6 +447,25 @@ export default function ChatPage() {
     }
   };
 
+  const clearAllNotifications = async () => {
+    if (!db || !user) return;
+    try {
+      const batch = writeBatch(db);
+      notifications.forEach(n => {
+        batch.update(doc(db, "users", user.uid, "notifications", n.id), { read: true });
+      });
+      await batch.commit();
+      toast({ title: "Notifications Cleared" });
+    } catch (e) {
+      console.error("Clear all failed", e);
+    }
+  };
+
+  const markNotifRead = async (id: string) => {
+    if (!db || !user) return;
+    await updateDoc(doc(db, "users", user.uid, "notifications", id), { read: true });
+  };
+
   if (isUserLoading || (!user && !isUserLoading)) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-white dark:bg-slate-950">
@@ -461,12 +484,58 @@ export default function ChatPage() {
         </div>
         <div className="flex items-center gap-2">
           <button onClick={toggleTheme} className="text-slate-400 p-1">{theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}</button>
-          <div className="relative">
-            <button className="text-slate-400 p-1"><Bell size={16} /></button>
-            {notifications.length > 0 && (
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-white" />
-            )}
-          </div>
+          
+          <Sheet open={isNotifOpen} onOpenChange={setIsNotifOpen}>
+            <SheetTrigger asChild>
+              <div className="relative cursor-pointer">
+                <button className="text-slate-400 p-1"><Bell size={16} /></button>
+                {notifications.length > 0 && (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-white" />
+                )}
+              </div>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[300px] sm:w-[350px] p-0 rounded-l-[2rem] border-none shadow-2xl">
+              <SheetHeader className="p-6 bg-[#312ECB] text-white rounded-tl-[2rem]">
+                <div className="flex items-center justify-between">
+                  <SheetTitle className="text-white font-black uppercase text-sm flex items-center gap-2">
+                    <Bell size={16} /> Notifications
+                  </SheetTitle>
+                  {notifications.length > 0 && (
+                    <Button 
+                      onClick={clearAllNotifications} 
+                      variant="ghost" 
+                      className="h-7 text-[8px] font-black uppercase bg-white/10 hover:bg-white/20 text-white rounded-lg px-2 gap-1"
+                    >
+                      <CheckCheck size={10} /> Clear All
+                    </Button>
+                  )}
+                </div>
+              </SheetHeader>
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 dark:bg-slate-950 h-full">
+                {notifications.length > 0 ? notifications.map((n) => (
+                  <div 
+                    key={n.id} 
+                    onClick={() => markNotifRead(n.id)}
+                    className="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 flex items-start gap-3 active:scale-95 transition-all cursor-pointer"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950 flex items-center justify-center text-emerald-600 shrink-0">
+                      <Zap size={14} />
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="text-[11px] font-black text-slate-800 dark:text-white leading-tight">{n.title}</p>
+                      <p className="text-[10px] font-bold text-slate-400 leading-relaxed">{n.message}</p>
+                    </div>
+                  </div>
+                )) : (
+                  <div className="flex flex-col items-center justify-center py-20 opacity-20">
+                    <Bell size={40} className="text-slate-400" />
+                    <p className="text-[10px] font-black uppercase mt-4">Inbox is clean</p>
+                  </div>
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
+
           <button onClick={() => router.push('/profile')} className="w-7 h-7 rounded-full bg-[#312ECB] text-white font-black text-[10px]">{user?.displayName?.[0] || 'U'}</button>
         </div>
       </header>
@@ -489,7 +558,7 @@ export default function ChatPage() {
           </div>
         )}
 
-        {messages.map((m: any) => (
+        {messages && messages.map((m: any) => (
           <MessageBubble key={m.id} sender={m.sender} text={m.text} options={m.options} onOptionClick={handleSend}
             isPaymentCard={m.isPaymentCard} paymentPrice={m.paymentPrice} rawPrice={m.rawPrice} onPaymentSubmit={(link, utr) => handleBundlePaymentSubmit(utr, link)}
             isSuccessCard={m.isSuccessCard} successDetails={m.successDetails} isBulkLinkCard={m.isBulkLinkCard} 
