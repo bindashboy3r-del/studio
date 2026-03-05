@@ -58,6 +58,7 @@ type ChatState =
   | 'choosing_order_type'
   | 'choosing_service' 
   | 'entering_quantity' 
+  | 'entering_bulk_links'
   | 'choosing_payment_method';
 
 interface OrderItem {
@@ -256,90 +257,134 @@ export default function ChatPage() {
     if (!text || !db || !currentUser) return;
     if (!manualText) setInputValue("");
 
+    const cleanText = text.toLowerCase();
+
+    // 1. PAYMENT SUBMISSION (MANUAL/UPI)
     if (text.startsWith("SUBMIT_PAYMENT:")) {
-      const [, link, utr] = text.split(":");
+      const [, linksInput, utr] = text.split(":");
       await addMessage('user', `Payment Submitted (UTR: ${utr})`);
       
-      const s = currentOrder.items[0]?.service;
-      const qty = currentOrder.items[0]?.quantity;
       const type = currentOrder.type || 'single';
       const disc = globalDiscounts[type] || 0;
-      const price = (qty / 1000) * (s.pricePer1000 || 0) * (1 - disc / 100);
+      const links = linksInput.split('\n').filter(l => l.trim());
+      const numLinks = links.length;
+
+      // Logic for Multi-Link or Combo
+      let totalPrice = 0;
+      let serviceNames = "";
+
+      if (type === 'combo') {
+        const qty = currentOrder.items[0]?.quantity;
+        const basePrice = currentOrder.items.reduce((acc, item) => acc + (qty / 1000) * (item.service.pricePer1000 || 0), 0);
+        totalPrice = basePrice * (1 - disc / 100);
+        serviceNames = "Combo (Likes+Views+Comments)";
+      } else {
+        const s = currentOrder.items[0]?.service;
+        const qty = currentOrder.items[0]?.quantity;
+        totalPrice = (qty / 1000) * (s.pricePer1000 || 0) * (1 - disc / 100) * numLinks;
+        serviceNames = s.name;
+      }
+
       const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}`;
 
       await addDoc(collection(db, "users", currentUser.uid, "orders"), {
         orderId,
-        service: s.name,
-        quantity: qty,
-        price,
+        service: serviceNames,
+        quantity: currentOrder.items[0]?.quantity,
+        price: totalPrice,
         status: 'Pending',
         type: 'Manual',
-        link,
+        links: links,
         utrId: utr,
         platform: 'instagram',
         createdAt: serverTimestamp()
       });
 
-      botReply(`✅ Details Submitted!\n\n🔗 Link: ${link}\n🔢 UTR: ${utr}\n\nAdmin 30-60 mins mein verify karke order start kar denge. Status check karte rahein. 🚀`);
+      botReply(`✅ Details Submitted!\n\n🔢 Order ID: #${orderId}\n💰 Amount: ₹${totalPrice.toFixed(2)}\n\nAdmin 30-60 mins mein verify karke order start kar denge. Status check karte rahein. 🚀`);
       setChatState('idle');
       return;
     }
 
+    // 2. WALLET CONFIRMATION
     if (text.startsWith("CONFIRM_WALLET:")) {
-      const [, link] = text.split(":");
+      const [, linksInput] = text.split(":");
       await addMessage('user', "Confirming Wallet Payment...");
-      const s = currentOrder.items[0]?.service;
-      const qty = currentOrder.items[0]?.quantity;
+      
       const type = currentOrder.type || 'single';
       const disc = globalDiscounts[type] || 0;
-      const price = (qty / 1000) * (s.pricePer1000 || 0) * (1 - disc / 100);
+      const links = linksInput.split('\n').filter(l => l.trim());
+      const numLinks = links.length;
+
+      let totalPrice = 0;
+      if (type === 'combo') {
+        const qty = currentOrder.items[0]?.quantity;
+        const basePrice = currentOrder.items.reduce((acc, item) => acc + (qty / 1000) * (item.service.pricePer1000 || 0), 0);
+        totalPrice = basePrice * (1 - disc / 100);
+      } else {
+        const s = currentOrder.items[0]?.service;
+        const qty = currentOrder.items[0]?.quantity;
+        totalPrice = (qty / 1000) * (s.pricePer1000 || 0) * (1 - disc / 100) * numLinks;
+      }
       
-      if (walletBalance >= price) {
+      if (walletBalance >= totalPrice) {
         setIsTyping(true);
         try {
           const apiSnap = await getDoc(doc(db, "globalSettings", "api"));
           const apiData = apiSnap.data();
-          const mapping = apiData?.mappings?.[s.id];
-          const provider = apiData?.providers?.find((p: any) => p.id === mapping?.providerId);
+          const batch = writeBatch(db);
+          const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}`;
 
-          let apiOrderId = null;
-          let status = 'Pending';
-
-          if (provider && mapping?.remoteServiceId) {
-            const apiRes = await placeApiOrder({
-              apiUrl: provider.url,
-              apiKey: provider.key,
-              serviceId: mapping.remoteServiceId,
-              link: link || 'manual_entry_needed',
-              quantity: qty
-            });
-            if (apiRes.success) {
-              apiOrderId = apiRes.order;
-              status = 'Processing';
+          // For each item and each link, create an order record
+          // In Combo, we place 3 separate API orders
+          if (type === 'combo') {
+            const qty = currentOrder.items[0].quantity;
+            for (const item of currentOrder.items) {
+              const mapping = apiData?.mappings?.[item.service.id];
+              const provider = apiData?.providers?.find((p: any) => p.id === mapping?.providerId);
+              if (provider && mapping?.remoteServiceId) {
+                await placeApiOrder({
+                  apiUrl: provider.url,
+                  apiKey: provider.key,
+                  serviceId: mapping.remoteServiceId,
+                  link: links[0],
+                  quantity: qty
+                });
+              }
+            }
+          } else {
+            const s = currentOrder.items[0].service;
+            const qty = currentOrder.items[0].quantity;
+            for (const l of links) {
+              const mapping = apiData?.mappings?.[s.id];
+              const provider = apiData?.providers?.find((p: any) => p.id === mapping?.providerId);
+              if (provider && mapping?.remoteServiceId) {
+                await placeApiOrder({
+                  apiUrl: provider.url,
+                  apiKey: provider.key,
+                  serviceId: mapping.remoteServiceId,
+                  link: l,
+                  quantity: qty
+                });
+              }
             }
           }
 
-          const batch = writeBatch(db);
-          const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}`;
           const userOrderRef = doc(collection(db, "users", currentUser.uid, "orders"));
-          
-          batch.update(userDocRef!, { balance: increment(-price) });
+          batch.update(userDocRef!, { balance: increment(-totalPrice) });
           batch.set(userOrderRef, {
             orderId,
-            apiOrderId,
-            providerId: provider?.id || null,
-            service: s.name,
-            quantity: qty,
-            price,
-            status,
+            service: type === 'combo' ? "Combo Bundle" : currentOrder.items[0].service.name,
+            quantity: currentOrder.items[0].quantity,
+            price: totalPrice,
+            status: 'Processing',
             type: 'API',
-            link: link,
+            links: links,
             platform: 'instagram',
             createdAt: serverTimestamp()
           });
           
           await batch.commit();
-          botReply(`🎉 Order Placed Successfully via Wallet!\n\n🆔 Order ID: ${orderId}\n💰 Paid: ₹${price.toFixed(2)}\n\nOrder process ho raha hai. Check 'Orders' for updates.`);
+          botReply(`🎉 Order Placed Successfully!\n\n🆔 Order ID: ${orderId}\n💰 Paid: ₹${totalPrice.toFixed(2)}\n\nOrder process ho raha hai. Check 'Orders' for updates.`);
           setChatState('idle');
         } catch (e) {
           botReply("❌ Kuch technical issue hua. Admin ko contact karein.");
@@ -353,38 +398,53 @@ export default function ChatPage() {
     }
 
     await addMessage('user', text);
-    const cleanText = text.toLowerCase();
 
-    // Specific Selection Priority
-    if (cleanText.includes("single order")) {
-      setChatState('choosing_service'); 
-      setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
-      botReply(`Pick a Service. You get ${globalDiscounts.single}% OFF!`, dynamicServices.map((s, i) => `${i + 1}. ${s.name}`));
-      return;
-    }
-
-    if (cleanText.includes("combo order")) {
-      setChatState('choosing_service'); 
-      setCurrentOrder({ type: 'combo', platform: 'instagram', items: [] });
-      botReply(`🎁 COMBO MODE: Pick a Service. You get ${globalDiscounts.combo}% OFF!`, dynamicServices.map((s, i) => `${i + 1}. ${s.name}`));
-      return;
-    }
-
-    if (cleanText.includes("bulk order")) {
-      setChatState('choosing_service'); 
-      setCurrentOrder({ type: 'bulk', platform: 'instagram', items: [] });
-      botReply(`🚀 BULK MODE: Pick a Service. You get ${globalDiscounts.bulk}% OFF!`, dynamicServices.map((s, i) => `${i + 1}. ${s.name}`));
-      return;
-    }
-
-    // Generic Menu Check
-    if (cleanText === 'hi' || cleanText === 'menu' || (cleanText.includes("order") && chatState === 'idle')) {
+    // 3. MENU PRIORITY
+    if (cleanText === 'hi' || cleanText === 'menu') {
       setChatState('choosing_order_type');
       botReply("Choose your boost style:", [
         `1. SINGLE ORDER (${globalDiscounts.single}% OFF)`, 
         `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)`, 
         `3. BULK ORDER (${globalDiscounts.bulk}% OFF)`
       ]);
+      return;
+    }
+
+    // 4. FLOW HANDLERS
+    if (cleanText.includes("single order") && chatState === 'choosing_order_type') {
+      setChatState('choosing_service'); 
+      setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
+      botReply(`Pick a Service. You get ${globalDiscounts.single}% OFF!`, dynamicServices.map((s, i) => `${i + 1}. ${s.name}`));
+      return;
+    }
+
+    if (cleanText.includes("combo order") && chatState === 'choosing_order_type') {
+      const likes = dynamicServices.find(s => s.name.toLowerCase().includes('likes'));
+      const views = dynamicServices.find(s => s.name.toLowerCase().includes('views'));
+      const comments = dynamicServices.find(s => s.name.toLowerCase().includes('comments'));
+
+      if (likes && views && comments) {
+        setChatState('entering_quantity'); 
+        setCurrentOrder({ 
+          type: 'combo', 
+          platform: 'instagram', 
+          items: [
+            { service: likes, quantity: 0, link: '' },
+            { service: views, quantity: 0, link: '' },
+            { service: comments, quantity: 0, link: '' }
+          ] 
+        });
+        botReply(`🎁 COMBO BUNDLE: Get Likes + Views + Comments at ${globalDiscounts.combo}% OFF!\n\n📊 Enter Quantity for the bundle (Min: 100).`);
+      } else {
+        botReply("⚠️ Combo services currently unavailable.");
+      }
+      return;
+    }
+
+    if (cleanText.includes("bulk order") && chatState === 'choosing_order_type') {
+      setChatState('choosing_service'); 
+      setCurrentOrder({ type: 'bulk', platform: 'instagram', items: [] });
+      botReply(`🚀 BULK MODE: Pick a Service to apply to MULTIPLE links. You get ${globalDiscounts.bulk}% OFF!`, dynamicServices.map((s, i) => `${i + 1}. ${s.name}`));
       return;
     }
 
@@ -400,59 +460,85 @@ export default function ChatPage() {
     // Quantity Input
     if (chatState === 'entering_quantity') {
       const qty = parseInt(text);
-      const s = currentOrder.items[0]?.service;
-      if (s && qty >= s.minQuantity) {
-        const updated = [{ service: s, quantity: qty, link: '' }];
-        setCurrentOrder(p => ({ ...p, items: updated }));
+      if (isNaN(qty)) return;
+
+      const type = currentOrder.type || 'single';
+      const minNeeded = type === 'combo' ? 100 : currentOrder.items[0]?.service.minQuantity;
+
+      if (qty >= minNeeded) {
+        const updatedItems = currentOrder.items.map(item => ({ ...item, quantity: qty }));
+        setCurrentOrder(p => ({ ...p, items: updatedItems }));
         setChatState('choosing_payment_method');
         
-        const type = currentOrder.type || 'single';
-        const raw = (qty / 1000) * (s.pricePer1000 || 0);
+        let rawPrice = 0;
+        if (type === 'combo') {
+          rawPrice = currentOrder.items.reduce((acc, item) => acc + (qty / 1000) * (item.service.pricePer1000 || 0), 0);
+        } else {
+          rawPrice = (qty / 1000) * (currentOrder.items[0].service.pricePer1000 || 0);
+        }
+
         const disc = globalDiscounts[type] || 0;
-        const discounted = raw * (1 - disc / 100);
+        const discounted = rawPrice * (1 - disc / 100);
         
-        const summary = `✅ ${type.toUpperCase()} SUMMARY\n───────────────\nService Price: ₹${raw.toFixed(2)}\nDiscount: ${disc}%\nFinal Price: ₹${discounted.toFixed(2)}\n───────────────\n💳 Wallet Balance: ₹${walletBalance.toFixed(0)}`;
+        const summary = `✅ ${type.toUpperCase()} SUMMARY\n───────────────\n${type === 'combo' ? 'Bundle: Likes+Views+Comments' : 'Service: ' + currentOrder.items[0].service.name}\nQuantity: ${qty}\nPrice: ₹${rawPrice.toFixed(2)}\nDiscount: ${disc}%\nFinal Price: ₹${discounted.toFixed(2)}\n───────────────\n💳 Wallet: ₹${walletBalance.toFixed(0)}`;
         
         const paymentOptions: string[] = [];
         if (paymentConfig?.walletEnabled !== false) paymentOptions.push("💳 PAY FROM WALLET");
         if (paymentConfig?.upiEnabled !== false) paymentOptions.push("📲 PAY VIA UPI QR");
 
         botReply(summary, paymentOptions, { 
-          rawPrice: raw, 
+          rawPrice: rawPrice, 
           paymentPrice: discounted, 
-          discountPct: disc 
+          discountPct: disc,
+          isBulk: type === 'bulk'
         });
-      } else if (s) botReply(`⚠️ Error: Minimum ${s.minQuantity} required.`);
+      } else {
+        botReply(`⚠️ Error: Minimum ${minNeeded} required.`);
+      }
       return;
     }
 
     // Payment Selection
     if (chatState === 'choosing_payment_method') {
-      const s = currentOrder.items[0]?.service;
-      const qty = currentOrder.items[0]?.quantity;
       const type = currentOrder.type || 'single';
-      const raw = (qty / 1000) * (s.pricePer1000 || 0);
+      const qty = currentOrder.items[0]?.quantity;
+      let rawPrice = 0;
+      let serviceName = "";
+
+      if (type === 'combo') {
+        rawPrice = currentOrder.items.reduce((acc, item) => acc + (qty / 1000) * (item.service.pricePer1000 || 0), 0);
+        serviceName = "Combo Bundle";
+      } else {
+        rawPrice = (qty / 1000) * (currentOrder.items[0].service.pricePer1000 || 0);
+        serviceName = currentOrder.items[0].service.name;
+      }
+
       const disc = globalDiscounts[type] || 0;
-      const discounted = raw * (1 - disc / 100);
+      const discounted = rawPrice * (1 - disc / 100);
 
       if (cleanText.includes("wallet")) {
-        if (walletBalance >= discounted) botReply(`Enter Link & Confirm Wallet Payment of ₹${discounted.toFixed(2)}?`, [], { 
-          isWalletCard: true, 
-          paymentPrice: discounted, 
-          rawPrice: raw, 
-          discountPct: disc,
-          serviceName: s?.name,
-          quantity: qty
-        });
-        else botReply("❌ Low Balance! Please refill your wallet.", ["💳 ADD FUNDS", "🏠 MENU"]);
+        if (walletBalance >= discounted) {
+          botReply(type === 'bulk' ? `Paste your links below & Confirm Order.` : `Enter Link & Confirm Wallet Payment?`, [], { 
+            isWalletCard: true, 
+            paymentPrice: discounted, 
+            rawPrice: rawPrice, 
+            discountPct: disc,
+            serviceName: serviceName,
+            quantity: qty,
+            isBulk: type === 'bulk'
+          });
+        } else {
+          botReply("❌ Low Balance! Please refill your wallet.", ["💳 ADD FUNDS", "🏠 MENU"]);
+        }
       } else if (cleanText.includes("upi")) {
         botReply(`Scan the QR to Pay:`, [], { 
           isPaymentCard: true, 
           paymentPrice: discounted, 
-          rawPrice: raw, 
+          rawPrice: rawPrice, 
           discountPct: disc,
-          serviceName: s?.name,
-          quantity: qty
+          serviceName: serviceName,
+          quantity: qty,
+          isBulk: type === 'bulk'
         });
       }
     }
@@ -515,6 +601,7 @@ export default function ChatPage() {
             discountPct={m.discountPct ?? 0} 
             serviceName={m.serviceName}
             quantity={m.quantity}
+            isBulk={m.isBulk}
           />
         ))}
         {isTyping && <TypingIndicator />}

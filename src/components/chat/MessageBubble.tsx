@@ -10,11 +10,13 @@ import {
   Download,
   Percent,
   MessageCircle,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Layers
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { SMMService } from "@/app/lib/constants";
@@ -35,6 +37,7 @@ interface MessageBubbleProps {
   discountPct?: number;
   serviceName?: string;
   quantity?: number;
+  isBulk?: boolean;
 }
 
 export function MessageBubble({ 
@@ -49,13 +52,14 @@ export function MessageBubble({
   isWalletCard,
   discountPct = 0,
   serviceName,
-  quantity
+  quantity,
+  isBulk
 }: MessageBubbleProps) {
   const isUser = sender === 'user';
   const { user } = useUser();
   const { toast } = useToast();
   
-  const [link, setLink] = useState("");
+  const [links, setLinks] = useState("");
   const [utr, setUtr] = useState("");
   const [mounted, setMounted] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -91,7 +95,7 @@ export function MessageBubble({
     const randomId = Math.floor(1000 + Math.random() * 9000);
     const displayId = `ORD-${randomId}`;
     
-    const message = `🚀 *NEW ORDER PLACED!*\n\n🆔 *Order ID:* #${displayId}\n📊 *Service:* ${serviceName || "Instagram Service"}\n🔢 *Quantity:* ${quantity || "N/A"}\n💰 *Price:* ₹${price.toFixed(2)}\n🔗 *Link:* ${link || "N/A"}\n💳 *Payment:* UPI (${utr || "N/A"})\n\nPlease process my order ASAP!`;
+    const message = `🚀 *NEW ORDER PLACED!*\n\n🆔 *Order ID:* #${displayId}\n📊 *Service:* ${serviceName || "Instagram Service"}\n🔢 *Quantity:* ${quantity || "N/A"}\n💰 *Price:* ₹${price.toFixed(2)}\n🔗 *Links:* ${links || "N/A"}\n💳 *Payment:* UPI (${utr || "N/A"})\n\nPlease process my order ASAP!`;
     
     window.open(`https://wa.me/${adminNumber}?text=${encodeURIComponent(message)}`, '_blank');
   };
@@ -136,8 +140,17 @@ export function MessageBubble({
             <div className="space-y-3">
               <div className="space-y-2">
                 <div className="space-y-1">
-                  <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-widest">Post/Profile Link</label>
-                  <Input placeholder="Enter link here" value={link} onChange={(e) => setLink(e.target.value)} className="h-10 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-xs" />
+                  <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-widest">{isBulk ? "Paste All Links (One per line)" : "Post/Profile Link"}</label>
+                  {isBulk ? (
+                    <Textarea 
+                      placeholder="https://link1.com&#10;https://link2.com" 
+                      value={links} 
+                      onChange={(e) => setLinks(e.target.value)} 
+                      className="min-h-[80px] rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-xs" 
+                    />
+                  ) : (
+                    <Input placeholder="Enter link here" value={links} onChange={(e) => setLinks(e.target.value)} className="h-10 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-xs" />
+                  )}
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] font-black uppercase text-red-500 ml-1 leading-none animate-pulse">Shi utr dalo varna payment verify nhi hoga</label>
@@ -146,7 +159,7 @@ export function MessageBubble({
               </div>
               
               <div className="flex flex-col gap-2 pt-1">
-                <Button onClick={() => onOptionClick?.(`SUBMIT_PAYMENT:${link}:${utr}`)} disabled={!link || utr.length !== 12} className="w-full h-12 bg-[#312ECB] font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10">
+                <Button onClick={() => onOptionClick?.(`SUBMIT_PAYMENT:${links}:${utr}`)} disabled={!links || utr.length !== 12} className="w-full h-12 bg-[#312ECB] font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10">
                   SUBMIT PAYMENT
                 </Button>
                 
@@ -178,21 +191,30 @@ export function MessageBubble({
              </div>
              
              <div className="space-y-1">
-                <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-widest">Post/Profile Link</label>
+                <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-widest">{isBulk ? "Paste All Links (One per line)" : "Post/Profile Link"}</label>
                 <div className="relative">
                   <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={12} />
-                  <Input 
-                    placeholder="Enter link here" 
-                    value={link} 
-                    onChange={(e) => setLink(e.target.value)} 
-                    className="h-10 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-xs pl-8" 
-                  />
+                  {isBulk ? (
+                    <Textarea 
+                      placeholder="https://link1.com&#10;https://link2.com" 
+                      value={links} 
+                      onChange={(e) => setLinks(e.target.value)} 
+                      className="min-h-[80px] rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-xs pl-8 pt-2.5" 
+                    />
+                  ) : (
+                    <Input 
+                      placeholder="Enter link here" 
+                      value={links} 
+                      onChange={(e) => setLinks(e.target.value)} 
+                      className="h-10 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-xs pl-8" 
+                    />
+                  )}
                 </div>
              </div>
 
              <Button 
-               onClick={() => onOptionClick?.(`CONFIRM_WALLET:${link}`)} 
-               disabled={!link}
+               onClick={() => onOptionClick?.(`CONFIRM_WALLET:${links}`)} 
+               disabled={!links}
                className="w-full h-12 bg-[#312ECB] font-black text-[10px] uppercase rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10"
              >
                CONFIRM ORDER
