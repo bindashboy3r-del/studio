@@ -96,7 +96,7 @@ export default function AddFundsPage() {
   const handleWhatsAppConfirmation = () => {
     const adminNumber = "919116399517";
     const username = user?.displayName || user?.email || "User";
-    const message = `Hello Admin, I have made a payment.\n\n👤 Username: ${username}\n💰 Amount: ₹${amount || "0"}\n🔢 UTR ID: ${utrId || "N/A"}\n\nPlease verify my payment.`;
+    const message = `🚀 *NEW PAYMENT SUBMITTED!*\n\n👤 *User Name:* ${username}\n🔢 *UTR ID:* ${utrId || "N/A"}\n💰 *Amount:* ₹${amount || "0"}\n\nKripya mera payment check karein aur balance add karein. Dhanyawad!`;
     window.open(`https://wa.me/${adminNumber}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
