@@ -110,6 +110,7 @@ export default function ChatPage() {
   const hasBroadcastShown = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Initialize session timestamp on mount to "clear" chat visually
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const now = new Date();
@@ -206,8 +207,10 @@ export default function ChatPage() {
 
   const messagesQuery = useMemoFirebase(() => {
     if (!db || !currentUser || !sessionStart) return null;
+    // CRITICAL: We only query messages from the CURRENT session to keep UI clean
     return query(
       collection(db, "users", currentUser.uid, "chatMessages"), 
+      where("timestamp", ">=", sessionStart),
       orderBy("timestamp", "asc")
     );
   }, [db, currentUser, sessionStart]);
@@ -238,7 +241,8 @@ export default function ChatPage() {
   };
 
   /**
-   * Smart Cleanup: Removes intermediate messages but PRESERVES order confirmations and mode headers.
+   * Smart Cleanup: Removes intermediate messages during flow switches.
+   * Preserves main menu and completed orders.
    */
   const cleanupIntermediateChats = async () => {
     if (!db || !currentUser) return;
@@ -248,7 +252,7 @@ export default function ChatPage() {
     
     snap.docs.forEach(d => {
       const data = d.data();
-      // Logic: Only delete if it's NOT an order confirmation or marked permanent (Main Menu / Selections)
+      // Logic: Preserve orders, greeting, and permanent menu headers
       const isPersistent = data.orderId || data.isInitialGreeting || data.isPermanent;
       if (!isPersistent) {
         batch.delete(d.ref);
@@ -257,9 +261,11 @@ export default function ChatPage() {
     await batch.commit();
   };
 
+  // Initial Greet when Entering Chat (Post SessionStart)
   useEffect(() => {
     if (currentUser && !isMessagesLoading && !hasInitialGreeted.current && sessionStart) {
       hasInitialGreeted.current = true;
+      // We only greet if there are no current session messages
       if (!messages || messages.length === 0) {
         setChatState('initial');
         botReply("👋 Welcome to SocialBoost! Automation Active. Type 'Hi' to begin. 🚀", [], { isInitialGreeting: true, isPermanent: true });
@@ -274,10 +280,9 @@ export default function ChatPage() {
 
     const cleanText = text.toLowerCase();
 
-    // GLOBAL INTERRUPTS: Switching modes triggers cleanup but preserves selection messages
+    // GLOBAL INTERRUPTS: Mode switching logic
     if (cleanText.includes("single order") || cleanText.includes("combo order") || cleanText.includes("bulk order")) {
       await cleanupIntermediateChats(); 
-      // Add the user selection as permanent
       await addMessage('user', text, [], { isPermanent: true }); 
       
       if (cleanText.includes("single order")) {
@@ -299,7 +304,7 @@ export default function ChatPage() {
       return;
     }
 
-    // BULK LINKS SUBMISSION FROM CARD
+    // Process UI Card Submissions
     if (text.startsWith("SUBMIT_BULK_LINKS:")) {
       const linksStr = text.replace("SUBMIT_BULK_LINKS:", "");
       const linksArr = linksStr.split('|').filter(l => l.trim());
@@ -310,29 +315,24 @@ export default function ChatPage() {
       return;
     }
 
-    // COMBO CONFIG SUBMISSION
     if (text.startsWith("SUBMIT_COMBO_CONFIG:")) {
       const [, itemsStr, linksInput, total] = text.split(":");
       await addMessage('user', "Proceeding with Combo Bundle...");
-      
       const items = itemsStr.split('|').map(s => {
         const [id, q] = s.split(',');
         const service = dynamicServices.find(ds => ds.id === id)!;
         return { service, quantity: parseInt(q), link: linksInput };
       });
-
       setCurrentOrder({ type: 'combo', platform: 'instagram', items });
       setChatState('choosing_payment_method');
-
       const paymentOptions: string[] = [];
       if (paymentConfig?.walletEnabled !== false) paymentOptions.push("💳 PAY FROM WALLET");
       if (paymentConfig?.upiEnabled !== false) paymentOptions.push("📲 PAY VIA UPI QR");
-
       botReply(`✅ COMBO BUNDLE READY\n───────────────\nFinal Price: ₹${parseFloat(total).toFixed(2)}\n───────────────\nChoose Payment:`, paymentOptions);
       return;
     }
 
-    // 1. PAYMENT SUBMISSION (MANUAL/UPI) - Make user confirmation permanent
+    // Final Order Submissions (Marked Permanent)
     if (text.startsWith("SUBMIT_PAYMENT:")) {
       const [, linksInput, utr] = text.split(":");
       await addMessage('user', `Payment Submitted (UTR: ${utr})`, [], { isPermanent: true });
@@ -357,30 +357,19 @@ export default function ChatPage() {
       }
 
       const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}`;
-
       await addDoc(collection(db, "users", currentUser.uid, "orders"), {
-        orderId,
-        service: serviceNames,
-        quantity: currentOrder.items[0]?.quantity || 0,
-        price: totalPrice,
-        status: 'Pending',
-        type: 'Manual',
-        links: linksArr,
-        utrId: utr,
-        platform: 'instagram',
-        createdAt: serverTimestamp()
+        orderId, service: serviceNames, quantity: currentOrder.items[0]?.quantity || 0, price: totalPrice,
+        status: 'Pending', type: 'Manual', links: linksArr, utrId: utr, platform: 'instagram', createdAt: serverTimestamp()
       });
 
-      botReply(`✅ Details Submitted!\n\n🔢 Order ID: #${orderId}\n💰 Amount: ₹${totalPrice.toFixed(2)}\n\nAdmin 30-60 mins mein verify karke order start kar denge. Status check karte rahein. 🚀`, [], { orderId, isPermanent: true });
+      botReply(`✅ Details Submitted!\n\n🔢 Order ID: #${orderId}\n💰 Amount: ₹${totalPrice.toFixed(2)}\n\nAdmin 30-60 mins mein verify karke order start kar denge. 🚀`, [], { orderId, isPermanent: true });
       setChatState('idle');
       return;
     }
 
-    // 2. WALLET CONFIRMATION - Make user confirmation permanent
     if (text.startsWith("CONFIRM_WALLET:")) {
       const [, linksInput] = text.split(":");
       await addMessage('user', "Confirming Wallet Payment...", [], { isPermanent: true });
-      
       const type = currentOrder.type || 'single';
       const disc = globalDiscounts[type] || 0;
       const linksArr = linksInput.split('\n').filter(l => l.trim());
@@ -409,13 +398,7 @@ export default function ChatPage() {
               const mapping = apiData?.mappings?.[item.service.id];
               const provider = apiData?.providers?.find((p: any) => p.id === mapping?.providerId);
               if (provider && mapping?.remoteServiceId) {
-                await placeApiOrder({
-                  apiUrl: provider.url,
-                  apiKey: provider.key,
-                  serviceId: mapping.remoteServiceId,
-                  link: linksArr[0],
-                  quantity: item.quantity
-                });
+                await placeApiOrder({ apiUrl: provider.url, apiKey: provider.key, serviceId: mapping.remoteServiceId, link: linksArr[0], quantity: item.quantity });
               }
             }
           } else {
@@ -425,13 +408,7 @@ export default function ChatPage() {
               const mapping = apiData?.mappings?.[s.id];
               const provider = apiData?.providers?.find((p: any) => p.id === mapping?.providerId);
               if (provider && mapping?.remoteServiceId) {
-                await placeApiOrder({
-                  apiUrl: provider.url,
-                  apiKey: provider.key,
-                  serviceId: mapping.remoteServiceId,
-                  link: l,
-                  quantity: qty
-                });
+                await placeApiOrder({ apiUrl: provider.url, apiKey: provider.key, serviceId: mapping.remoteServiceId, link: l, quantity: qty });
               }
             }
           }
@@ -439,32 +416,19 @@ export default function ChatPage() {
           const userOrderRef = doc(collection(db, "users", currentUser.uid, "orders"));
           batch.update(userDocRef!, { balance: increment(-totalPrice) });
           batch.set(userOrderRef, {
-            orderId,
-            service: type === 'combo' ? "Combo Bundle" : currentOrder.items[0].service.name,
-            quantity: currentOrder.items[0].quantity,
-            price: totalPrice,
-            status: 'Processing',
-            type: 'API',
-            links: linksArr,
-            platform: 'instagram',
-            createdAt: serverTimestamp()
+            orderId, service: type === 'combo' ? "Combo Bundle" : currentOrder.items[0].service.name,
+            quantity: currentOrder.items[0].quantity, price: totalPrice, status: 'Processing', type: 'API',
+            links: linksArr, platform: 'instagram', createdAt: serverTimestamp()
           });
-          
           await batch.commit();
-          botReply(`🎉 Order Placed Successfully!\n\n🆔 Order ID: ${orderId}\n💰 Paid: ₹${totalPrice.toFixed(2)}\n\nOrder process ho raha hai. Check 'Orders' for updates.`, [], { orderId, isPermanent: true });
+          botReply(`🎉 Order Placed Successfully!\n\n🆔 Order ID: ${orderId}\n💰 Paid: ₹${totalPrice.toFixed(2)}`, [], { orderId, isPermanent: true });
           setChatState('idle');
-        } catch (e) {
-          botReply("❌ Kuch technical issue hua. Admin ko contact karein.");
-        } finally {
-          setIsTyping(false);
-        }
-      } else {
-        botReply("❌ Low Balance! Please refill your wallet.");
-      }
+        } catch (e) { botReply("❌ Kuch technical issue hua."); } finally { setIsTyping(false); }
+      } else { botReply("❌ Low Balance!"); }
       return;
     }
 
-    // MENU PRIORITY - Keep main menu permanent
+    // MAIN MENU Trigger
     if (cleanText === 'hi' || cleanText === 'menu') {
       await addMessage('user', text, [], { isPermanent: true });
       setChatState('choosing_order_type');
@@ -478,7 +442,7 @@ export default function ChatPage() {
 
     await addMessage('user', text);
 
-    // Service Selection
+    // Contextual Handling
     const serviceMatch = dynamicServices.find((s, i) => cleanText === (i + 1).toString() || cleanText.includes(s.name.toLowerCase()));
     if (serviceMatch && chatState === 'choosing_service') {
       setCurrentOrder(p => ({ ...p, items: [{ service: serviceMatch, quantity: 0, link: '' }] }));
@@ -487,53 +451,35 @@ export default function ChatPage() {
       return;
     }
 
-    // Quantity Input
     if (chatState === 'entering_quantity') {
       const qty = parseInt(text);
       if (isNaN(qty)) return;
-
       const type = currentOrder.type || 'single';
       const minNeeded = currentOrder.items[0]?.service.minQuantity;
-
       if (qty >= minNeeded) {
         const updatedItems = currentOrder.items.map(item => ({ ...item, quantity: qty }));
         setCurrentOrder(p => ({ ...p, items: updatedItems }));
         setChatState('choosing_payment_method');
-        
         const numLinks = type === 'bulk' ? (currentOrder.tempLinks?.length || 1) : 1;
         const rawPrice = (qty / 1000) * (currentOrder.items[0].service.pricePer1000 || 0) * numLinks;
         const disc = globalDiscounts[type] || 0;
         const discounted = rawPrice * (1 - disc / 100);
-        
-        const summary = `✅ ${type.toUpperCase() === 'SINGLE' ? 'SINGLE ORDER' : type.toUpperCase()} SUMMARY\n───────────────\nService: ${currentOrder.items[0].service.name}\nQuantity: ${qty} ${type === 'bulk' ? `(x ${numLinks} links)` : ''}\nReal Price: ₹${rawPrice.toFixed(2)}\nDiscount: ${disc}%\nFinal Price: ₹${discounted.toFixed(2)}\n───────────────\n💳 Wallet: ₹${walletBalance.toFixed(0)}`;
-        
         const paymentOptions: string[] = [];
         if (paymentConfig?.walletEnabled !== false) paymentOptions.push("💳 PAY FROM WALLET");
         if (paymentConfig?.upiEnabled !== false) paymentOptions.push("📲 PAY VIA UPI QR");
-
-        botReply(summary, paymentOptions, { 
-          rawPrice: rawPrice, 
-          paymentPrice: discounted, 
-          discountPct: disc,
-          isBulk: type === 'bulk',
+        botReply(`✅ ${type.toUpperCase()} SUMMARY\nPrice: ₹${discounted.toFixed(2)}`, paymentOptions, { 
+          rawPrice, paymentPrice: discounted, discountPct: disc, isBulk: type === 'bulk',
           prefilledLinks: type === 'bulk' ? currentOrder.tempLinks?.join('\n') : ''
         });
-      } else {
-        botReply(`⚠️ Error: Minimum ${minNeeded} required.`);
-      }
+      } else { botReply(`⚠️ Error: Minimum ${minNeeded} required.`); }
       return;
     }
 
-    // Payment Selection
     if (chatState === 'choosing_payment_method') {
       const type = currentOrder.type || 'single';
       const disc = globalDiscounts[type] || 0;
-      
-      let rawPrice = 0;
-      let serviceName = "";
-      let qty = 0;
+      let rawPrice = 0; let serviceName = ""; let qty = 0;
       const numLinks = type === 'bulk' ? (currentOrder.tempLinks?.length || 1) : 1;
-
       if (type === 'combo') {
         rawPrice = currentOrder.items.reduce((acc, item) => acc + (item.quantity / 1000) * (item.service.pricePer1000 || 0), 0);
         serviceName = "Combo Bundle";
@@ -543,33 +489,19 @@ export default function ChatPage() {
         rawPrice = (qty / 1000) * (currentOrder.items[0].service.pricePer1000 || 0) * numLinks;
         serviceName = currentOrder.items[0].service.name;
       }
-
       const discounted = rawPrice * (1 - disc / 100);
-
       if (cleanText.includes("wallet")) {
         if (walletBalance >= discounted) {
-          botReply(type === 'bulk' ? `Confirm Bulk Order for ${numLinks} links?` : `Enter Link & Confirm Wallet Payment?`, [], { 
-            isWalletCard: true, 
-            paymentPrice: discounted, 
-            rawPrice: rawPrice, 
-            discountPct: disc,
-            serviceName: serviceName,
-            quantity: qty,
-            isBulk: type === 'bulk',
+          botReply(type === 'bulk' ? `Confirm Bulk Order?` : `Enter Link & Confirm?`, [], { 
+            isWalletCard: true, paymentPrice: discounted, rawPrice, discountPct: disc,
+            serviceName, quantity: qty, isBulk: type === 'bulk',
             prefilledLinks: type === 'bulk' ? currentOrder.tempLinks?.join('\n') : ''
           });
-        } else {
-          botReply("❌ Low Balance! Please refill your wallet.", ["💳 ADD FUNDS", "🏠 MENU"]);
-        }
+        } else { botReply("❌ Low Balance!", ["💳 ADD FUNDS", "🏠 MENU"]); }
       } else if (cleanText.includes("upi")) {
-        botReply(`Scan the QR to Pay:`, [], { 
-          isPaymentCard: true, 
-          paymentPrice: discounted, 
-          rawPrice: rawPrice, 
-          discountPct: disc,
-          serviceName: serviceName,
-          quantity: qty,
-          isBulk: type === 'bulk',
+        botReply(`Scan QR:`, [], { 
+          isPaymentCard: true, paymentPrice: discounted, rawPrice, discountPct: disc,
+          serviceName, quantity: qty, isBulk: type === 'bulk',
           prefilledLinks: type === 'bulk' ? currentOrder.tempLinks?.join('\n') : ''
         });
       }
@@ -619,24 +551,12 @@ export default function ChatPage() {
       <main className="flex-1 overflow-y-auto p-4 flex flex-col relative pb-24 custom-scrollbar">
         {messages?.map(m => (
           <MessageBubble 
-            key={m.id} 
-            sender={m.sender} 
-            text={m.text} 
-            options={m.options} 
-            onOptionClick={handleSend} 
-            isPaymentCard={m.isPaymentCard} 
-            paymentPrice={m.paymentPrice} 
-            rawPrice={m.rawPrice}
-            isWalletCard={m.isWalletCard} 
-            isComboConfigCard={m.isComboConfigCard}
-            isBulkLinkCard={m.isBulkLinkCard}
-            timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} 
-            dynamicServices={dynamicServices} 
-            discountPct={m.discountPct ?? 0} 
-            serviceName={m.serviceName}
-            quantity={m.quantity}
-            isBulk={m.isBulk}
-            prefilledLinks={m.prefilledLinks}
+            key={m.id} sender={m.sender} text={m.text} options={m.options} onOptionClick={handleSend} 
+            isPaymentCard={m.isPaymentCard} paymentPrice={m.paymentPrice} rawPrice={m.rawPrice}
+            isWalletCard={m.isWalletCard} isComboConfigCard={m.isComboConfigCard} isBulkLinkCard={m.isBulkLinkCard}
+            timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} dynamicServices={dynamicServices} 
+            discountPct={m.discountPct ?? 0} serviceName={m.serviceName} quantity={m.quantity}
+            isBulk={m.isBulk} prefilledLinks={m.prefilledLinks}
           />
         ))}
         {isTyping && <TypingIndicator />}
@@ -669,11 +589,8 @@ export default function ChatPage() {
       <footer className="p-4 bg-slate-900/80 backdrop-blur-xl border-t border-white/5 z-50">
         <div className="flex items-center gap-3 bg-slate-950 rounded-[1.8rem] p-1.5 shadow-3d-pressed">
           <Input 
-            value={inputValue} 
-            onChange={e => setInputValue(e.target.value)} 
-            onKeyDown={e => e.key === "Enter" && handleSend()} 
-            placeholder="Type your Request..." 
-            className="flex-1 bg-transparent border-none font-bold text-sm h-11 focus-visible:ring-0 text-white placeholder:text-slate-600" 
+            value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSend()} 
+            placeholder="Type your Request..." className="flex-1 bg-transparent border-none font-bold text-sm h-11 focus-visible:ring-0 text-white placeholder:text-slate-600" 
           />
           <Button onClick={() => handleSend()} size="icon" className="rounded-2xl h-10 w-10 bg-[#312ECB] hover:bg-[#2825A6] shadow-3d active:shadow-3d-pressed">
             <Send size={18} />
@@ -681,47 +598,34 @@ export default function ChatPage() {
         </div>
       </footer>
 
-      {/* Popups */}
+      {/* Dialogs */}
       <Dialog open={isBroadcastOpen} onOpenChange={setIsBroadcastOpen}>
         <DialogContent className="max-w-[340px] rounded-[2.5rem] border-none shadow-3d bg-[#030712] p-0 overflow-hidden">
-          <header className="bg-gradient-to-r from-[#312ECB] to-purple-600 p-6 text-white relative">
-             <div className="flex flex-col items-center gap-2">
-                <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center border border-white/20 shadow-3d-sm animate-pulse">
-                  <Megaphone size={24} className="text-white fill-current" />
-                </div>
-                <DialogTitle className="text-white font-black uppercase text-[10px] tracking-[0.3em] mt-2">Special Update</DialogTitle>
-             </div>
-             <button onClick={() => setIsBroadcastOpen(false)} className="absolute top-4 right-4 text-white/60 hover:text-white transition-colors">
-               <X size={18} />
-             </button>
+          <header className="bg-gradient-to-r from-[#312ECB] to-purple-600 p-6 text-white relative text-center">
+             <Megaphone size={24} className="mx-auto animate-pulse" />
+             <DialogTitle className="text-white font-black uppercase text-[10px] tracking-[0.3em] mt-2">Special Update</DialogTitle>
           </header>
           <div className="p-8 space-y-6 text-center">
-             <div className="bg-slate-900/50 p-6 rounded-[2rem] border border-white/5 shadow-3d-pressed">
-                <p className="text-[13px] font-bold text-slate-200 leading-relaxed italic">
-                  "{activeBroadcast?.text}"
-                </p>
-             </div>
-             <Button onClick={() => setIsBroadcastOpen(false)} className="w-full h-12 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-3d active:shadow-3d-pressed">Got it! 🚀</Button>
+             <p className="text-[13px] font-bold text-slate-200 leading-relaxed italic">"{activeBroadcast?.text}"</p>
+             <Button onClick={() => setIsBroadcastOpen(false)} className="w-full h-12 bg-[#312ECB] text-white font-black uppercase tracking-widest rounded-2xl">Got it!</Button>
           </div>
         </DialogContent>
       </Dialog>
 
       <Dialog open={isNotifOpen} onOpenChange={setIsNotifOpen}>
         <DialogContent className="max-w-[340px] rounded-[2.5rem] border-none shadow-3d bg-[#030712] p-0 overflow-hidden">
-          <header className="bg-[#312ECB] p-6 text-white">
-             <div className="flex items-center justify-between">
-                <DialogTitle className="text-white font-black uppercase text-xs flex items-center gap-2"><Bell size={16} /> Notifications</DialogTitle>
-                <Button onClick={handleClearNotifs} variant="ghost" className="h-7 text-[8px] font-black uppercase bg-white/10 rounded-lg px-2">Clear All</Button>
-             </div>
+          <header className="bg-[#312ECB] p-6 text-white flex items-center justify-between">
+             <DialogTitle className="text-white font-black uppercase text-xs">Notifications</DialogTitle>
+             <Button onClick={handleClearNotifs} variant="ghost" className="h-7 text-[8px] uppercase bg-white/10 rounded-lg">Clear All</Button>
           </header>
           <ScrollArea className="h-[400px] p-4">
              <div className="space-y-3">
                 {notifications.length > 0 ? notifications.map(n => (
-                  <div key={n.id} onClick={handleClearNotifs} className="bg-slate-900 p-4 rounded-2xl shadow-3d-sm border border-white/5 flex items-start gap-3 cursor-pointer">
-                    <div className="w-8 h-8 rounded-lg bg-[#312ECB]/20 flex items-center justify-center text-[#312ECB] shrink-0"><Zap size={14} /></div>
-                    <div className="space-y-0.5"><p className="text-[11px] font-black text-white">{n.title}</p><p className="text-[10px] font-bold text-slate-400">{n.message}</p></div>
+                  <div key={n.id} onClick={handleClearNotifs} className="bg-slate-900 p-4 rounded-2xl border border-white/5 flex items-start gap-3">
+                    <Zap size={14} className="text-[#312ECB] shrink-0" />
+                    <div className="space-y-0.5"><p className="text-[11px] font-black text-white">{n.title}</p><p className="text-[10px] text-slate-400">{n.message}</p></div>
                   </div>
-                )) : <div className="flex flex-col items-center justify-center py-20 opacity-20 text-white"><Bell size={40} /><p className="text-[10px] font-black uppercase mt-4">Inbox Clear</p></div>}
+                )) : <p className="text-center py-20 text-slate-600 uppercase text-[10px] font-black">Inbox Clear</p>}
              </div>
           </ScrollArea>
         </DialogContent>
@@ -729,27 +633,21 @@ export default function ChatPage() {
 
       <Dialog open={isOrdersOpen} onOpenChange={setIsOrdersOpen}>
         <DialogContent className="max-w-[360px] rounded-[2.5rem] border-none shadow-3d bg-[#030712] p-0 overflow-hidden">
-          <header className="bg-slate-900 px-6 py-4 flex items-center justify-between border-b border-white/5">
-             <DialogTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-white"><Package size={16} className="inline mr-2" /> Order History</DialogTitle>
+          <header className="bg-slate-900 px-6 py-4 border-b border-white/5">
+             <DialogTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-white">Order History</DialogTitle>
           </header>
           <ScrollArea className="h-[500px] p-4">
              <div className="space-y-3">
-                {userOrders.length > 0 ? userOrders.map((order: any) => {
-                  const displayId = order.orderId || order.id.slice(0, 8).toUpperCase();
-                  return (
-                    <div key={order.id} className="bg-slate-900 p-4 rounded-[1.2rem] shadow-3d-sm border border-white/5 flex flex-col gap-1.5">
-                       <div className="flex items-center justify-between">
-                          <h3 className="text-[11px] font-black uppercase text-[#312ECB] truncate max-w-[180px]">{order.service}</h3>
-                          <Badge className="text-[8px] font-black bg-slate-800 text-slate-400">#{displayId}</Badge>
-                       </div>
-                       <div className="flex items-center gap-2.5">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase">Qty: {order.quantity}</span>
-                          <span className="text-[9px] font-black text-emerald-600">₹{order.price?.toFixed(2)}</span>
-                          <Badge className={cn("ml-auto text-[8px] h-4.5 font-black px-2 border-none rounded-md", order.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-blue-500/10 text-blue-500')}>{order.status}</Badge>
-                       </div>
-                    </div>
-                  );
-                }) : <div className="text-center py-20 opacity-20 text-white"><Package size={40} className="mx-auto" /><p className="text-[10px] font-black uppercase mt-4">No Orders</p></div>}
+                {userOrders.length > 0 ? userOrders.map((order: any) => (
+                  <div key={order.id} className="bg-slate-900 p-4 rounded-[1.2rem] border border-white/5">
+                     <h3 className="text-[11px] font-black uppercase text-[#312ECB]">{order.service}</h3>
+                     <div className="flex items-center gap-2.5 mt-1 text-[9px] font-bold text-slate-400">
+                        <span>Qty: {order.quantity}</span>
+                        <span className="text-emerald-600">₹{order.price?.toFixed(2)}</span>
+                        <Badge className="ml-auto bg-blue-500/10 text-blue-500">{order.status}</Badge>
+                     </div>
+                  </div>
+                )) : <p className="text-center py-20 text-slate-600 uppercase text-[10px] font-black">No Orders</p>}
              </div>
           </ScrollArea>
         </DialogContent>
@@ -757,18 +655,14 @@ export default function ChatPage() {
 
       <Dialog open={isLogsOpen} onOpenChange={setIsLogsOpen}>
         <DialogContent className="max-w-[360px] rounded-[2.5rem] border-none shadow-3d bg-[#030712] p-0 overflow-hidden">
-          <header className="bg-slate-900 px-6 py-4 flex items-center justify-between border-b border-white/5">
-             <DialogTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-white"><MessageSquareText size={16} className="inline mr-2" /> Chat Logs</DialogTitle>
+          <header className="bg-slate-900 px-6 py-4 border-b border-white/5">
+             <DialogTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-white">Chat Logs</DialogTitle>
           </header>
           <ScrollArea className="h-[500px] p-4">
              <div className="space-y-3">
                 {rawLogs?.map((log: any) => (
-                  <div key={log.id} className={cn("p-3 rounded-2xl shadow-3d-sm border flex flex-col gap-1", log.sender === 'bot' ? "bg-slate-900 ml-0 mr-8 border-white/5" : "bg-emerald-950/20 ml-8 mr-0 border-emerald-500/10")}>
-                     <div className="flex items-center justify-between">
-                        <span className={cn("text-[7px] font-black uppercase tracking-widest", log.sender === 'bot' ? "text-[#312ECB]" : "text-emerald-600")}>{log.sender === 'bot' ? 'Assistant' : 'You'}</span>
-                        <span className="text-[7px] font-bold text-slate-400">{log.timestamp?.toDate ? format(log.timestamp.toDate(), 'HH:mm') : ''}</span>
-                     </div>
-                     <p className="text-[10px] font-bold text-slate-200 leading-relaxed">{log.text}</p>
+                  <div key={log.id} className={cn("p-3 rounded-2xl border", log.sender === 'bot' ? "bg-slate-900 mr-8" : "bg-emerald-950/20 ml-8")}>
+                     <p className="text-[10px] font-bold text-slate-200">{log.text}</p>
                   </div>
                 ))}
              </div>
