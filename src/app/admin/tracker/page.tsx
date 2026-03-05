@@ -37,6 +37,7 @@ import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { useToast } from "@/hooks/use-toast";
 import { getApiOrdersStatus } from "@/app/actions/smm-api";
+import { cn } from "@/lib/utils";
 
 export default function TrackerPage() {
   const { user, isUserLoading } = useUser();
@@ -209,12 +210,6 @@ export default function TrackerPage() {
       .then(() => {
         toast({ title: "Status Updated", description: `Order set to ${newStatus}.` });
       });
-  };
-
-  const copyToClipboard = (text: string, label: string) => {
-    if (!text) return;
-    navigator.clipboard.writeText(text);
-    toast({ title: "Copied", description: `${label} copied to clipboard.` });
   };
 
   const activeStatusesList = ['Pending', 'Processing', 'In progress', 'In-progress', 'In Progress'];
