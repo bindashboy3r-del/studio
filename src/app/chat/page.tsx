@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -112,15 +111,8 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const keepSession = sessionStorage.getItem('keepChatSession') === 'true';
-    let sessionTimeStr = sessionStorage.getItem('chatSessionStartTime');
-    if (!keepSession || !sessionTimeStr) {
-      const now = new Date();
-      sessionTimeStr = now.toISOString();
-      sessionStorage.setItem('chatSessionStartTime', sessionTimeStr);
-    }
-    setSessionStart(Timestamp.fromDate(new Date(sessionTimeStr)));
-    sessionStorage.removeItem('keepChatSession');
+    const now = new Date();
+    setSessionStart(Timestamp.fromDate(now));
   }, []);
 
   useEffect(() => {
@@ -215,7 +207,6 @@ export default function ChatPage() {
     if (!db || !currentUser || !sessionStart) return null;
     return query(
       collection(db, "users", currentUser.uid, "chatMessages"), 
-      where("timestamp", ">=", sessionStart),
       orderBy("timestamp", "asc")
     );
   }, [db, currentUser, sessionStart]);
@@ -245,18 +236,20 @@ export default function ChatPage() {
     }, 800);
   };
 
-  // Selective Cleanup: Deletes "faltu" intermediate messages
+  /**
+   * Smart Cleanup: Removes intermediate messages but PRESERVES order confirmations.
+   */
   const cleanupIntermediateChats = async () => {
     if (!db || !currentUser) return;
-    // We find all messages from this session and delete them to keep it clean
-    const q = query(collection(db, "users", currentUser.uid, "chatMessages"), where("timestamp", ">=", sessionStart));
+    const q = query(collection(db, "users", currentUser.uid, "chatMessages"));
     const snap = await getDocs(q);
     const batch = writeBatch(db);
-    // Keep only the messages that are order confirmations or the very first mode selection
+    
     snap.docs.forEach(d => {
       const data = d.data();
-      // Logic: Only delete if it's not a successful order placement card
-      if (!data.orderId) {
+      // Logic: Only delete if it's NOT an order confirmation or marked permanent
+      const isPersistent = data.orderId || data.isInitialGreeting || data.isPermanent;
+      if (!isPersistent) {
         batch.delete(d.ref);
       }
     });
@@ -268,7 +261,7 @@ export default function ChatPage() {
       hasInitialGreeted.current = true;
       if (!messages || messages.length === 0) {
         setChatState('initial');
-        botReply("👋 Welcome to SocialBoost! Automation Active. Type 'Hi' to begin. 🚀");
+        botReply("👋 Welcome to SocialBoost! Automation Active. Type 'Hi' to begin. 🚀", [], { isInitialGreeting: true });
       }
     }
   }, [currentUser, isMessagesLoading, messages, sessionStart]);
@@ -279,6 +272,30 @@ export default function ChatPage() {
     if (!manualText) setInputValue("");
 
     const cleanText = text.toLowerCase();
+
+    // GLOBAL INTERRUPTS: Switching modes triggers cleanup
+    if (cleanText.includes("single order") || cleanText.includes("combo order") || cleanText.includes("bulk order")) {
+      await cleanupIntermediateChats(); 
+      await addMessage('user', text, [], { isPermanent: true }); // Make the mode selection permanent
+      
+      if (cleanText.includes("single order")) {
+        setChatState('choosing_service'); 
+        setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
+        botReply(`Pick a Service. You get ${globalDiscounts.single}% OFF!`, dynamicServices.map((s, i) => `${i + 1}. ${s.name}`));
+      } else if (cleanText.includes("combo order")) {
+        setChatState('configuring_combo'); 
+        setCurrentOrder({ type: 'combo', platform: 'instagram', items: [] });
+        botReply("Configure your custom combo bundle:", [], { 
+          isComboConfigCard: true, 
+          discountPct: globalDiscounts.combo 
+        });
+      } else if (cleanText.includes("bulk order")) {
+        setChatState('bulk_adding_links'); 
+        setCurrentOrder({ type: 'bulk', platform: 'instagram', items: [], tempLinks: [] });
+        botReply(`🚀 BULK MODE: Add links one by one. Click SUBMIT when finished!`, [], { isBulkLinkCard: true });
+      }
+      return;
+    }
 
     // BULK LINKS SUBMISSION FROM CARD
     if (text.startsWith("SUBMIT_BULK_LINKS:")) {
@@ -334,7 +351,7 @@ export default function ChatPage() {
         const s = currentOrder.items[0]?.service;
         const qty = currentOrder.items[0]?.quantity;
         totalPrice = (qty / 1000) * (s.pricePer1000 || 0) * (1 - disc / 100) * numLinks;
-        serviceNames = s.name;
+        serviceNames = s?.name || "Service";
       }
 
       const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -342,7 +359,7 @@ export default function ChatPage() {
       await addDoc(collection(db, "users", currentUser.uid, "orders"), {
         orderId,
         service: serviceNames,
-        quantity: currentOrder.items[0]?.quantity,
+        quantity: currentOrder.items[0]?.quantity || 0,
         price: totalPrice,
         status: 'Pending',
         type: 'Manual',
@@ -352,7 +369,7 @@ export default function ChatPage() {
         createdAt: serverTimestamp()
       });
 
-      botReply(`✅ Details Submitted!\n\n🔢 Order ID: #${orderId}\n💰 Amount: ₹${totalPrice.toFixed(2)}\n\nAdmin 30-60 mins mein verify karke order start kar denge. Status check karte rahein. 🚀`);
+      botReply(`✅ Details Submitted!\n\n🔢 Order ID: #${orderId}\n💰 Amount: ₹${totalPrice.toFixed(2)}\n\nAdmin 30-60 mins mein verify karke order start kar denge. Status check karte rahein. 🚀`, [], { orderId });
       setChatState('idle');
       return;
     }
@@ -432,7 +449,7 @@ export default function ChatPage() {
           });
           
           await batch.commit();
-          botReply(`🎉 Order Placed Successfully!\n\n🆔 Order ID: ${orderId}\n💰 Paid: ₹${totalPrice.toFixed(2)}\n\nOrder process ho raha hai. Check 'Orders' for updates.`);
+          botReply(`🎉 Order Placed Successfully!\n\n🆔 Order ID: ${orderId}\n💰 Paid: ₹${totalPrice.toFixed(2)}\n\nOrder process ho raha hai. Check 'Orders' for updates.`, [], { orderId });
           setChatState('idle');
         } catch (e) {
           botReply("❌ Kuch technical issue hua. Admin ko contact karein.");
@@ -441,30 +458,6 @@ export default function ChatPage() {
         }
       } else {
         botReply("❌ Low Balance! Please refill your wallet.");
-      }
-      return;
-    }
-
-    // GLOBAL INTERRUPTS: Mode switch deletes intermediate "faltu" chats
-    if (cleanText.includes("single order") || cleanText.includes("combo order") || cleanText.includes("bulk order")) {
-      await cleanupIntermediateChats(); 
-      await addMessage('user', text);
-      
-      if (cleanText.includes("single order")) {
-        setChatState('choosing_service'); 
-        setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
-        botReply(`Pick a Service. You get ${globalDiscounts.single}% OFF!`, dynamicServices.map((s, i) => `${i + 1}. ${s.name}`));
-      } else if (cleanText.includes("combo order")) {
-        setChatState('configuring_combo'); 
-        setCurrentOrder({ type: 'combo', platform: 'instagram', items: [] });
-        botReply("Configure your custom combo bundle:", [], { 
-          isComboConfigCard: true, 
-          discountPct: globalDiscounts.combo 
-        });
-      } else if (cleanText.includes("bulk order")) {
-        setChatState('bulk_adding_links'); 
-        setCurrentOrder({ type: 'bulk', platform: 'instagram', items: [], tempLinks: [] });
-        botReply(`🚀 BULK MODE: Add links one by one. Click SUBMIT when finished!`, [], { isBulkLinkCard: true });
       }
       return;
     }
