@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -98,7 +99,7 @@ export default function AuthPage() {
 
       <div className="mt-10 flex flex-col items-center space-y-4 opacity-30">
         <div className="flex gap-6"><ShieldCheck size={16} /><Rocket size={16} /><Globe size={16} /></div>
-        <p className="text-[10px] font-black text-[#111B21] dark:text-slate-500 uppercase tracking-[0.4em]">PRO VERSION 3.0</p>
+        <p className="text-[10px] font-black text-[#111B21] dark:text-slate-500 uppercase tracking-[0.4em]">PRO VERSION</p>
       </div>
     </div>
   );

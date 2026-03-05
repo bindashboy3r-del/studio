@@ -96,7 +96,6 @@ export default function ChatPage() {
   const hasInitialGreeted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Session Management: Clear chat if not coming from History/Orders
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
@@ -110,7 +109,7 @@ export default function ChatPage() {
     }
     
     setSessionStart(Timestamp.fromDate(new Date(sessionTimeStr)));
-    sessionStorage.removeItem('keepChatSession'); // Reset flag for next move
+    sessionStorage.removeItem('keepChatSession');
   }, []);
 
   useEffect(() => {
@@ -162,7 +161,6 @@ export default function ChatPage() {
     return () => { unsubBroadcast(); unsubDiscounts(); unsubSocial(); unsubNotifs(); };
   }, [db, currentUser]);
 
-  // Rolling 7-day delete for historical logs (Runs once per mount)
   useEffect(() => {
     if (!db || !currentUser) return;
     const cleanupOldLogs = async () => {
@@ -217,25 +215,10 @@ export default function ChatPage() {
       hasInitialGreeted.current = true;
       if (!messages || messages.length === 0) {
         setChatState('initial');
-        botReply("👋 Welcome to SocialBoost! 3D Automation Active. Type 'Hi' to begin. 🚀");
+        botReply("👋 Welcome to SocialBoost! Automation Active. Type 'Hi' to begin. 🚀");
       }
     }
   }, [currentUser, isMessagesLoading, messages, sessionStart]);
-
-  const calculateTotalPrice = (itemsOverride?: OrderItem[], typeOverride?: string) => {
-    const items = itemsOverride || currentOrder.items;
-    const type = typeOverride || currentOrder.type;
-    const raw = items.reduce((sum, item) => {
-      const multiplier = (type === 'bulk' && currentOrder.bulkLinks) ? currentOrder.bulkLinks.length : 1;
-      return sum + ((item.quantity / 1000) * (item.service.pricePer1000 || 0) * multiplier);
-    }, 0);
-    const disc = type === 'combo' ? globalDiscounts.combo : type === 'bulk' ? globalDiscounts.bulk : globalDiscounts.single;
-    return {
-      raw,
-      discounted: raw * (1 - disc / 100),
-      discountPct: disc
-    };
-  };
 
   const handleSend = async (manualText?: string) => {
     const text = manualText || inputValue.trim();
@@ -249,7 +232,7 @@ export default function ChatPage() {
 
     if (isSwitch) {
       setChatState('choosing_order_type');
-      botReply("Choose your boost style (3D Neumorphic Mode):", [
+      botReply("Choose your boost style:", [
         `1. SINGLE ORDER (${globalDiscounts.single}% OFF)`, 
         `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)`, 
         `3. BULK ORDER (${globalDiscounts.bulk}% OFF)`
@@ -278,31 +261,35 @@ export default function ChatPage() {
         const updated = [{ service: s, quantity: qty, link: '' }];
         setCurrentOrder(p => ({ ...p, items: updated }));
         setChatState('choosing_payment_method');
-        const { raw, discounted, discountPct } = calculateTotalPrice(updated);
+        const raw = (qty / 1000) * (s.pricePer1000 || 0);
+        const disc = globalDiscounts.single;
+        const discounted = raw * (1 - disc / 100);
         
-        const summary = `✅ ORDER SUMMARY\n───────────────\nOriginal Price: ₹${raw.toFixed(2)}\nDiscount Applied: ${discountPct}%\n🔥 You Pay: ₹${discounted.toFixed(2)}\n───────────────\n💳 Wallet Balance: ₹${walletBalance.toFixed(0)}`;
+        const summary = `✅ ORDER SUMMARY\n───────────────\nOriginal Price: ₹${raw.toFixed(2)}\nDiscount Applied: ${disc}%\n🔥 You Pay: ₹${discounted.toFixed(2)}\n───────────────\n💳 Wallet Balance: ₹${walletBalance.toFixed(0)}`;
         
         botReply(summary, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"], { 
           rawPrice: raw, 
           paymentPrice: discounted, 
-          discountPct 
+          discountPct: disc 
         });
       } else if (s) botReply(`⚠️ Error: Minimum ${s.minQuantity} required.`);
       return;
     }
 
     if (chatState === 'choosing_payment_method') {
-      const { raw, discounted, discountPct } = calculateTotalPrice();
+      const s = currentOrder.items[0]?.service;
+      const qty = currentOrder.items[0]?.quantity;
+      const raw = (qty / 1000) * (s.pricePer1000 || 0);
+      const discounted = raw * (1 - globalDiscounts.single / 100);
+
       if (cleanText.includes("wallet")) {
-        if (walletBalance >= discounted) botReply(`Confirm Wallet Payment of ₹${discounted.toFixed(2)}?`, [], { isWalletCard: true, paymentPrice: discounted, rawPrice: raw, discountPct });
+        if (walletBalance >= discounted) botReply(`Confirm Wallet Payment of ₹${discounted.toFixed(2)}?`, [], { isWalletCard: true, paymentPrice: discounted, rawPrice: raw, discountPct: globalDiscounts.single });
         else botReply("❌ Low Balance! Please refill your wallet.", ["💳 ADD FUNDS", "🏠 MENU"]);
       } else if (cleanText.includes("upi")) {
-        botReply(`Scan the 3D QR to Pay:`, [], { isPaymentCard: true, paymentPrice: discounted, rawPrice: raw, discountPct });
+        botReply(`Scan the QR to Pay:`, [], { isPaymentCard: true, paymentPrice: discounted, rawPrice: raw, discountPct: globalDiscounts.single });
       }
     }
   };
-
-  if (isUserLoading) return <div className="min-h-screen flex flex-col items-center justify-center bg-[#030712]"><Loader2 className="w-8 h-8 text-[#312ECB] animate-spin mb-3" /></div>;
 
   return (
     <div className="flex flex-col h-screen max-w-lg mx-auto overflow-hidden relative whatsapp-bg font-body">
@@ -412,7 +399,7 @@ export default function ChatPage() {
             value={inputValue} 
             onChange={e => setInputValue(e.target.value)} 
             onKeyDown={e => e.key === "Enter" && handleSend()} 
-            placeholder="Type your 3D Request..." 
+            placeholder="Type your Request..." 
             className="flex-1 bg-transparent border-none font-bold text-sm h-11 focus-visible:ring-0 shadow-none text-white placeholder:text-slate-600" 
           />
           <Button 

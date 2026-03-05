@@ -8,7 +8,8 @@ import {
   Wallet,
   Copy,
   Download,
-  Percent
+  Percent,
+  MessageCircle
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { SMMService } from "@/app/lib/constants";
+import { useUser } from "@/firebase";
 
 interface MessageBubbleProps {
   sender: 'user' | 'bot';
@@ -46,6 +48,7 @@ export function MessageBubble({
   discountPct = 0
 }: MessageBubbleProps) {
   const isUser = sender === 'user';
+  const { user } = useUser();
   const { toast } = useToast();
   
   const [link, setLink] = useState("");
@@ -77,6 +80,13 @@ export function MessageBubble({
       toast({ title: "QR Saved" });
     } catch (e) { window.open(qrUrl, '_blank'); }
     finally { setIsDownloading(false); }
+  };
+
+  const handleWhatsAppConfirmation = () => {
+    const adminNumber = "919116399517";
+    const username = user?.displayName || user?.email || "User";
+    const message = `Hello Admin, I have made a payment.\n\n👤 Username: ${username}\n💰 Amount: ₹${price.toFixed(2)}\n🔢 UTR ID: ${utr || "N/A"}\n🔗 Link: ${link || "N/A"}\n\nPlease verify my payment.`;
+    window.open(`https://wa.me/${adminNumber}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
   if (!mounted) return null;
@@ -127,9 +137,22 @@ export function MessageBubble({
                   <Input placeholder="Enter 12-Digit UTR ID" value={utr} maxLength={12} onChange={(e) => setUtr(e.target.value.replace(/[^0-9]/g, ''))} className="h-10 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-black tracking-widest text-xs" />
                 </div>
               </div>
-              <Button onClick={() => onOptionClick?.(`SUBMIT_PAYMENT:${link}:${utr}`)} disabled={!link || utr.length !== 12} className="w-full h-12 bg-[#312ECB] font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10">
-                SUBMIT 3D PAYMENT
-              </Button>
+              
+              <div className="flex flex-col gap-2 pt-1">
+                <Button onClick={() => onOptionClick?.(`SUBMIT_PAYMENT:${link}:${utr}`)} disabled={!link || utr.length !== 12} className="w-full h-12 bg-[#312ECB] font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10">
+                  SUBMIT PAYMENT
+                </Button>
+                
+                <div className="flex flex-col items-center gap-1">
+                  <p className="text-[7px] font-black uppercase text-red-500 tracking-tighter">payment karne ke bad admin ko bheje</p>
+                  <Button 
+                    onClick={handleWhatsAppConfirmation}
+                    className="w-full h-10 bg-[#25D366] hover:bg-[#1EBE57] text-white font-black text-[9px] uppercase tracking-widest rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10 gap-2"
+                  >
+                    <MessageCircle size={14} /> Send to WhatsApp
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         ) : isWalletCard ? (

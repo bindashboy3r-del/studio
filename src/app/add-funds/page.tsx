@@ -14,7 +14,8 @@ import {
   ChevronRight,
   QrCode,
   Copy,
-  CheckCircle2
+  CheckCircle2,
+  MessageCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +36,7 @@ export default function AddFundsPage() {
   const [paymentConfig, setPaymentConfig] = useState<any>(null);
 
   useEffect(() => {
-    if (!db || !user) return; // Fixed: Wait for user to prevent permission errors
+    if (!db || !user) return;
     const unsubFinance = onSnapshot(doc(db, "globalSettings", "finance"), (snap) => {
       if (snap.exists()) setGlobalBonus(snap.data().bonusPercentage || 0);
     });
@@ -90,6 +91,13 @@ export default function AddFundsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleWhatsAppConfirmation = () => {
+    const adminNumber = "919116399517";
+    const username = user?.displayName || user?.email || "User";
+    const message = `Hello Admin, I have made a payment.\n\n👤 Username: ${username}\n💰 Amount: ₹${amount || "0"}\n🔢 UTR ID: ${utrId || "N/A"}\n\nPlease verify my payment.`;
+    window.open(`https://wa.me/${adminNumber}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
   const copyUpi = () => {
@@ -182,14 +190,26 @@ export default function AddFundsPage() {
             </div>
           </div>
 
-          <Button 
-            onClick={handleManualSubmit}
-            disabled={loading || !amount || utrId.length !== 12}
-            className="w-full h-11 bg-[#312ECB] hover:bg-[#2825A6] text-white rounded-lg font-black text-[9px] uppercase tracking-widest shadow-md gap-2"
-          >
-            {loading ? <Loader2 className="animate-spin" size={12} /> : "Submit Request"}
-            <CheckCircle2 size={12} />
-          </Button>
+          <div className="flex flex-col gap-2">
+            <Button 
+              onClick={handleManualSubmit}
+              disabled={loading || !amount || utrId.length !== 12}
+              className="w-full h-11 bg-[#312ECB] hover:bg-[#2825A6] text-white rounded-lg font-black text-[9px] uppercase tracking-widest shadow-md gap-2"
+            >
+              {loading ? <Loader2 className="animate-spin" size={12} /> : "Submit Request"}
+              <CheckCircle2 size={12} />
+            </Button>
+
+            <div className="flex flex-col items-center gap-1 mt-1">
+              <p className="text-[7px] font-black uppercase text-red-500 tracking-tighter">payment karne ke bad admin ko bheje</p>
+              <Button 
+                onClick={handleWhatsAppConfirmation}
+                className="w-full h-10 bg-[#25D366] hover:bg-[#1EBE57] text-white rounded-lg font-black text-[9px] uppercase tracking-widest shadow-md gap-2"
+              >
+                <MessageCircle size={14} /> Send to WhatsApp
+              </Button>
+            </div>
+          </div>
         </div>
 
         <button 
