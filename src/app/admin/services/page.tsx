@@ -50,13 +50,6 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Accordion,
   AccordionContent,
   AccordionItem,
@@ -143,6 +136,8 @@ export default function ServiceManagerPage() {
 
   const handleDeleteCategory = async (platform: string) => {
     if (!db || !isActuallyAdmin) return;
+    if (!confirm(`Are you sure? This will delete all services in ${PLATFORMS[platform as Platform]}.`)) return;
+    
     setDeletingCategory(platform);
     
     try {
@@ -169,20 +164,33 @@ export default function ServiceManagerPage() {
       return;
     }
 
-    const docId = newService.id.toLowerCase().replace(/\s+/g, '_');
-    const docRef = doc(db, "services", docId);
+    const platform = newService.platform || 'other';
+    const cleanIdInput = newService.id.toLowerCase().replace(/\s+/g, '_');
+    // UNIQUE ID: Prefix with platform to prevent cross-category collisions
+    const finalDocId = `${platform}_${cleanIdInput}`;
+    
+    const docRef = doc(db, "services", finalDocId);
     const data = {
       ...newService,
-      id: docId,
+      id: finalDocId,
+      platform: platform,
       order: Number(newService.order) || (services?.length || 0) + 1,
       updatedAt: serverTimestamp()
     };
 
     setDoc(docRef, data)
       .then(() => {
-        toast({ title: "Service Added", description: `${newService.name} is now live.` });
+        toast({ title: "Service Added", description: `${newService.name} is now live in ${PLATFORMS[platform as Platform]}.` });
         setIsAddingService(false);
-        setNewService({ id: "", name: "", platform: newService.platform as Platform, isActive: true, pricePer1000: 0, minQuantity: 100, order: (services?.length || 0) + 1 });
+        setNewService({ 
+          id: "", 
+          name: "", 
+          platform: platform as Platform, 
+          isActive: true, 
+          pricePer1000: 0, 
+          minQuantity: 100, 
+          order: (services?.length || 0) + 1 
+        });
       })
       .catch((err) => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
@@ -378,8 +386,8 @@ export default function ServiceManagerPage() {
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Service ID</label>
-                <Input placeholder="e.g. followers_vip" value={newService.id || ""} onChange={e => setNewService({...newService, id: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
+                <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Service Unique ID</label>
+                <Input placeholder="e.g. basic_likes" value={newService.id || ""} onChange={e => setNewService({...newService, id: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Position</label>
@@ -388,7 +396,7 @@ export default function ServiceManagerPage() {
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Service Name</label>
-              <Input placeholder="Real Fast Followers" value={newService.name || ""} onChange={e => setNewService({...newService, name: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
+              <Input placeholder="Fast YouTube Likes" value={newService.name || ""} onChange={e => setNewService({...newService, name: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
