@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -14,7 +15,6 @@ import {
   writeBatch,
   increment,
   getDoc,
-  getDocs,
   Timestamp
 } from "firebase/firestore";
 import { MessageBubble } from "@/components/chat/MessageBubble";
@@ -31,13 +31,9 @@ import {
   Share2,
   Instagram,
   MessageCircle,
-  Loader2,
   Bell,
   MessageSquareText,
   Package,
-  Clock,
-  Copy,
-  ChevronLeft,
   Megaphone
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -45,7 +41,7 @@ import { SMMService, Platform } from "@/app/lib/constants";
 import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { subDays, format, isValid, isAfter } from "date-fns";
+import { format } from "date-fns";
 import {
   Dialog,
   DialogContent,
@@ -54,6 +50,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { placeApiOrder } from "@/app/actions/smm-api";
 
 type ChatState = 
   | 'idle' 
@@ -126,7 +123,6 @@ export default function ChatPage() {
     if (!isUserLoading && !currentUser) router.push("/");
   }, [currentUser, isUserLoading, router]);
 
-  // Dynamic Services
   const servicesQuery = useMemoFirebase(() => {
     if (!db || !currentUser) return null;
     return query(collection(db, "services"), orderBy("order", "asc"));
@@ -138,7 +134,6 @@ export default function ChatPage() {
     return [...rawDynamicServices].filter(s => s.isActive !== false).sort((a, b) => (a.order || 0) - (b.order || 0));
   }, [rawDynamicServices]);
 
-  // Wallet Balance
   const userDocRef = useMemoFirebase(() => {
     if (!db || !currentUser) return null;
     return doc(db, "users", currentUser.uid);
@@ -146,11 +141,9 @@ export default function ChatPage() {
   const { data: userData } = useDoc(userDocRef);
   const walletBalance = userData?.balance || 0;
 
-  // Global Sync
   useEffect(() => {
     if (!db || !currentUser) return; 
     
-    // Broadcast Listener
     const unsubBroadcast = onSnapshot(
       query(collection(db, "globalAnnouncements"), where("active", "==", true), orderBy("timestamp", "desc"), limit(1)), 
       (snap) => {
@@ -161,8 +154,6 @@ export default function ChatPage() {
             setIsBroadcastOpen(true);
             hasBroadcastShown.current = true;
           }
-        } else {
-          setActiveBroadcast(null);
         }
       }
     );
@@ -182,7 +173,7 @@ export default function ChatPage() {
       if (snap.exists()) setPaymentConfig(snap.data());
     });
 
-    const unsubNotifs = onSnapshot(query(collection(db, "users", currentUser.uid, "notifications"), orderBy("createdAt", "desc"), limit(100)), (snap) => {
+    const unsubNotifs = onSnapshot(collection(db, "users", currentUser.uid, "notifications"), (snap) => {
       const items = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((n: any) => n.read === false);
       setNotifications(items);
     });
@@ -190,7 +181,6 @@ export default function ChatPage() {
     return () => { unsubBroadcast(); unsubDiscounts(); unsubSocial(); unsubPayment(); unsubNotifs(); };
   }, [db, currentUser]);
 
-  // Popups logic omitted for brevity, same as previous version but kept in final content...
   const userOrdersQuery = useMemoFirebase(() => {
     if (!db || !currentUser || !isOrdersOpen) return null;
     return collection(db, "users", currentUser.uid, "orders");
@@ -201,8 +191,7 @@ export default function ChatPage() {
     return rawOrders.map(o => {
       let createdAt = new Date();
       if (o.createdAt?.toDate) createdAt = o.createdAt.toDate();
-      let effectiveStatus = o.status || 'Pending';
-      return { ...o, createdAt, effectiveStatus };
+      return { ...o, createdAt };
     }).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }, [rawOrders]);
 
@@ -264,6 +253,26 @@ export default function ChatPage() {
     if (text.startsWith("SUBMIT_PAYMENT:")) {
       const [, link, utr] = text.split(":");
       await addMessage('user', `Payment Submitted (UTR: ${utr})`);
+      
+      // Save Pending Manual Order
+      const s = currentOrder.items[0]?.service;
+      const qty = currentOrder.items[0]?.quantity;
+      const price = (qty / 1000) * (s.pricePer1000 || 0) * (1 - globalDiscounts.single / 100);
+      const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}`;
+
+      await addDoc(collection(db, "users", currentUser.uid, "orders"), {
+        orderId,
+        service: s.name,
+        quantity: qty,
+        price,
+        status: 'Pending',
+        type: 'Manual',
+        link,
+        utrId: utr,
+        platform: 'instagram',
+        createdAt: serverTimestamp()
+      });
+
       botReply(`✅ Details Submitted!\n\n🔗 Link: ${link}\n🔢 UTR: ${utr}\n\nAdmin 30-60 mins mein verify karke order start kar denge. Status check karte rahein. 🚀`);
       setChatState('idle');
       return;
@@ -276,25 +285,57 @@ export default function ChatPage() {
       const price = (qty / 1000) * (s.pricePer1000 || 0) * (1 - globalDiscounts.single / 100);
       
       if (walletBalance >= price) {
-        const batch = writeBatch(db);
-        const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}`;
-        const userOrderRef = doc(collection(db, "users", currentUser.uid, "orders"));
-        
-        batch.update(userDocRef!, { balance: increment(-price) });
-        batch.set(userOrderRef, {
-          orderId,
-          service: s.name,
-          quantity: qty,
-          price,
-          status: 'Pending',
-          platform: 'instagram',
-          createdAt: serverTimestamp(),
-          autoCompleteAt: null
-        });
-        
-        await batch.commit();
-        botReply(`🎉 Order Placed Successfully!\n\n🆔 Order ID: ${orderId}\n💰 Paid: ₹${price.toFixed(2)}\n\nOrder process ho raha hai. Check 'Orders' for updates.`);
-        setChatState('idle');
+        setIsTyping(true);
+        try {
+          // Check API Config
+          const apiSnap = await getDoc(doc(db, "globalSettings", "api"));
+          const apiData = apiSnap.data();
+          const mapping = apiData?.mappings?.[s.id];
+          const provider = apiData?.providers?.find((p: any) => p.id === mapping?.providerId);
+
+          let apiOrderId = null;
+          let status = 'Pending';
+
+          if (provider && mapping?.remoteServiceId) {
+            const apiRes = await placeApiOrder({
+              apiUrl: provider.url,
+              apiKey: provider.key,
+              serviceId: mapping.remoteServiceId,
+              link: currentOrder.items[0].link || 'manual_entry_needed',
+              quantity: qty
+            });
+            if (apiRes.success) {
+              apiOrderId = apiRes.order;
+              status = 'Processing';
+            }
+          }
+
+          const batch = writeBatch(db);
+          const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}`;
+          const userOrderRef = doc(collection(db, "users", currentUser.uid, "orders"));
+          
+          batch.update(userDocRef!, { balance: increment(-price) });
+          batch.set(userOrderRef, {
+            orderId,
+            apiOrderId,
+            providerId: provider?.id || null,
+            service: s.name,
+            quantity: qty,
+            price,
+            status,
+            type: 'API',
+            platform: 'instagram',
+            createdAt: serverTimestamp()
+          });
+          
+          await batch.commit();
+          botReply(`🎉 Order Placed Successfully via Wallet!\n\n🆔 Order ID: ${orderId}\n💰 Paid: ₹${price.toFixed(2)}\n\nOrder process ho raha hai. Check 'Orders' for updates.`);
+          setChatState('idle');
+        } catch (e) {
+          botReply("❌ Kuch technical issue hua. Admin ko contact karein.");
+        } finally {
+          setIsTyping(false);
+        }
       } else {
         botReply("❌ Low Balance! Please refill your wallet.");
       }
@@ -416,7 +457,7 @@ export default function ChatPage() {
         </button>
         <div className="flex items-center gap-3">
           <button onClick={() => setIsOrdersOpen(true)} className="text-[10px] font-black uppercase text-[#312ECB] flex items-center gap-1.5 shadow-3d-sm rounded-xl px-3 py-1.5 active:shadow-3d-pressed">
-            <HistoryIcon size={14} /> ORDERS
+            <Package size={14} /> ORDERS
           </button>
           <button onClick={() => setIsLogsOpen(true)} className="text-[10px] font-black uppercase text-pink-500 flex items-center gap-1.5 shadow-3d-sm rounded-xl px-3 py-1.5 active:shadow-3d-pressed">
             <MessageSquareText size={14} /> HISTORY
@@ -485,7 +526,7 @@ export default function ChatPage() {
         </div>
       </footer>
 
-      {/* POPUP: Broadcast Announcement */}
+      {/* Popups */}
       <Dialog open={isBroadcastOpen} onOpenChange={setIsBroadcastOpen}>
         <DialogContent className="max-w-[340px] rounded-[2.5rem] border-none shadow-3d bg-[#030712] p-0 overflow-hidden">
           <header className="bg-gradient-to-r from-[#312ECB] to-purple-600 p-6 text-white relative">
@@ -505,17 +546,11 @@ export default function ChatPage() {
                   "{activeBroadcast?.text}"
                 </p>
              </div>
-             <Button 
-               onClick={() => setIsBroadcastOpen(false)} 
-               className="w-full h-12 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-3d active:shadow-3d-pressed"
-             >
-               Got it! 🚀
-             </Button>
+             <Button onClick={() => setIsBroadcastOpen(false)} className="w-full h-12 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-3d active:shadow-3d-pressed">Got it! 🚀</Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* POPUP: Notifications */}
       <Dialog open={isNotifOpen} onOpenChange={setIsNotifOpen}>
         <DialogContent className="max-w-[340px] rounded-[2.5rem] border-none shadow-3d bg-[#030712] p-0 overflow-hidden">
           <header className="bg-[#312ECB] p-6 text-white">
@@ -537,26 +572,25 @@ export default function ChatPage() {
         </DialogContent>
       </Dialog>
 
-      {/* POPUP: Order History */}
       <Dialog open={isOrdersOpen} onOpenChange={setIsOrdersOpen}>
-        <DialogContent className="max-w-[360px] rounded-[2.5rem] border-none shadow-3d bg-[#F0F2F5] dark:bg-[#030712] p-0 overflow-hidden">
-          <header className="bg-white dark:bg-slate-900 px-6 py-4 flex items-center justify-between border-b border-gray-100">
-             <DialogTitle className="text-[10px] font-black uppercase tracking-[0.2em]"><Package size={16} className="inline mr-2" /> Order History</DialogTitle>
+        <DialogContent className="max-w-[360px] rounded-[2.5rem] border-none shadow-3d bg-[#030712] p-0 overflow-hidden">
+          <header className="bg-slate-900 px-6 py-4 flex items-center justify-between border-b border-white/5">
+             <DialogTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-white"><Package size={16} className="inline mr-2" /> Order History</DialogTitle>
           </header>
           <ScrollArea className="h-[500px] p-4">
              <div className="space-y-3">
                 {userOrders.length > 0 ? userOrders.map((order: any) => {
                   const displayId = order.orderId || order.id.slice(0, 8).toUpperCase();
                   return (
-                    <div key={order.id} className="bg-white dark:bg-slate-900 p-4 rounded-[1.2rem] shadow-3d-sm border border-gray-50 flex flex-col gap-1.5">
+                    <div key={order.id} className="bg-slate-900 p-4 rounded-[1.2rem] shadow-3d-sm border border-white/5 flex flex-col gap-1.5">
                        <div className="flex items-center justify-between">
                           <h3 className="text-[11px] font-black uppercase text-[#312ECB] truncate max-w-[180px]">{order.service}</h3>
-                          <Badge className="text-[8px] font-black bg-slate-100 dark:bg-slate-800 text-slate-400">#{displayId}</Badge>
+                          <Badge className="text-[8px] font-black bg-slate-800 text-slate-400">#{displayId}</Badge>
                        </div>
                        <div className="flex items-center gap-2.5">
                           <span className="text-[9px] font-bold text-slate-400 uppercase">Qty: {order.quantity}</span>
                           <span className="text-[9px] font-black text-emerald-600">₹{order.price?.toFixed(2)}</span>
-                          <Badge className={cn("ml-auto text-[8px] h-4.5 font-black px-2 border-none rounded-md", order.effectiveStatus === 'Completed' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600')}>{order.effectiveStatus}</Badge>
+                          <Badge className={cn("ml-auto text-[8px] h-4.5 font-black px-2 border-none rounded-md", order.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-blue-500/10 text-blue-500')}>{order.status}</Badge>
                        </div>
                     </div>
                   );
@@ -566,21 +600,20 @@ export default function ChatPage() {
         </DialogContent>
       </Dialog>
 
-      {/* POPUP: Chat History (Logs) */}
       <Dialog open={isLogsOpen} onOpenChange={setIsLogsOpen}>
-        <DialogContent className="max-w-[360px] rounded-[2.5rem] border-none shadow-3d bg-[#F0F2F5] dark:bg-[#030712] p-0 overflow-hidden">
-          <header className="bg-white dark:bg-slate-900 px-6 py-4 flex items-center justify-between border-b border-gray-100">
-             <DialogTitle className="text-[10px] font-black uppercase tracking-[0.2em]"><MessageSquareText size={16} className="inline mr-2" /> Chat Logs</DialogTitle>
+        <DialogContent className="max-w-[360px] rounded-[2.5rem] border-none shadow-3d bg-[#030712] p-0 overflow-hidden">
+          <header className="bg-slate-900 px-6 py-4 flex items-center justify-between border-b border-white/5">
+             <DialogTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-white"><MessageSquareText size={16} className="inline mr-2" /> Chat Logs</DialogTitle>
           </header>
           <ScrollArea className="h-[500px] p-4">
              <div className="space-y-3">
                 {rawLogs?.map((log: any) => (
-                  <div key={log.id} className={cn("p-3 rounded-2xl shadow-3d-sm border flex flex-col gap-1", log.sender === 'bot' ? "bg-white dark:bg-slate-900 ml-0 mr-8" : "bg-emerald-50 dark:bg-emerald-950/20 ml-8 mr-0")}>
+                  <div key={log.id} className={cn("p-3 rounded-2xl shadow-3d-sm border flex flex-col gap-1", log.sender === 'bot' ? "bg-slate-900 ml-0 mr-8 border-white/5" : "bg-emerald-950/20 ml-8 mr-0 border-emerald-500/10")}>
                      <div className="flex items-center justify-between">
                         <span className={cn("text-[7px] font-black uppercase tracking-widest", log.sender === 'bot' ? "text-[#312ECB]" : "text-emerald-600")}>{log.sender === 'bot' ? 'Assistant' : 'You'}</span>
                         <span className="text-[7px] font-bold text-slate-400">{log.timestamp?.toDate ? format(log.timestamp.toDate(), 'HH:mm') : ''}</span>
                      </div>
-                     <p className="text-[10px] font-bold text-slate-700 dark:text-slate-200 leading-relaxed">{log.text}</p>
+                     <p className="text-[10px] font-bold text-slate-200 leading-relaxed">{log.text}</p>
                   </div>
                 ))}
              </div>
