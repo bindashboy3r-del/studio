@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -9,10 +8,14 @@ import {
   Save, 
   CreditCard, 
   Link as LinkIcon,
-  ShieldCheck
+  ShieldCheck,
+  Wallet,
+  Zap,
+  ToggleLeft
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { useUser, useFirestore } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { doc, setDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
@@ -26,6 +29,8 @@ export default function PaymentSettingsPage() {
   const [upiId, setUpiId] = useState("");
   const [merchantName, setMerchantName] = useState("");
   const [qrImageUrl, setQrImageUrl] = useState("");
+  const [walletEnabled, setWalletEnabled] = useState(true);
+  const [upiEnabled, setUpiEnabled] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   const ADMIN_EMAIL = "chetanmadhav4@gmail.com";
@@ -44,6 +49,8 @@ export default function PaymentSettingsPage() {
         setUpiId(data.upiId || "");
         setMerchantName(data.merchantName || "");
         setQrImageUrl(data.qrImageUrl || "");
+        setWalletEnabled(data.walletEnabled ?? true);
+        setUpiEnabled(data.upiEnabled ?? true);
       }
     });
     return () => unsub();
@@ -57,10 +64,12 @@ export default function PaymentSettingsPage() {
         upiId,
         merchantName,
         qrImageUrl,
+        walletEnabled,
+        upiEnabled,
         updatedAt: serverTimestamp(),
         updatedBy: user.email
       }, { merge: true });
-      toast({ title: "Settings Saved", description: "Payment QR & UPI details updated." });
+      toast({ title: "Settings Saved", description: "Payment controls updated successfully." });
     } catch (e) {
       toast({ variant: "destructive", title: "Save Failed", description: "Database error." });
     } finally {
@@ -87,10 +96,46 @@ export default function PaymentSettingsPage() {
       </header>
 
       <main className="max-w-md mx-auto p-6 space-y-6 mt-4">
+        {/* Payment Visibility Controls */}
+        <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-slate-100 space-y-6">
+          <div className="flex items-center gap-3 border-b border-slate-50 pb-4">
+            <ToggleLeft className="text-[#312ECB]" size={20} />
+            <h3 className="text-[11px] font-black uppercase text-slate-800 tracking-widest">Visibility Controls</h3>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl shadow-inner border border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
+                  <Wallet size={18} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase text-slate-800">Wallet Payment</p>
+                  <p className="text-[8px] font-bold text-slate-400 uppercase">Show during checkout</p>
+                </div>
+              </div>
+              <Switch checked={walletEnabled} onCheckedChange={setWalletEnabled} className="data-[state=checked]:bg-[#312ECB]" />
+            </div>
+
+            <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl shadow-inner border border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 shadow-sm">
+                  <QrCode size={18} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase text-slate-800">UPI / QR Payment</p>
+                  <p className="text-[8px] font-bold text-slate-400 uppercase">Show during checkout</p>
+                </div>
+              </div>
+              <Switch checked={upiEnabled} onCheckedChange={setUpiEnabled} className="data-[state=checked]:bg-[#312ECB]" />
+            </div>
+          </div>
+        </div>
+
         <div className="bg-[#312ECB] rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden">
           <div className="relative z-10 flex items-center gap-4">
             <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center">
-              <QrCode size={28} />
+              <Zap size={28} />
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Global Settings</p>
@@ -138,14 +183,14 @@ export default function PaymentSettingsPage() {
                   className="h-14 bg-slate-50 border-none rounded-2xl pl-12 pr-5 text-sm font-bold shadow-inner"
                 />
               </div>
-              <p className="text-[9px] font-bold text-slate-400 uppercase mt-1 ml-1">Leave empty to use auto-generated QR from UPI ID.</p>
+              <p className="text-[9px] font-bold text-slate-400 uppercase mt-1 ml-1">Leave empty to use auto-generated QR.</p>
             </div>
           </div>
 
           <div className="bg-blue-50 p-5 rounded-3xl border border-blue-100 flex items-start gap-4">
             <ShieldCheck className="text-blue-600 shrink-0" size={20} />
             <p className="text-[10px] font-bold text-blue-700 leading-relaxed uppercase">
-              Notice: These details are visible to all users on the Add Funds page. Ensure your UPI ID is correct to receive payments directly.
+              Notice: These details are visible to all users on the Add Funds page. Ensure UPI is correct.
             </p>
           </div>
         </div>

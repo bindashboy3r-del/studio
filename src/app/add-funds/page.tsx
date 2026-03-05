@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -63,6 +62,12 @@ export default function AddFundsPage() {
       return;
     }
 
+    const amtNum = parseFloat(amount);
+    if (amtNum < 5) {
+      toast({ variant: "destructive", title: "Amount Too Low", description: "Minimum deposit ₹5 required." });
+      return;
+    }
+
     if (utrId.length !== 12) {
       toast({ variant: "destructive", title: "Invalid UTR", description: "UTR must be 12 digits." });
       return;
@@ -74,7 +79,7 @@ export default function AddFundsPage() {
         userId: user.uid,
         userEmail: user.email || '',
         displayName: user.displayName || 'User',
-        amount: parseFloat(amount),
+        amount: amtNum,
         utrId: utrId.trim(),
         status: 'Pending',
         type: 'Manual',
@@ -85,7 +90,7 @@ export default function AddFundsPage() {
         title: "Request Submitted!", 
         description: "Wallet will be credited in 30-60 mins." 
       });
-      router.push('/orders');
+      router.push('/chat');
     } catch (error: any) {
       toast({ variant: "destructive", title: "Failed", description: "Try again later." });
     } finally {
@@ -151,32 +156,32 @@ export default function AddFundsPage() {
 
           <button 
             onClick={copyUpi}
-            className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-50 rounded-full border border-slate-100"
+            className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-50 rounded-full border border-slate-100 shadow-sm active:scale-95 transition-all"
           >
             <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">{upiId}</span>
             <Copy size={8} className="text-[#312ECB]" />
           </button>
         </div>
 
-        <div className="bg-white rounded-[1.2rem] p-4 shadow-sm border border-gray-50 space-y-3">
+        <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-50 space-y-4">
           <div className="text-center">
-            <h3 className="text-[8px] font-black uppercase tracking-widest text-slate-400">Step 2: Submit Details</h3>
+            <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">Step 2: Submit Details</h3>
           </div>
 
-          <div className="space-y-2.5">
+          <div className="space-y-3">
             <div className="space-y-1">
-              <label className="text-[7px] font-black uppercase text-slate-400 tracking-widest ml-1">Amount (₹)</label>
+              <label className="text-[8px] font-black uppercase text-slate-400 tracking-widest ml-1">Amount (Min ₹5)</label>
               <Input 
                 type="number" 
-                placeholder="0.00" 
+                placeholder="₹0.00" 
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="h-10 bg-slate-50 border-none rounded-lg px-3 text-xs font-black"
+                className="h-12 bg-slate-50 border-none rounded-2xl px-4 text-sm font-black shadow-inner"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-[8px] font-black uppercase text-red-500 tracking-tight ml-1 leading-none">
+              <label className="text-[9px] font-black uppercase text-red-500 tracking-tight ml-1 leading-none animate-pulse">
                 Shi utr dalo varna payment verify nhi hoga
               </label>
               <Input 
@@ -185,42 +190,42 @@ export default function AddFundsPage() {
                 value={utrId}
                 maxLength={12}
                 onChange={(e) => setUtrId(e.target.value.replace(/[^0-9]/g, ''))}
-                className="h-10 bg-slate-50 border-none rounded-lg px-3 text-xs font-black tracking-widest"
+                className="h-12 bg-slate-50 border-none rounded-2xl px-4 text-sm font-black tracking-widest shadow-inner"
               />
             </div>
           </div>
 
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-3">
             <Button 
               onClick={handleManualSubmit}
               disabled={loading || !amount || utrId.length !== 12}
-              className="w-full h-11 bg-[#312ECB] hover:bg-[#2825A6] text-white rounded-lg font-black text-[9px] uppercase tracking-widest shadow-md gap-2"
+              className="w-full h-12 bg-[#312ECB] hover:bg-[#2825A6] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg gap-2 active:scale-95 transition-all"
             >
               {loading ? <Loader2 className="animate-spin" size={12} /> : "Submit Request"}
               <CheckCircle2 size={12} />
             </Button>
 
             <div className="flex flex-col items-center gap-1 mt-1">
-              <p className="text-[7px] font-black uppercase text-red-500 tracking-tighter">payment karne ke bad admin ko bheje</p>
+              <p className="text-[8px] font-black uppercase text-red-500 tracking-tighter">payment karne ke bad admin ko bheje</p>
               <Button 
                 onClick={handleWhatsAppConfirmation}
-                className="w-full h-10 bg-[#25D366] hover:bg-[#1EBE57] text-white rounded-lg font-black text-[9px] uppercase tracking-widest shadow-md gap-2"
+                className="w-full h-11 bg-[#25D366] hover:bg-[#1EBE57] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg gap-2 active:scale-95 transition-all"
               >
-                <MessageCircle size={14} /> Send to WhatsApp
+                <MessageCircle size={16} /> Send to WhatsApp
               </Button>
             </div>
           </div>
         </div>
 
         <button 
-          onClick={() => router.push('/orders')}
-          className="w-full bg-white rounded-lg p-2.5 flex items-center justify-between border border-gray-100"
+          onClick={() => router.push('/chat')}
+          className="w-full bg-white rounded-2xl p-3.5 flex items-center justify-between border border-gray-100 shadow-sm active:bg-slate-50"
         >
           <div className="flex items-center gap-2">
-            <History className="text-slate-400" size={14} />
-            <span className="text-[8px] font-black uppercase tracking-widest">History</span>
+            <History className="text-slate-400" size={16} />
+            <span className="text-[9px] font-black uppercase tracking-widest">Back to Chat</span>
           </div>
-          <ChevronRight className="text-slate-300" size={12} />
+          <ChevronRight className="text-slate-300" size={14} />
         </button>
       </main>
     </div>

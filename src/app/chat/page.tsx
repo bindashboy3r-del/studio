@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -101,6 +100,7 @@ export default function ChatPage() {
   const [activeBroadcast, setActiveBroadcast] = useState<any>(null);
   const [globalDiscounts, setGlobalDiscounts] = useState({ single: 0, combo: 0, bulk: 0 });
   const [socialLinks, setSocialLinks] = useState<any>(null);
+  const [paymentConfig, setPaymentConfig] = useState<any>(null);
   const [showSocialMenu, setShowSocialMenu] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [sessionStart, setSessionStart] = useState<Timestamp | null>(null);
@@ -157,7 +157,6 @@ export default function ChatPage() {
         if (!snap.empty) {
           const data = snap.docs[0].data();
           setActiveBroadcast(data);
-          // Show popup automatically on first load per session
           if (!hasBroadcastShown.current) {
             setIsBroadcastOpen(true);
             hasBroadcastShown.current = true;
@@ -179,15 +178,19 @@ export default function ChatPage() {
       if (snap.exists()) setSocialLinks(snap.data());
     });
 
-    const unsubNotifs = onSnapshot(query(collection(db, "users", currentUser.uid, "notifications"), orderBy("createdAt", "desc"), limit(50)), (snap) => {
+    const unsubPayment = onSnapshot(doc(db, "globalSettings", "payment"), (snap) => {
+      if (snap.exists()) setPaymentConfig(snap.data());
+    });
+
+    const unsubNotifs = onSnapshot(query(collection(db, "users", currentUser.uid, "notifications"), orderBy("createdAt", "desc"), limit(100)), (snap) => {
       const items = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((n: any) => n.read === false);
       setNotifications(items);
     });
 
-    return () => { unsubBroadcast(); unsubDiscounts(); unsubSocial(); unsubNotifs(); };
+    return () => { unsubBroadcast(); unsubDiscounts(); unsubSocial(); unsubPayment(); unsubNotifs(); };
   }, [db, currentUser]);
 
-  // Orders Query for Popup
+  // Popups logic omitted for brevity, same as previous version but kept in final content...
   const userOrdersQuery = useMemoFirebase(() => {
     if (!db || !currentUser || !isOrdersOpen) return null;
     return collection(db, "users", currentUser.uid, "orders");
@@ -203,14 +206,12 @@ export default function ChatPage() {
     }).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }, [rawOrders]);
 
-  // Chat Logs Query for Popup
   const chatLogsQuery = useMemoFirebase(() => {
     if (!db || !currentUser || !isLogsOpen) return null;
     return query(collection(db, "users", currentUser.uid, "chatMessages"), orderBy("timestamp", "desc"), limit(100));
   }, [db, currentUser, isLogsOpen]);
   const { data: rawLogs } = useCollection(chatLogsQuery);
 
-  // Messages for Current Session
   const messagesQuery = useMemoFirebase(() => {
     if (!db || !currentUser || !sessionStart) return null;
     return query(
@@ -260,7 +261,6 @@ export default function ChatPage() {
     if (!text || !db || !currentUser) return;
     if (!manualText) setInputValue("");
 
-    // Special Commands from Button Pay
     if (text.startsWith("SUBMIT_PAYMENT:")) {
       const [, link, utr] = text.split(":");
       await addMessage('user', `Payment Submitted (UTR: ${utr})`);
@@ -340,9 +340,13 @@ export default function ChatPage() {
         const disc = globalDiscounts.single;
         const discounted = raw * (1 - disc / 100);
         
-        const summary = `✅ ORDER SUMMARY\n───────────────\nOriginal Price: ₹${raw.toFixed(2)}\nDiscount Applied: ${disc}%\n🔥 You Pay: ₹${discounted.toFixed(2)}\n───────────────\n💳 Wallet Balance: ₹${walletBalance.toFixed(0)}`;
+        const summary = `✅ ORDER SUMMARY\n───────────────\nService Price: ₹${raw.toFixed(2)}\nDiscount: ${disc}%\nFinal Price: ₹${discounted.toFixed(2)}\n───────────────\n💳 Wallet Balance: ₹${walletBalance.toFixed(0)}`;
         
-        botReply(summary, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"], { 
+        const paymentOptions: string[] = [];
+        if (paymentConfig?.walletEnabled !== false) paymentOptions.push("💳 PAY FROM WALLET");
+        if (paymentConfig?.upiEnabled !== false) paymentOptions.push("📲 PAY VIA UPI QR");
+
+        botReply(summary, paymentOptions, { 
           rawPrice: raw, 
           paymentPrice: discounted, 
           discountPct: disc 
@@ -390,7 +394,6 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-screen max-w-lg mx-auto overflow-hidden relative whatsapp-bg font-body">
-      {/* 3D Header */}
       <header className="glass-header px-4 py-3 flex items-center justify-between shadow-3d-sm">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-2xl bg-[#312ECB] flex items-center justify-center text-white shadow-3d-sm"><Zap className="fill-current" size={18} /></div>
@@ -407,7 +410,6 @@ export default function ChatPage() {
         </div>
       </header>
 
-      {/* Sub Header (Balance & Links) */}
       <div className="bg-slate-900/50 backdrop-blur-md px-4 py-2 flex items-center justify-between border-b border-white/5 z-40">
         <button onClick={() => router.push('/add-funds')} className="flex items-center gap-2 bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-full border border-emerald-500/20 shadow-3d-sm active:shadow-3d-pressed">
           <Wallet size={14} /><span className="text-[11px] font-black">₹{walletBalance.toFixed(0)}</span><PlusCircle size={14} />
@@ -422,7 +424,6 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {/* Chat Messages */}
       <main className="flex-1 overflow-y-auto p-4 flex flex-col relative pb-24 custom-scrollbar">
         {messages?.map(m => (
           <MessageBubble 
@@ -445,7 +446,6 @@ export default function ChatPage() {
         {isTyping && <TypingIndicator />}
         <div ref={scrollRef} />
 
-        {/* Small Floating Social Button (Bottom Left) */}
         <div className="fixed bottom-24 left-4 z-50 flex flex-col items-start gap-3">
           {showSocialMenu && (
             <div className="flex flex-col gap-3 mb-2 animate-in slide-in-from-bottom-5">
@@ -470,7 +470,6 @@ export default function ChatPage() {
         </div>
       </main>
 
-      {/* 3D Input Footer */}
       <footer className="p-4 bg-slate-900/80 backdrop-blur-xl border-t border-white/5 z-50">
         <div className="flex items-center gap-3 bg-slate-950 rounded-[1.8rem] p-1.5 shadow-3d-pressed">
           <Input 
