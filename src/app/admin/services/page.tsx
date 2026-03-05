@@ -74,7 +74,6 @@ export default function ServiceManagerPage() {
   const [enabledCategories, setEnabledCategories] = useState<Platform[]>([]);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [isAddingService, setIsAddingService] = useState(false);
-  const [isSeeding, setIsSeeding] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deletingCategory, setDeletingCategory] = useState<string | null>(null);
   
@@ -99,7 +98,6 @@ export default function ServiceManagerPage() {
       if (snap.exists()) {
         setEnabledCategories(snap.data().list || []);
       } else {
-        // Initial setup from existing services if any
         setEnabledCategories(['instagram']);
       }
     });
@@ -148,11 +146,9 @@ export default function ServiceManagerPage() {
     setDeletingCategory(platform);
     
     try {
-      // 1. Remove from enabled list
       const newList = enabledCategories.filter(p => p !== platform);
       await setDoc(doc(db, "globalSettings", "categories"), { list: newList }, { merge: true });
 
-      // 2. Delete all services in that category
       const q = query(collection(db, "services"), where("platform", "==", platform));
       const snap = await getDocs(q);
       const batch = writeBatch(db);
@@ -186,7 +182,7 @@ export default function ServiceManagerPage() {
       .then(() => {
         toast({ title: "Service Added", description: `${newService.name} is now live.` });
         setIsAddingService(false);
-        setNewService({ id: "", name: "", platform: 'instagram', isActive: true, pricePer1000: 0, minQuantity: 100, order: (services?.length || 0) + 1 });
+        setNewService({ id: "", name: "", platform: newService.platform as Platform, isActive: true, pricePer1000: 0, minQuantity: 100, order: (services?.length || 0) + 1 });
       })
       .catch((err) => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
@@ -241,7 +237,7 @@ export default function ServiceManagerPage() {
             </DialogTrigger>
             <DialogContent className="rounded-[2rem] border-none shadow-2xl p-8 bg-white">
               <DialogHeader>
-                <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
+                <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-3 text-slate-900">
                   <LayoutGrid className="text-[#312ECB]" /> Create Category
                 </DialogTitle>
               </DialogHeader>
@@ -253,7 +249,7 @@ export default function ServiceManagerPage() {
                     disabled={enabledCategories.includes(key)}
                     onClick={() => handleAddCategory(key)}
                     className={cn(
-                      "h-16 rounded-2xl flex flex-col gap-1 border-slate-100 font-black text-[10px] uppercase",
+                      "h-16 rounded-2xl flex flex-col gap-1 border-slate-100 font-black text-[10px] uppercase text-slate-600",
                       enabledCategories.includes(key) && "opacity-30 bg-slate-50"
                     )}
                   >
@@ -290,7 +286,6 @@ export default function ServiceManagerPage() {
                   </AccordionTrigger>
                   <AccordionContent className="px-6 pb-6 pt-2">
                     <div className="space-y-4">
-                      {/* Add Service within Category */}
                       <Button 
                         onClick={() => {
                           setNewService({...newService, platform: platform});
@@ -308,7 +303,7 @@ export default function ServiceManagerPage() {
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
                                 <span className="text-[13px] font-black text-slate-800">{service.name}</span>
-                                <Badge variant="outline" className="text-[7px] uppercase opacity-40 border-slate-200">#{service.order}</Badge>
+                                <Badge variant="outline" className="text-[7px] uppercase opacity-40 border-slate-200 text-slate-600">#{service.order}</Badge>
                               </div>
                               <code className="text-[8px] font-bold text-slate-400 uppercase">{service.id}</code>
                             </div>
@@ -320,7 +315,7 @@ export default function ServiceManagerPage() {
                                   type="number" 
                                   defaultValue={service.pricePer1000} 
                                   onBlur={(e) => handleUpdateField(service, 'pricePer1000', parseFloat(e.target.value))}
-                                  className="h-9 w-20 bg-white border-none rounded-xl pl-6 text-xs font-black shadow-sm" 
+                                  className="h-9 w-20 bg-white border-none rounded-xl pl-6 text-xs font-black shadow-sm text-slate-900" 
                                 />
                               </div>
                               <div className="relative">
@@ -329,7 +324,7 @@ export default function ServiceManagerPage() {
                                   type="number" 
                                   defaultValue={service.minQuantity} 
                                   onBlur={(e) => handleUpdateField(service, 'minQuantity', parseInt(e.target.value))}
-                                  className="h-9 w-20 bg-white border-none rounded-xl pl-6 text-xs font-black shadow-sm" 
+                                  className="h-9 w-20 bg-white border-none rounded-xl pl-6 text-xs font-black shadow-sm text-slate-900" 
                                 />
                               </div>
                               <button onClick={() => handleDeleteService(service.id)} className="p-2.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
@@ -373,7 +368,6 @@ export default function ServiceManagerPage() {
         )}
       </main>
 
-      {/* Global Add Service Dialog */}
       <Dialog open={isAddingService} onOpenChange={setIsAddingService}>
         <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-8 bg-white">
           <DialogHeader>
@@ -384,26 +378,26 @@ export default function ServiceManagerPage() {
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Service ID</label>
-                <Input placeholder="e.g. followers_vip" value={newService.id || ""} onChange={e => setNewService({...newService, id: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Service ID</label>
+                <Input placeholder="e.g. followers_vip" value={newService.id || ""} onChange={e => setNewService({...newService, id: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Position</label>
-                <Input type="number" placeholder="1" value={newService.order || ""} onChange={e => setNewService({...newService, order: parseInt(e.target.value) || 0})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Position</label>
+                <Input type="number" placeholder="1" value={newService.order || ""} onChange={e => setNewService({...newService, order: parseInt(e.target.value) || 0})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
               </div>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Service Name</label>
-              <Input placeholder="Real Fast Followers" value={newService.name || ""} onChange={e => setNewService({...newService, name: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+              <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Service Name</label>
+              <Input placeholder="Real Fast Followers" value={newService.name || ""} onChange={e => setNewService({...newService, name: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Price per 1k (₹)</label>
-                <Input type="number" placeholder="89" value={newService.pricePer1000 || ""} onChange={e => setNewService({...newService, pricePer1000: parseFloat(e.target.value) || 0})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Price per 1k (₹)</label>
+                <Input type="number" placeholder="89" value={newService.pricePer1000 || ""} onChange={e => setNewService({...newService, pricePer1000: parseFloat(e.target.value) || 0})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Min Quantity</label>
-                <Input type="number" placeholder="100" value={newService.minQuantity || ""} onChange={e => setNewService({...newService, minQuantity: parseInt(e.target.value) || 0})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Min Quantity</label>
+                <Input type="number" placeholder="100" value={newService.minQuantity || ""} onChange={e => setNewService({...newService, minQuantity: parseInt(e.target.value) || 0})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
               </div>
             </div>
           </div>

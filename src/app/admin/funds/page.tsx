@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -51,7 +52,6 @@ export default function FundRequestsPage() {
     }
   }, [admin, isUserLoading, isActuallyAdmin, router]);
 
-  // Load Global Settings
   useEffect(() => {
     if (!db || !isActuallyAdmin) return;
     const unsub = onSnapshot(doc(db, "globalSettings", "finance"), (snap) => {
@@ -153,7 +153,6 @@ export default function FundRequestsPage() {
         balance: increment(validatedAmount)
       });
 
-      // Notification
       const notifRef = doc(collection(db, "users", request.userId, "notifications"));
       batch.set(notifRef, {
         title: '💰 Wallet Credited!',
@@ -203,14 +202,14 @@ export default function FundRequestsPage() {
           
           <div className="bg-white p-4 rounded-[2rem] border border-slate-100 flex items-center gap-4 shadow-sm">
             <div className="flex flex-col">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Deposit Bonus %</span>
+              <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Deposit Bonus %</span>
               <div className="flex items-center gap-2 mt-1">
                 <Zap className={parseFloat(globalBonus) > 0 ? "text-emerald-500 animate-pulse" : "text-slate-300"} size={16} />
                 <Input 
                   type="number"
                   value={globalBonus}
                   onChange={(e) => setGlobalBonus(e.target.value)}
-                  className="w-20 h-10 bg-slate-50 border-none rounded-xl text-sm font-black"
+                  className="w-20 h-10 bg-slate-50 border-none rounded-xl text-sm font-black text-slate-900"
                 />
               </div>
             </div>
@@ -228,12 +227,12 @@ export default function FundRequestsPage() {
           <Table>
             <TableHeader className="bg-slate-50">
               <TableRow className="border-slate-100">
-                <TableHead className="text-[10px] font-black uppercase py-6">User</TableHead>
-                <TableHead className="text-[10px] font-black uppercase py-6">Requested</TableHead>
-                <TableHead className="text-[10px] font-black uppercase py-6">Final Credit (With Bonus)</TableHead>
-                <TableHead className="text-[10px] font-black uppercase py-6">UTR ID</TableHead>
-                <TableHead className="text-[10px] font-black uppercase py-6">Status</TableHead>
-                <TableHead className="text-right text-[10px] font-black uppercase py-6">Actions</TableHead>
+                <TableHead className="text-[10px] font-black uppercase py-6 text-slate-600">User</TableHead>
+                <TableHead className="text-[10px] font-black uppercase py-6 text-slate-600">Requested</TableHead>
+                <TableHead className="text-[10px] font-black uppercase py-6 text-slate-600">Final Credit (With Bonus)</TableHead>
+                <TableHead className="text-[10px] font-black uppercase py-6 text-slate-600">UTR ID</TableHead>
+                <TableHead className="text-[10px] font-black uppercase py-6 text-slate-600">Status</TableHead>
+                <TableHead className="text-right text-[10px] font-black uppercase py-6 text-slate-600">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -242,10 +241,10 @@ export default function FundRequestsPage() {
                   <TableCell>
                     <div className="flex flex-col">
                       <span className="font-black text-[#111B21] text-sm">{req.displayName || 'Anonymous'}</span>
-                      <span className="text-[10px] font-bold text-slate-400">{req.userEmail}</span>
+                      <span className="text-[10px] font-bold text-slate-500">{req.userEmail}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="font-black text-slate-500 text-sm">₹{req.amount}</TableCell>
+                  <TableCell className="font-black text-slate-600 text-sm">₹{req.amount}</TableCell>
                   <TableCell>
                     {req.status === 'Pending' ? (
                       <div className="flex items-center gap-2">
@@ -261,7 +260,7 @@ export default function FundRequestsPage() {
                       <div className="font-black text-emerald-600 text-sm">₹{req.finalCreditAmount || req.amount}</div>
                     )}
                   </TableCell>
-                  <TableCell><code className="bg-slate-100 px-3 py-1 rounded-lg text-[11px] font-black">{req.utrId}</code></TableCell>
+                  <TableCell><code className="bg-slate-100 px-3 py-1 rounded-lg text-[11px] font-black text-slate-700">{req.utrId}</code></TableCell>
                   <TableCell>
                     <Badge className={
                       req.status === 'Pending' ? 'bg-yellow-500/10 text-yellow-600 border-none' : 
@@ -302,8 +301,8 @@ export default function FundRequestsPage() {
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-20">
                     <div className="flex flex-col items-center opacity-20">
-                      <Wallet size={48} />
-                      <p className="text-[10px] font-black uppercase mt-4">No pending requests</p>
+                      <Wallet size={48} className="text-slate-400" />
+                      <p className="text-[10px] font-black uppercase mt-4 text-slate-500">No pending requests</p>
                     </div>
                   </TableCell>
                 </TableRow>
