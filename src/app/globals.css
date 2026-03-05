@@ -4,38 +4,15 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 241 63% 49%; /* #312ECB */
-    --primary-foreground: 0 0% 100%;
-    --secondary: 142 70% 45%; /* #25D366 */
-    --secondary-foreground: 0 0% 100%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 241 63% 96%;
-    --accent-foreground: 241 63% 20%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 241 63% 49%;
-    --radius: 1.5rem;
-  }
-
-  .dark {
     --background: 222 47% 6%;
     --foreground: 210 40% 98%;
     --card: 222 47% 8%;
     --card-foreground: 210 40% 98%;
     --popover: 222 47% 8%;
     --popover-foreground: 210 40% 98%;
-    --primary: 241 63% 49%;
+    --primary: 241 63% 49%; /* #312ECB */
     --primary-foreground: 0 0% 100%;
-    --secondary: 142 70% 45%;
+    --secondary: 142 70% 45%; /* #25D366 */
     --secondary-foreground: 0 0% 100%;
     --muted: 217.2 32.6% 12%;
     --muted-foreground: 215 20.2% 65.1%;
@@ -46,6 +23,7 @@
     --border: 217.2 32.6% 12%;
     --input: 217.2 32.6% 12%;
     --ring: 241 63% 49%;
+    --radius: 1.5rem;
   }
 }
 
@@ -58,53 +36,46 @@
   }
 }
 
-/* 3D Neumorphic Shadow Classes */
+/* Enhanced 3D Neumorphic Shadows - Dark Mode Focus */
 .shadow-3d {
-  box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.08), -8px -8px 16px rgba(255, 255, 255, 0.8);
-}
-
-.dark .shadow-3d {
-  box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.5), -4px -4px 12px rgba(255, 255, 255, 0.05);
+  box-shadow: 
+    10px 10px 20px rgba(0, 0, 0, 0.6), 
+    -4px -4px 15px rgba(255, 255, 255, 0.03);
 }
 
 .shadow-3d-sm {
-  box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.08), -4px -4px 8px rgba(255, 255, 255, 0.8);
-}
-
-.dark .shadow-3d-sm {
-  box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.5), -2px -2px 6px rgba(255, 255, 255, 0.05);
+  box-shadow: 
+    5px 5px 10px rgba(0, 0, 0, 0.5), 
+    -2px -2px 8px rgba(255, 255, 255, 0.02);
 }
 
 .shadow-3d-pressed {
-  box-shadow: inset 4px 4px 8px rgba(0, 0, 0, 0.08), inset -4px -4px 8px rgba(255, 255, 255, 0.8);
+  box-shadow: 
+    inset 6px 6px 12px rgba(0, 0, 0, 0.6), 
+    inset -2px -2px 8px rgba(255, 255, 255, 0.02);
 }
 
-.dark .shadow-3d-pressed {
-  box-shadow: inset 4px 4px 8px rgba(0, 0, 0, 0.5), inset -2px -2px 6px rgba(255, 255, 255, 0.05);
-}
-
-/* Glassmorphism Classes */
 .glass-header {
-  @apply bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-white/20 dark:border-slate-800/20 sticky top-0 z-50;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  @apply bg-slate-900/90 backdrop-blur-xl border-b border-white/5 sticky top-0 z-50;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
 .whatsapp-bg {
-  @apply bg-[#F0F2F5] dark:bg-slate-950;
-  background-image: url("https://www.transparenttextures.com/patterns/cubes.png");
-  background-repeat: repeat;
-  opacity: 0.9;
+  @apply bg-[#030712];
+  background-image: 
+    radial-gradient(circle at 2px 2px, rgba(255,255,255,0.03) 1px, transparent 0);
+  background-size: 24px 24px;
 }
 
-/* Modern Message Bubbles with 3D feel */
+/* 3D Chat Bubbles */
 .bubble-bot {
-  @apply bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-[1.8rem] rounded-tl-none border border-slate-50 dark:border-slate-800;
-  box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.03);
+  @apply bg-slate-900 text-slate-100 rounded-[1.5rem] rounded-tl-none border border-white/5;
+  box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.5), -2px -2px 8px rgba(255, 255, 255, 0.01);
 }
 
 .bubble-user {
-  @apply bg-[#E7F8F2] dark:bg-[#064E3B] text-slate-800 dark:text-emerald-50 rounded-[1.8rem] rounded-tr-none border border-emerald-100/50 dark:border-emerald-900/30;
-  box-shadow: -4px 4px 12px rgba(37, 211, 102, 0.05);
+  @apply bg-[#064E3B] text-emerald-50 rounded-[1.5rem] rounded-tr-none border border-emerald-500/10;
+  box-shadow: -8px 8px 16px rgba(0, 0, 0, 0.5), 2px -2px 8px rgba(255, 255, 255, 0.01);
 }
 
 @keyframes typing {
@@ -117,20 +88,19 @@
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  @apply bg-slate-400 mx-0.5;
+  @apply bg-slate-500 mx-0.5;
   animation: typing 1s infinite ease-in-out;
 }
 
 .dot:nth-child(2) { animation-delay: 0.2s; }
 .dot:nth-child(3) { animation-delay: 0.4s; }
 
-/* Custom Scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
+  width: 3px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
   @apply bg-transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  @apply bg-slate-200 dark:bg-slate-800 rounded-full;
+  @apply bg-slate-800 rounded-full;
 }
