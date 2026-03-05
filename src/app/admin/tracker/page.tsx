@@ -114,9 +114,22 @@ export default function TrackerPage() {
     return () => unsubscribe();
   }, [user, db, isActuallyAdmin, isUserLoading]);
 
-  const syncAllWithApi = async () => {
-    if (!db || !isActuallyAdmin) return;
-    setIsSyncing(true);
+  // Automatic sync on mount
+  useEffect(() => {
+    if (orders.length > 0 && !isSyncing && isActuallyAdmin) {
+      const activeOrdersCount = orders.filter(o => 
+        ['pending', 'processing', 'in progress', 'inprogress'].includes((o.status || 'pending').toLowerCase()) && o.apiOrderId
+      ).length;
+      
+      if (activeOrdersCount > 0) {
+        syncAllWithApi(true); // silent sync
+      }
+    }
+  }, [orders.length, isActuallyAdmin]);
+
+  const syncAllWithApi = async (silent = false) => {
+    if (!db || !isActuallyAdmin || isSyncing) return;
+    if (!silent) setIsSyncing(true);
     
     const activeStatuses = ['pending', 'processing', 'in progress', 'inprogress'];
     const needsSync = orders.filter(o => 
@@ -126,15 +139,17 @@ export default function TrackerPage() {
     );
 
     if (needsSync.length === 0) {
-      toast({ title: "Sync Complete", description: "No orders require API status check." });
-      setIsSyncing(false);
+      if (!silent) {
+        toast({ title: "Sync Complete", description: "No orders require API status check." });
+        setIsSyncing(false);
+      }
       return;
     }
 
     try {
       const apiSettingsSnap = await getDoc(doc(db, "globalSettings", "api"));
       if (!apiSettingsSnap.exists()) {
-        toast({ variant: "destructive", title: "API Config Missing" });
+        if (!silent) toast({ variant: "destructive", title: "API Config Missing" });
         setIsSyncing(false);
         return;
       }
@@ -157,19 +172,25 @@ export default function TrackerPage() {
             const matchingOrder = needsSync.find(o => o.apiOrderId === apiId);
             
             if (matchingOrder && apiStatus && apiStatus.toLowerCase() !== (matchingOrder.status || '').toLowerCase()) {
+              // Map various "Finished" statuses to app "Completed"
+              let finalStatus = apiStatus;
+              const s = apiStatus.toLowerCase();
+              if (s === 'completed' || s === 'success' || s === 'finish' || s === 'finished') finalStatus = 'Completed';
+              if (s === 'canceled' || s === 'cancelled' || s === 'fail' || s === 'error') finalStatus = 'Cancelled';
+
               await updateDoc(doc(db, matchingOrder.path), { 
-                status: apiStatus,
+                status: finalStatus,
                 apiStatusLastChecked: serverTimestamp()
               });
             }
           }
         }
       }
-      toast({ title: "Sync Successful", description: "All active orders updated with latest API status." });
+      if (!silent) toast({ title: "Sync Successful", description: "All active orders updated with latest API status." });
     } catch (e) {
-      toast({ variant: "destructive", title: "Sync Failed", description: "Error connecting to SMM panels." });
+      if (!silent) toast({ variant: "destructive", title: "Sync Failed", description: "Error connecting to SMM panels." });
     } finally {
-      setIsSyncing(false);
+      if (!silent) setIsSyncing(false);
     }
   };
 
@@ -196,91 +217,72 @@ export default function TrackerPage() {
     toast({ title: "Copied", description: `${label} copied to clipboard.` });
   };
 
-  const activeStatuses = ['Pending', 'Processing', 'In progress', 'In-progress', 'In Progress'];
-  const activeOrders = orders.filter(o => activeStatuses.includes(o.effectiveStatus));
-  const historyOrders = orders.filter(o => !activeStatuses.includes(o.effectiveStatus));
+  const activeStatusesList = ['Pending', 'Processing', 'In progress', 'In-progress', 'In Progress'];
+  const activeOrders = orders.filter(o => activeStatusesList.includes(o.effectiveStatus));
+  const historyOrders = orders.filter(o => !activeStatusesList.includes(o.effectiveStatus));
 
   const OrderTable = ({ data }: { data: any[] }) => (
     <div className="overflow-x-auto">
       <Table>
         <TableHeader className="bg-slate-50">
           <TableRow className="border-slate-100 hover:bg-transparent">
-            <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Order ID</TableHead>
-            <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Service</TableHead>
-            <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Link</TableHead>
-            <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">API Info</TableHead>
-            <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Status</TableHead>
-            <TableHead className="text-right text-[10px] font-black uppercase tracking-widest py-6">Actions</TableHead>
+            <TableHead className="text-[9px] font-black uppercase tracking-widest py-4">Order Info</TableHead>
+            <TableHead className="text-[9px] font-black uppercase tracking-widest py-4">Service Details</TableHead>
+            <TableHead className="text-[9px] font-black uppercase tracking-widest py-4">API Hub</TableHead>
+            <TableHead className="text-[9px] font-black uppercase tracking-widest py-4">Status</TableHead>
+            <TableHead className="text-right text-[9px] font-black uppercase tracking-widest py-4">Control</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {data.map((order) => (
             <TableRow key={order.id} className="border-slate-50 hover:bg-slate-50/50 transition-colors">
-              <TableCell className="text-[11px] font-bold text-slate-400 uppercase">
+              <TableCell className="text-[10px] font-bold text-slate-400 uppercase">
                 <span className="text-[#111B21] font-black">{order.orderId || order.id.slice(0,8).toUpperCase()}</span><br/>
-                {isValid(order.createdAt) ? format(order.createdAt, 'MMM dd HH:mm') : 'N/A'}
+                {isValid(order.createdAt) ? format(order.createdAt, 'dd MMM HH:mm') : 'N/A'}
               </TableCell>
               <TableCell>
                 <div className="flex flex-col">
-                  <span className="font-black uppercase text-[10px] text-blue-600">{order.platform || 'Platform'}</span>
-                  <span className="text-sm font-bold text-slate-800">{order.service || 'N/A'} ({order.quantity || 0})</span>
-                  <span className="text-[9px] font-black text-emerald-600">₹{order.price?.toFixed(2)}</span>
-                </div>
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center gap-2">
-                  <span className="max-w-[120px] truncate text-[11px] font-bold text-slate-500">
-                    {order.link || 'No Link'}
-                  </span>
-                  {order.link && (
-                    <>
-                      <button onClick={() => copyToClipboard(order.link, "Link")} className="text-slate-300 hover:text-blue-600"><Copy size={12} /></button>
-                      <a href={order.link} target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-blue-600"><ExternalLink size={12} /></a>
-                    </>
-                  )}
+                  <span className="font-black uppercase text-[9px] text-blue-600">{order.platform || 'Platform'}</span>
+                  <span className="text-[11px] font-bold text-slate-800 truncate max-w-[150px]">{order.service || 'N/A'}</span>
+                  <span className="text-[9px] font-black text-emerald-600">₹{order.price?.toFixed(2)} ({order.quantity || 0})</span>
                 </div>
               </TableCell>
               <TableCell>
                 {order.apiOrderId ? (
-                  <div className="flex flex-col gap-1">
-                    <Badge variant="secondary" className="text-[9px] w-fit font-black bg-slate-100">API: {order.apiOrderId}</Badge>
-                    <span className="text-[8px] font-bold text-slate-400 uppercase">{order.providerId || 'Unknown Provider'}</span>
-                  </div>
-                ) : order.apiError ? (
-                  <div className="flex items-center gap-1 text-red-500">
-                    <AlertCircle size={12} />
-                    <span className="text-[9px] font-black uppercase">API Error</span>
+                  <div className="flex flex-col gap-0.5">
+                    <Badge variant="secondary" className="text-[8px] w-fit font-black bg-slate-100 h-4 px-1.5">ID: {order.apiOrderId}</Badge>
+                    <span className="text-[7px] font-bold text-slate-400 uppercase">{order.providerId?.slice(0,10)}...</span>
                   </div>
                 ) : (
-                  <span className="text-[9px] font-bold text-slate-300 italic">Manual Order</span>
+                  <span className="text-[8px] font-bold text-slate-300 italic">Manual</span>
                 )}
               </TableCell>
               <TableCell>
-                <Badge className={
-                  order.effectiveStatus === 'Pending' ? 'bg-yellow-500/10 text-yellow-600 border-none' : 
-                  (order.effectiveStatus === 'Processing' || order.effectiveStatus === 'In progress') ? 'bg-blue-500/10 text-blue-600 border-none' :
-                  (order.effectiveStatus === 'Cancelled' || order.effectiveStatus === 'Canceled') ? 'bg-red-500/10 text-red-600 border-none' :
-                  order.effectiveStatus === 'Refunded' ? 'bg-amber-100 text-amber-700 border-none' :
-                  'bg-emerald-500/10 text-emerald-600 border-none'
-                }>
+                <Badge className={cn(
+                  "text-[8px] h-5 font-black px-2 border-none rounded-lg",
+                  order.effectiveStatus === 'Pending' ? 'bg-yellow-500/10 text-yellow-600' : 
+                  (order.effectiveStatus === 'Processing' || order.effectiveStatus === 'In progress') ? 'bg-blue-500/10 text-blue-600' :
+                  (order.effectiveStatus === 'Cancelled' || order.effectiveStatus === 'Canceled') ? 'bg-red-500/10 text-red-600' :
+                  order.effectiveStatus === 'Refunded' ? 'bg-amber-100 text-amber-700' :
+                  'bg-emerald-500/10 text-emerald-600'
+                )}>
                   {(order.effectiveStatus === 'Processing' || order.effectiveStatus === 'In progress') && <Clock size={10} className="mr-1 inline animate-spin" />}
-                  {order.effectiveStatus === 'Refunded' && <Wallet size={10} className="mr-1 inline" />}
                   {order.effectiveStatus}
                 </Badge>
               </TableCell>
               <TableCell className="text-right">
                 {order.effectiveStatus === 'Pending' ? (
                   <Select onValueChange={(val) => updateStatus(order, val)}>
-                    <SelectTrigger className="w-[120px] h-10 bg-white border-slate-200 rounded-xl text-[10px] font-black uppercase">
+                    <SelectTrigger className="w-[80px] h-8 bg-white border-slate-200 rounded-lg text-[8px] font-black uppercase">
                       <SelectValue placeholder="Action" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Processing" className="text-[10px] font-black uppercase text-blue-600">Processing</SelectItem>
-                      <SelectItem value="Cancelled" className="text-[10px] font-black uppercase text-red-600">Reject</SelectItem>
+                      <SelectItem value="Processing" className="text-[8px] font-black uppercase text-blue-600">Approve</SelectItem>
+                      <SelectItem value="Cancelled" className="text-[8px] font-black uppercase text-red-600">Reject</SelectItem>
                     </SelectContent>
                   </Select>
                 ) : (
-                  <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Locked</span>
+                  <span className="text-[8px] font-black text-slate-300 uppercase">Fixed</span>
                 )}
               </TableCell>
             </TableRow>
@@ -297,37 +299,34 @@ export default function TrackerPage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 font-body">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <header className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button onClick={() => router.push("/admin")} className="p-3 bg-white rounded-2xl text-slate-400 hover:text-[#312ECB] shadow-sm transition-colors">
-              <ChevronLeft size={24} />
-            </button>
-            <div>
-              <h1 className="text-2xl font-black tracking-tight text-[#111B21]">LIVE TRACKER</h1>
-              <p className="text-[10px] font-black text-[#312ECB] uppercase tracking-widest">Approve & Manage Orders</p>
-            </div>
-          </div>
-          <Button 
-            onClick={syncAllWithApi} 
-            disabled={isSyncing}
-            className="bg-[#312ECB] hover:bg-[#2825A6] rounded-xl h-12 px-6 font-black uppercase text-[10px] tracking-widest gap-2 shadow-lg"
-          >
-            {isSyncing ? <RefreshCw className="animate-spin" size={16} /> : <Globe size={16} />}
-            Sync with APIs
-          </Button>
-        </header>
+    <div className="min-h-screen bg-slate-50 font-body pb-10">
+      <header className="bg-white px-4 py-3 flex items-center justify-between border-b border-slate-100 sticky top-0 z-50">
+        <div className="flex items-center gap-2">
+          <button onClick={() => router.push("/admin")} className="p-1.5 hover:bg-slate-50 rounded-lg text-slate-400">
+            <ChevronLeft size={18} />
+          </button>
+          <h1 className="text-sm font-black tracking-tight text-[#111B21] uppercase">Live Tracker</h1>
+        </div>
+        <Button 
+          onClick={() => syncAllWithApi()} 
+          disabled={isSyncing}
+          className="bg-[#312ECB] hover:bg-[#2825A6] rounded-lg h-8 px-3 font-black uppercase text-[8px] tracking-widest gap-1.5 shadow-sm"
+        >
+          {isSyncing ? <RefreshCw className="animate-spin" size={12} /> : <Globe size={12} />}
+          Sync API
+        </Button>
+      </header>
 
-        <main className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden">
+      <main className="max-w-4xl mx-auto p-3 space-y-4">
+        <div className="bg-white rounded-[1.5rem] shadow-sm border border-slate-100 overflow-hidden">
           <Tabs defaultValue="pending" className="w-full">
-            <div className="px-8 pt-6 pb-2 border-b border-slate-50 flex items-center justify-between">
-              <TabsList className="bg-slate-100 rounded-2xl p-1 h-12">
-                <TabsTrigger value="pending" className="rounded-xl px-6 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-[#312ECB] data-[state=active]:text-white">
+            <div className="px-4 pt-4 border-b border-slate-50 flex items-center justify-between">
+              <TabsList className="bg-slate-100 rounded-xl p-1 h-9">
+                <TabsTrigger value="pending" className="rounded-lg px-4 text-[8px] font-black uppercase data-[state=active]:bg-[#312ECB] data-[state=active]:text-white">
                   Active ({activeOrders.length})
                 </TabsTrigger>
-                <TabsTrigger value="history" className="rounded-xl px-6 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-[#312ECB] data-[state=active]:text-white">
-                  History ({historyOrders.length})
+                <TabsTrigger value="history" className="rounded-lg px-4 text-[8px] font-black uppercase data-[state=active]:bg-[#312ECB] data-[state=active]:text-white">
+                  History
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -340,8 +339,8 @@ export default function TrackerPage() {
               <OrderTable data={historyOrders} />
             </TabsContent>
           </Tabs>
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }
