@@ -144,13 +144,11 @@ export default function ChatPage() {
   useEffect(() => {
     if (!db || !currentUser) return; 
     
-    // Fixed: Simplified query to avoid "Index Required" error. Sorting done client-side.
     const unsubBroadcast = onSnapshot(
       query(collection(db, "globalAnnouncements"), where("active", "==", true)), 
       (snap) => {
         if (!snap.empty) {
           const docs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
-          // Sort client-side to get latest
           docs.sort((a, b) => {
             const timeA = a.timestamp?.toMillis?.() || a.timestamp?.seconds || 0;
             const timeB = b.timestamp?.toMillis?.() || b.timestamp?.seconds || 0;
@@ -181,7 +179,6 @@ export default function ChatPage() {
       if (snap.exists()) setPaymentConfig(snap.data());
     });
 
-    // Fixed: Simplified notification query to avoid index errors
     const unsubNotifs = onSnapshot(collection(db, "users", currentUser.uid, "notifications"), (snap) => {
       const items = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((n: any) => n.read === false);
       setNotifications(items);
@@ -354,7 +351,26 @@ export default function ChatPage() {
     await addMessage('user', text);
     const cleanText = text.toLowerCase();
 
-    if (cleanText.includes("order") || cleanText === 'hi' || cleanText === 'menu') {
+    // Priority Check: Selections first to avoid generic "order" keyword loop
+    if (cleanText.includes("single")) {
+      setChatState('choosing_service'); 
+      setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
+      botReply(`Pick a Service. You get ${globalDiscounts.single}% OFF!`, dynamicServices.map((s, i) => `${i + 1}. ${s.name}`));
+      return;
+    }
+
+    if (cleanText.includes("combo")) {
+      botReply("Combo Orders are coming soon! Try Single Order for now. 😊", ["1. SINGLE ORDER"]);
+      return;
+    }
+
+    if (cleanText.includes("bulk")) {
+      botReply("Bulk Orders are coming soon! Try Single Order for now. 😊", ["1. SINGLE ORDER"]);
+      return;
+    }
+
+    // Generic Menu Check
+    if (cleanText === 'hi' || cleanText === 'menu' || cleanText.includes("order")) {
       setChatState('choosing_order_type');
       botReply("Choose your boost style:", [
         `1. SINGLE ORDER (${globalDiscounts.single}% OFF)`, 
@@ -364,13 +380,7 @@ export default function ChatPage() {
       return;
     }
 
-    if (cleanText.includes("single")) {
-      setChatState('choosing_service'); 
-      setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
-      botReply(`Pick a Service. You get ${globalDiscounts.single}% OFF!`, dynamicServices.map((s, i) => `${i + 1}. ${s.name}`));
-      return;
-    }
-
+    // Service Selection
     const serviceMatch = dynamicServices.find((s, i) => cleanText === (i + 1).toString() || cleanText.includes(s.name.toLowerCase()));
     if (serviceMatch && chatState === 'choosing_service') {
       setCurrentOrder(p => ({ ...p, items: [{ service: serviceMatch, quantity: 0, link: '' }] }));
@@ -379,6 +389,7 @@ export default function ChatPage() {
       return;
     }
 
+    // Quantity Input
     if (chatState === 'entering_quantity') {
       const qty = parseInt(text);
       const s = currentOrder.items[0]?.service;
@@ -405,6 +416,7 @@ export default function ChatPage() {
       return;
     }
 
+    // Payment Selection
     if (chatState === 'choosing_payment_method') {
       const s = currentOrder.items[0]?.service;
       const qty = currentOrder.items[0]?.quantity;
@@ -462,7 +474,7 @@ export default function ChatPage() {
 
       <div className="bg-slate-900/50 backdrop-blur-md px-4 py-2 flex items-center justify-between border-b border-white/5 z-40">
         <button onClick={() => router.push('/add-funds')} className="flex items-center gap-2 bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-full border border-emerald-500/20 shadow-3d-sm active:shadow-3d-pressed">
-          <Wallet size={14} /><span className="text-[11px] font-black">₹{walletBalance.toFixed(0)}</span><PlusCircle size={14} />
+          <Wallet size={14} /><span className="text-[11px] font-black text-emerald-400">₹{walletBalance.toFixed(0)}</span><PlusCircle size={14} />
         </button>
         <div className="flex items-center gap-3">
           <button onClick={() => setIsOrdersOpen(true)} className="text-[10px] font-black uppercase text-[#312ECB] flex items-center gap-1.5 shadow-3d-sm rounded-xl px-3 py-1.5 active:shadow-3d-pressed">
@@ -573,9 +585,9 @@ export default function ChatPage() {
                 {notifications.length > 0 ? notifications.map(n => (
                   <div key={n.id} onClick={handleClearNotifs} className="bg-slate-900 p-4 rounded-2xl shadow-3d-sm border border-white/5 flex items-start gap-3 cursor-pointer">
                     <div className="w-8 h-8 rounded-lg bg-[#312ECB]/20 flex items-center justify-center text-[#312ECB] shrink-0"><Zap size={14} /></div>
-                    <div className="space-y-0.5"><p className="text-[11px] font-black">{n.title}</p><p className="text-[10px] font-bold text-slate-400">{n.message}</p></div>
+                    <div className="space-y-0.5"><p className="text-[11px] font-black text-white">{n.title}</p><p className="text-[10px] font-bold text-slate-400">{n.message}</p></div>
                   </div>
-                )) : <div className="flex flex-col items-center justify-center py-20 opacity-20"><Bell size={40} /><p className="text-[10px] font-black uppercase mt-4">Inbox Clear</p></div>}
+                )) : <div className="flex flex-col items-center justify-center py-20 opacity-20 text-white"><Bell size={40} /><p className="text-[10px] font-black uppercase mt-4">Inbox Clear</p></div>}
              </div>
           </ScrollArea>
         </DialogContent>
@@ -603,7 +615,7 @@ export default function ChatPage() {
                        </div>
                     </div>
                   );
-                }) : <div className="text-center py-20 opacity-20"><Package size={40} className="mx-auto" /><p className="text-[10px] font-black uppercase mt-4">No Orders</p></div>}
+                }) : <div className="text-center py-20 opacity-20 text-white"><Package size={40} className="mx-auto" /><p className="text-[10px] font-black uppercase mt-4">No Orders</p></div>}
              </div>
           </ScrollArea>
         </DialogContent>
