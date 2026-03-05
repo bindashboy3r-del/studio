@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -23,11 +24,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { 
   Send, 
-  Moon, 
-  Sun,
   History,
   X,
-  Megaphone,
   Zap,
   Wallet,
   PlusCircle,
@@ -36,7 +34,6 @@ import {
   MessageCircle,
   Loader2,
   Bell,
-  CheckCheck,
   MessageSquareText
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -94,20 +91,34 @@ export default function ChatPage() {
   const [showSocialMenu, setShowSocialMenu] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [sessionStart, setSessionStart] = useState<Timestamp | null>(null);
   
   const hasInitialGreeted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Session Management: Clear chat if not coming from History/Orders
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const keepSession = sessionStorage.getItem('keepChatSession') === 'true';
+    let sessionTimeStr = sessionStorage.getItem('chatSessionStartTime');
+    
+    if (!keepSession || !sessionTimeStr) {
+      const now = new Date();
+      sessionTimeStr = now.toISOString();
+      sessionStorage.setItem('chatSessionStartTime', sessionTimeStr);
+    }
+    
+    setSessionStart(Timestamp.fromDate(new Date(sessionTimeStr)));
+    sessionStorage.removeItem('keepChatSession'); // Reset flag for next move
+  }, []);
 
   useEffect(() => {
     if (!isUserLoading && !currentUser) router.push("/");
   }, [currentUser, isUserLoading, router]);
 
-  const navigateWithSession = (path: string, keep: boolean) => {
-    if (keep) sessionStorage.setItem('keepChatSession', 'true');
-    else {
-      sessionStorage.removeItem('keepChatSession');
-      sessionStorage.removeItem('chatSessionStartTime');
-    }
+  const navigateWithSession = (path: string) => {
+    sessionStorage.setItem('keepChatSession', 'true');
     router.push(path);
   };
 
@@ -151,10 +162,30 @@ export default function ChatPage() {
     return () => { unsubBroadcast(); unsubDiscounts(); unsubSocial(); unsubNotifs(); };
   }, [db, currentUser]);
 
-  const messagesQuery = useMemoFirebase(() => {
-    if (!db || !currentUser) return null;
-    return query(collection(db, "users", currentUser.uid, "chatMessages"), orderBy("timestamp", "asc"));
+  // Rolling 7-day delete for historical logs (Runs once per mount)
+  useEffect(() => {
+    if (!db || !currentUser) return;
+    const cleanupOldLogs = async () => {
+      const sevenDaysAgo = subDays(new Date(), 7);
+      const qOld = query(collection(db, "users", currentUser.uid, "chatMessages"), where("timestamp", "<", sevenDaysAgo));
+      const snap = await getDocs(qOld);
+      if (!snap.empty) {
+        const batch = writeBatch(db);
+        snap.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      }
+    };
+    cleanupOldLogs();
   }, [db, currentUser]);
+
+  const messagesQuery = useMemoFirebase(() => {
+    if (!db || !currentUser || !sessionStart) return null;
+    return query(
+      collection(db, "users", currentUser.uid, "chatMessages"), 
+      where("timestamp", ">=", sessionStart),
+      orderBy("timestamp", "asc")
+    );
+  }, [db, currentUser, sessionStart]);
   const { data: messages, isLoading: isMessagesLoading } = useCollection(messagesQuery);
 
   useEffect(() => {
@@ -182,14 +213,14 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
-    if (currentUser && !isMessagesLoading && !hasInitialGreeted.current) {
+    if (currentUser && !isMessagesLoading && !hasInitialGreeted.current && sessionStart) {
       hasInitialGreeted.current = true;
       if (!messages || messages.length === 0) {
         setChatState('initial');
         botReply("👋 Welcome to SocialBoost! 3D Automation Active. Type 'Hi' to begin. 🚀");
       }
     }
-  }, [currentUser, isMessagesLoading, messages]);
+  }, [currentUser, isMessagesLoading, messages, sessionStart]);
 
   const calculateTotalPrice = (itemsOverride?: OrderItem[], typeOverride?: string) => {
     const items = itemsOverride || currentOrder.items;
@@ -249,7 +280,7 @@ export default function ChatPage() {
         setChatState('choosing_payment_method');
         const { raw, discounted, discountPct } = calculateTotalPrice(updated);
         
-        const summary = `✅ ORDER SUMMARY\n───────────────\n💰 Real Price: ₹${raw.toFixed(2)}\n🎁 Discount: ${discountPct}%\n🔥 You Pay: ₹${discounted.toFixed(2)}\n───────────────\n💳 Wallet: ₹${walletBalance.toFixed(0)}`;
+        const summary = `✅ ORDER SUMMARY\n───────────────\nOriginal Price: ₹${raw.toFixed(2)}\nDiscount Applied: ${discountPct}%\n🔥 You Pay: ₹${discounted.toFixed(2)}\n───────────────\n💳 Wallet Balance: ₹${walletBalance.toFixed(0)}`;
         
         botReply(summary, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"], { 
           rawPrice: raw, 
@@ -297,13 +328,13 @@ export default function ChatPage() {
                 <div className="flex items-center justify-between">
                   <SheetTitle className="text-white font-black uppercase text-xs flex items-center gap-2">Notifications</SheetTitle>
                   {notifications.length > 0 && (
-                    <Button onClick={async () => { const batch = writeBatch(db!); notifications.forEach(n => batch.update(doc(db!, "users", currentUser!.uid, "notifications", n.id), { read: true })); await batch.commit(); }} variant="ghost" className="h-7 text-[8px] font-black uppercase bg-white/10 rounded-lg px-2 shadow-3d-sm">Clear</Button>
+                    <Button onClick={async () => { const batch = writeBatch(db!); notifications.forEach(n => batch.update(doc(db!, "users", currentUser!.uid, "notifications", n.id), { read: true })); await batch.commit(); }} variant="ghost" className="h-7 text-[8px] font-black uppercase bg-white/10 rounded-lg px-2 shadow-3d-sm">Clear All</Button>
                   )}
                 </div>
               </SheetHeader>
               <div className="flex-1 overflow-y-auto p-4 space-y-3 h-full custom-scrollbar">
                 {notifications.length > 0 ? notifications.map(n => (
-                  <div key={n.id} className="bg-slate-900 p-4 rounded-2xl shadow-3d-sm border border-white/5 flex items-start gap-3">
+                  <div key={n.id} onClick={async () => { await writeBatch(db!).update(doc(db!, "users", currentUser!.uid, "notifications", n.id), { read: true }).commit(); }} className="bg-slate-900 p-4 rounded-2xl shadow-3d-sm border border-white/5 flex items-start gap-3 cursor-pointer">
                     <div className="w-8 h-8 rounded-lg bg-[#312ECB]/20 flex items-center justify-center text-[#312ECB] shrink-0"><Zap size={14} /></div>
                     <div className="space-y-0.5"><p className="text-[11px] font-black">{n.title}</p><p className="text-[10px] font-bold text-slate-400">{n.message}</p></div>
                   </div>
@@ -311,21 +342,21 @@ export default function ChatPage() {
               </div>
             </SheetContent>
           </Sheet>
-          <button onClick={() => navigateWithSession('/profile', false)} className="w-9 h-9 rounded-2xl bg-slate-800 text-white font-black text-sm shadow-3d-sm active:shadow-3d-pressed border border-white/5">
+          <button onClick={() => router.push('/profile')} className="w-9 h-9 rounded-2xl bg-slate-800 text-white font-black text-sm shadow-3d-sm active:shadow-3d-pressed border border-white/5">
             {currentUser?.displayName?.[0] || 'U'}
           </button>
         </div>
       </header>
 
       <div className="bg-slate-900/50 backdrop-blur-md px-4 py-2 flex items-center justify-between border-b border-white/5 z-40">
-        <button onClick={() => navigateWithSession('/add-funds', false)} className="flex items-center gap-2 bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-full border border-emerald-500/20 shadow-3d-sm active:shadow-3d-pressed">
+        <button onClick={() => router.push('/add-funds')} className="flex items-center gap-2 bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-full border border-emerald-500/20 shadow-3d-sm active:shadow-3d-pressed">
           <Wallet size={14} /><span className="text-[11px] font-black">₹{walletBalance.toFixed(0)}</span><PlusCircle size={14} />
         </button>
         <div className="flex items-center gap-3">
-          <button onClick={() => navigateWithSession('/orders', true)} className="text-[10px] font-black uppercase text-[#312ECB] flex items-center gap-1.5 shadow-3d-sm rounded-xl px-3 py-1.5 active:shadow-3d-pressed">
+          <button onClick={() => navigateWithSession('/orders')} className="text-[10px] font-black uppercase text-[#312ECB] flex items-center gap-1.5 shadow-3d-sm rounded-xl px-3 py-1.5 active:shadow-3d-pressed">
             <History size={14} /> ORDERS
           </button>
-          <button onClick={() => navigateWithSession('/chat-logs', true)} className="text-[10px] font-black uppercase text-pink-500 flex items-center gap-1.5 shadow-3d-sm rounded-xl px-3 py-1.5 active:shadow-3d-pressed">
+          <button onClick={() => navigateWithSession('/chat-logs')} className="text-[10px] font-black uppercase text-pink-500 flex items-center gap-1.5 shadow-3d-sm rounded-xl px-3 py-1.5 active:shadow-3d-pressed">
             <MessageSquareText size={14} /> HISTORY
           </button>
         </div>
@@ -355,22 +386,22 @@ export default function ChatPage() {
           {showSocialMenu && (
             <div className="flex flex-col gap-3 mb-2 animate-in slide-in-from-bottom-5 duration-300">
               {socialLinks?.instagram && (
-                <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 rounded-2xl flex items-center justify-center text-white shadow-3d active:shadow-3d-pressed transition-all">
-                  <Instagram size={20} />
+                <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="w-8 h-8 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 rounded-xl flex items-center justify-center text-white shadow-3d active:shadow-3d-pressed transition-all">
+                  <Instagram size={16} />
                 </a>
               )}
               {socialLinks?.whatsapp && (
-                <a href={socialLinks.whatsapp} target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-[#25D366] rounded-2xl flex items-center justify-center text-white shadow-3d active:shadow-3d-pressed transition-all">
-                  <MessageCircle size={20} />
+                <a href={socialLinks.whatsapp} target="_blank" rel="noopener noreferrer" className="w-8 h-8 bg-[#25D366] rounded-xl flex items-center justify-center text-white shadow-3d active:shadow-3d-pressed transition-all">
+                  <MessageCircle size={16} />
                 </a>
               )}
             </div>
           )}
           <button 
             onClick={() => setShowSocialMenu(!showSocialMenu)} 
-            className={cn("w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-3d transition-all active:shadow-3d-pressed", showSocialMenu ? "bg-red-500 rotate-90 shadow-3d-pressed" : "bg-[#312ECB]")}
+            className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-3d transition-all active:shadow-3d-pressed", showSocialMenu ? "bg-red-500 rotate-90 shadow-3d-pressed" : "bg-[#312ECB]")}
           >
-            {showSocialMenu ? <X size={24} /> : <Share2 size={24} />}
+            {showSocialMenu ? <X size={20} /> : <Share2 size={20} />}
           </button>
         </div>
       </main>

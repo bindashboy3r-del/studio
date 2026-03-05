@@ -1,16 +1,14 @@
+
 "use client";
 
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { 
   SendHorizonal, 
-  CheckCircle, 
   Wallet,
   Copy,
   Download,
-  Percent,
-  TrendingDown,
-  Zap
+  Percent
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -85,7 +83,10 @@ export function MessageBubble({
 
   return (
     <div className={cn("flex w-full mb-4", isUser ? "justify-end" : "justify-start")}>
-      <div className={cn("max-w-[92%] px-4 py-3 relative", isUser ? "bubble-user" : "bubble-bot")}>
+      <div className={cn(
+        "max-w-[92%] px-4 py-3 relative border border-white/5", 
+        isUser ? "bubble-user" : "bubble-bot"
+      )}>
         
         {isPaymentCard ? (
           <div className="space-y-4 min-w-[220px]">
@@ -96,13 +97,13 @@ export function MessageBubble({
                 </Badge>
               </div>
               <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-slate-500 line-through">REAL: ₹{finalRawPrice.toFixed(2)}</span>
-                <h3 className="text-[20px] font-black text-[#312ECB] tracking-tighter">PAY: ₹{price.toFixed(2)}</h3>
+                <span className="text-[10px] font-bold text-slate-500 line-through tracking-wider">Original Price: ₹{finalRawPrice.toFixed(2)}</span>
+                <h3 className="text-[18px] font-black text-[#312ECB] tracking-tighter">NOW ONLY: ₹{price.toFixed(2)}</h3>
               </div>
             </div>
 
-            <div className="bg-slate-950 p-3 rounded-[1.5rem] flex flex-col items-center gap-3 shadow-3d-pressed border border-white/5">
-              <div className="bg-white p-2 rounded-2xl shadow-3d">
+            <div className="bg-slate-950 p-3 rounded-[1.5rem] flex flex-col items-center gap-3 shadow-3d-pressed border border-white/10">
+              <div className="bg-white p-2 rounded-2xl shadow-3d border border-white/20">
                 <img src={qrUrl} alt="UPI QR" className="w-28 h-28" />
               </div>
               <div className="flex w-full gap-2">
@@ -118,38 +119,38 @@ export function MessageBubble({
             <div className="space-y-3">
               <div className="space-y-2">
                 <div className="space-y-1">
-                  <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-widest">Instagram Link</label>
-                  <Input placeholder="Profile/Post Link" value={link} onChange={(e) => setLink(e.target.value)} className="h-10 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-xs" />
+                  <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-widest">Post/Profile Link</label>
+                  <Input placeholder="Enter link here" value={link} onChange={(e) => setLink(e.target.value)} className="h-10 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-xs" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] font-black uppercase text-red-500 ml-1 leading-none animate-pulse">Shi utr dalo varna payment verify nhi hoga</label>
-                  <Input placeholder="12-Digit UTR ID" value={utr} maxLength={12} onChange={(e) => setUtr(e.target.value.replace(/[^0-9]/g, ''))} className="h-10 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-black tracking-widest text-xs" />
+                  <Input placeholder="Enter 12-Digit UTR ID" value={utr} maxLength={12} onChange={(e) => setUtr(e.target.value.replace(/[^0-9]/g, ''))} className="h-10 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-black tracking-widest text-xs" />
                 </div>
               </div>
-              <Button onClick={() => onOptionClick?.(`SUBMIT_PAYMENT:${link}:${utr}`)} disabled={!link || utr.length !== 12} className="w-full h-12 bg-[#312ECB] font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-3d active:shadow-3d-pressed">
+              <Button onClick={() => onOptionClick?.(`SUBMIT_PAYMENT:${link}:${utr}`)} disabled={!link || utr.length !== 12} className="w-full h-12 bg-[#312ECB] font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10">
                 SUBMIT 3D PAYMENT
               </Button>
             </div>
           </div>
         ) : isWalletCard ? (
           <div className="space-y-4 min-w-[200px]">
-             <div className="flex flex-col items-center gap-2 p-4 bg-slate-950 rounded-[1.5rem] shadow-3d-pressed border border-white/5">
-                <div className="w-10 h-10 bg-[#312ECB] rounded-2xl flex items-center justify-center shadow-3d">
+             <div className="flex flex-col items-center gap-2 p-4 bg-slate-950 rounded-[1.5rem] shadow-3d-pressed border border-white/10">
+                <div className="w-10 h-10 bg-[#312ECB] rounded-2xl flex items-center justify-center shadow-3d border border-white/10">
                   <Wallet className="text-white" size={20} />
                 </div>
                 <div className="text-center">
-                  <Badge className="bg-pink-500/20 text-pink-400 border-none font-black text-[7px] mb-1">Deducting from Wallet</Badge>
+                  <Badge className="bg-pink-500/20 text-pink-400 border-none font-black text-[7px] mb-1">WALLET PAYMENT</Badge>
                   <div className="flex flex-col items-center mt-1">
-                    <span className="text-[10px] font-bold text-slate-500 line-through">REAL: ₹{finalRawPrice.toFixed(2)}</span>
-                    <p className="text-[22px] font-black text-[#312ECB] tracking-tighter">PAY: ₹{price.toFixed(2)}</p>
+                    <span className="text-[10px] font-bold text-slate-500 line-through">Real: ₹{finalRawPrice.toFixed(2)}</span>
+                    <p className="text-[20px] font-black text-[#312ECB] tracking-tighter">Pay: ₹{price.toFixed(2)}</p>
                   </div>
                 </div>
              </div>
-             <Button onClick={() => onOptionClick?.(`CONFIRM_WALLET:${link}`)} className="w-full h-12 bg-[#312ECB] font-black text-[10px] uppercase rounded-2xl shadow-3d active:shadow-3d-pressed">CONFIRM ORDER</Button>
+             <Button onClick={() => onOptionClick?.(`CONFIRM_WALLET:${link}`)} className="w-full h-12 bg-[#312ECB] font-black text-[10px] uppercase rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10">CONFIRM ORDER</Button>
           </div>
         ) : (
           <div className="space-y-1">
-            <p className="text-[12px] font-bold whitespace-pre-wrap leading-relaxed">{text}</p>
+            <p className="text-[12px] font-bold whitespace-pre-wrap leading-relaxed tracking-wide">{text}</p>
           </div>
         )}
 
