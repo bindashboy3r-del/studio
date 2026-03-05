@@ -127,7 +127,7 @@ export default function ServiceManagerPage() {
     const newList = Array.from(new Set([...enabledCategories, platform]));
     try {
       await setDoc(doc(db, "globalSettings", "categories"), { list: newList }, { merge: true });
-      toast({ title: "Category Added", description: `${PLATFORMS[platform]} is now active.` });
+      toast({ title: "Category Added", description: `${PLATFORMS[platform] || platform} is now active.` });
       setIsAddingCategory(false);
     } catch (e) {
       toast({ variant: "destructive", title: "Failed to add category" });
@@ -136,23 +136,27 @@ export default function ServiceManagerPage() {
 
   const handleDeleteCategory = async (platform: string) => {
     if (!db || !isActuallyAdmin) return;
-    if (!confirm(`Are you sure? This will delete all services in ${PLATFORMS[platform as Platform]}.`)) return;
+    const platformLabel = PLATFORMS[platform as Platform] || platform;
+    if (!confirm(`Are you sure? This will delete all services in ${platformLabel}.`)) return;
     
     setDeletingCategory(platform);
     
     try {
+      // 1. Update the category list
       const newList = enabledCategories.filter(p => p !== platform);
-      await setDoc(doc(db, "globalSettings", "categories"), { list: newList }, { merge: true });
+      await setDoc(doc(db, "globalSettings", "categories"), { list: newList });
 
+      // 2. Delete all services associated with this platform
       const q = query(collection(db, "services"), where("platform", "==", platform));
       const snap = await getDocs(q);
       const batch = writeBatch(db);
       snap.docs.forEach(d => batch.delete(d.ref));
       await batch.commit();
 
-      toast({ title: "Category Deleted", description: `Removed ${PLATFORMS[platform as Platform]} and all its services.` });
-    } catch (e) {
-      toast({ variant: "destructive", title: "Deletion Failed" });
+      toast({ title: "Category Deleted", description: `Removed ${platformLabel} and all its services.` });
+    } catch (e: any) {
+      console.error("Delete Category Error:", e);
+      toast({ variant: "destructive", title: "Deletion Failed", description: e.message || "Database error." });
     } finally {
       setDeletingCategory(null);
     }
@@ -180,7 +184,7 @@ export default function ServiceManagerPage() {
 
     setDoc(docRef, data)
       .then(() => {
-        toast({ title: "Service Added", description: `${newService.name} is now live in ${PLATFORMS[platform as Platform]}.` });
+        toast({ title: "Service Added", description: `${newService.name} is now live in ${PLATFORMS[platform as Platform] || platform}.` });
         setIsAddingService(false);
         setNewService({ 
           id: "", 
@@ -284,7 +288,7 @@ export default function ServiceManagerPage() {
                           {getPlatformIcon(platform)}
                         </div>
                         <div>
-                          <h2 className="text-lg font-black uppercase tracking-tight text-slate-900">{PLATFORMS[platform]} Category</h2>
+                          <h2 className="text-lg font-black uppercase tracking-tight text-slate-900">{PLATFORMS[platform] || platform} Category</h2>
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                             {(groupedServices[platform] || []).length} Services Managed
                           </p>
@@ -302,7 +306,7 @@ export default function ServiceManagerPage() {
                         variant="outline" 
                         className="w-full h-14 border-dashed border-slate-200 rounded-2xl text-slate-400 font-black text-[11px] uppercase tracking-widest hover:bg-slate-50 gap-2"
                       >
-                        <Plus size={16} /> Add Service to {PLATFORMS[platform]}
+                        <Plus size={16} /> Add Service to {PLATFORMS[platform] || platform}
                       </Button>
 
                       <div className="space-y-3">
@@ -344,7 +348,7 @@ export default function ServiceManagerPage() {
                       </div>
 
                       <div className="pt-4 border-t border-slate-100 mt-4 flex justify-between items-center">
-                        <div className="flex items-center gap-2 text-red-400">
+                        <div className="flex items-center gap-2 text-red-500">
                           <AlertTriangle size={14} />
                           <span className="text-[9px] font-black uppercase tracking-widest">Danger Zone</span>
                         </div>
@@ -380,7 +384,7 @@ export default function ServiceManagerPage() {
         <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-8 bg-white">
           <DialogHeader>
             <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-3 text-slate-900">
-              <Layers className="text-[#312ECB]" /> Add Service to {PLATFORMS[newService.platform as Platform]}
+              <Layers className="text-[#312ECB]" /> Add Service to {PLATFORMS[newService.platform as Platform] || newService.platform}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
