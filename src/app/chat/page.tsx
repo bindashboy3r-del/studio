@@ -262,7 +262,9 @@ export default function ChatPage() {
       
       const s = currentOrder.items[0]?.service;
       const qty = currentOrder.items[0]?.quantity;
-      const price = (qty / 1000) * (s.pricePer1000 || 0) * (1 - globalDiscounts.single / 100);
+      const type = currentOrder.type || 'single';
+      const disc = globalDiscounts[type] || 0;
+      const price = (qty / 1000) * (s.pricePer1000 || 0) * (1 - disc / 100);
       const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}`;
 
       await addDoc(collection(db, "users", currentUser.uid, "orders"), {
@@ -288,7 +290,9 @@ export default function ChatPage() {
       await addMessage('user', "Confirming Wallet Payment...");
       const s = currentOrder.items[0]?.service;
       const qty = currentOrder.items[0]?.quantity;
-      const price = (qty / 1000) * (s.pricePer1000 || 0) * (1 - globalDiscounts.single / 100);
+      const type = currentOrder.type || 'single';
+      const disc = globalDiscounts[type] || 0;
+      const price = (qty / 1000) * (s.pricePer1000 || 0) * (1 - disc / 100);
       
       if (walletBalance >= price) {
         setIsTyping(true);
@@ -351,26 +355,30 @@ export default function ChatPage() {
     await addMessage('user', text);
     const cleanText = text.toLowerCase();
 
-    // Priority Check: Selections first to avoid generic "order" keyword loop
-    if (cleanText.includes("single")) {
+    // Specific Selection Priority
+    if (cleanText.includes("single order")) {
       setChatState('choosing_service'); 
       setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
       botReply(`Pick a Service. You get ${globalDiscounts.single}% OFF!`, dynamicServices.map((s, i) => `${i + 1}. ${s.name}`));
       return;
     }
 
-    if (cleanText.includes("combo")) {
-      botReply("Combo Orders are coming soon! Try Single Order for now. 😊", ["1. SINGLE ORDER"]);
+    if (cleanText.includes("combo order")) {
+      setChatState('choosing_service'); 
+      setCurrentOrder({ type: 'combo', platform: 'instagram', items: [] });
+      botReply(`🎁 COMBO MODE: Pick a Service. You get ${globalDiscounts.combo}% OFF!`, dynamicServices.map((s, i) => `${i + 1}. ${s.name}`));
       return;
     }
 
-    if (cleanText.includes("bulk")) {
-      botReply("Bulk Orders are coming soon! Try Single Order for now. 😊", ["1. SINGLE ORDER"]);
+    if (cleanText.includes("bulk order")) {
+      setChatState('choosing_service'); 
+      setCurrentOrder({ type: 'bulk', platform: 'instagram', items: [] });
+      botReply(`🚀 BULK MODE: Pick a Service. You get ${globalDiscounts.bulk}% OFF!`, dynamicServices.map((s, i) => `${i + 1}. ${s.name}`));
       return;
     }
 
     // Generic Menu Check
-    if (cleanText === 'hi' || cleanText === 'menu' || cleanText.includes("order")) {
+    if (cleanText === 'hi' || cleanText === 'menu' || (cleanText.includes("order") && chatState === 'idle')) {
       setChatState('choosing_order_type');
       botReply("Choose your boost style:", [
         `1. SINGLE ORDER (${globalDiscounts.single}% OFF)`, 
@@ -397,11 +405,13 @@ export default function ChatPage() {
         const updated = [{ service: s, quantity: qty, link: '' }];
         setCurrentOrder(p => ({ ...p, items: updated }));
         setChatState('choosing_payment_method');
+        
+        const type = currentOrder.type || 'single';
         const raw = (qty / 1000) * (s.pricePer1000 || 0);
-        const disc = globalDiscounts.single;
+        const disc = globalDiscounts[type] || 0;
         const discounted = raw * (1 - disc / 100);
         
-        const summary = `✅ ORDER SUMMARY\n───────────────\nService Price: ₹${raw.toFixed(2)}\nDiscount: ${disc}%\nFinal Price: ₹${discounted.toFixed(2)}\n───────────────\n💳 Wallet Balance: ₹${walletBalance.toFixed(0)}`;
+        const summary = `✅ ${type.toUpperCase()} SUMMARY\n───────────────\nService Price: ₹${raw.toFixed(2)}\nDiscount: ${disc}%\nFinal Price: ₹${discounted.toFixed(2)}\n───────────────\n💳 Wallet Balance: ₹${walletBalance.toFixed(0)}`;
         
         const paymentOptions: string[] = [];
         if (paymentConfig?.walletEnabled !== false) paymentOptions.push("💳 PAY FROM WALLET");
@@ -420,15 +430,17 @@ export default function ChatPage() {
     if (chatState === 'choosing_payment_method') {
       const s = currentOrder.items[0]?.service;
       const qty = currentOrder.items[0]?.quantity;
+      const type = currentOrder.type || 'single';
       const raw = (qty / 1000) * (s.pricePer1000 || 0);
-      const discounted = raw * (1 - globalDiscounts.single / 100);
+      const disc = globalDiscounts[type] || 0;
+      const discounted = raw * (1 - disc / 100);
 
       if (cleanText.includes("wallet")) {
         if (walletBalance >= discounted) botReply(`Enter Link & Confirm Wallet Payment of ₹${discounted.toFixed(2)}?`, [], { 
           isWalletCard: true, 
           paymentPrice: discounted, 
           rawPrice: raw, 
-          discountPct: globalDiscounts.single,
+          discountPct: disc,
           serviceName: s?.name,
           quantity: qty
         });
@@ -438,7 +450,7 @@ export default function ChatPage() {
           isPaymentCard: true, 
           paymentPrice: discounted, 
           rawPrice: raw, 
-          discountPct: globalDiscounts.single,
+          discountPct: disc,
           serviceName: s?.name,
           quantity: qty
         });
