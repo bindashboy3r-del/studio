@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -93,7 +92,6 @@ export default function ChatPage() {
   const hasInitialGreeted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Authentication Guard
   useEffect(() => {
     if (!isUserLoading && !user) {
       router.push("/");
@@ -350,7 +348,6 @@ export default function ChatPage() {
     await addMessage('user', text);
     const cleanText = text.toLowerCase();
 
-    // Smart Flow Switching Detection
     const isMajorSwitch = cleanText.includes("single order") || cleanText.includes("combo order") || cleanText.includes("bulk order") || cleanText === 'hi' || cleanText === 'menu';
     const serviceMatch = dynamicServices.find((s, i) => cleanText === (i + 1).toString() || cleanText.includes(s.name.toLowerCase()));
 
@@ -412,8 +409,6 @@ export default function ChatPage() {
           botReply(`${priceMsg}\n💳 Wallet: ₹${walletBalance.toFixed(2)}`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]);
         } else if (s) {
           botReply(`⚠️ Minimum quantity for ${s.name} is ${s.minQuantity}. Kripya sahi quantity enter karein.`);
-        } else {
-          botReply("Something went wrong. Please type 'Hi' to restart.");
         }
         break;
       case 'choosing_payment_method':
@@ -436,39 +431,39 @@ export default function ChatPage() {
   if (isUserLoading || (!user && !isUserLoading)) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-white dark:bg-slate-950">
-        <Loader2 className="w-12 h-12 text-[#312ECB] animate-spin mb-4" />
-        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Verifying session...</p>
+        <Loader2 className="w-10 h-10 text-[#312ECB] animate-spin mb-4" />
+        <p className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-400">Loading Session...</p>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col h-screen max-w-lg mx-auto overflow-hidden relative shadow-2xl bg-white dark:bg-slate-950 font-body">
-      <header className="bg-white dark:bg-slate-900 px-5 py-4 flex items-center justify-between border-b border-gray-100 dark:border-slate-800 z-50">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-[14px] bg-[#312ECB] flex items-center justify-center text-white shadow-lg"><Zap className="fill-current" size={20} /></div>
-          <h1 className="text-[20px] font-black italic tracking-tighter text-[#312ECB] dark:text-white uppercase">SOCIALBOOST</h1>
+      <header className="bg-white dark:bg-slate-900 px-4 py-3 flex items-center justify-between border-b border-gray-100 dark:border-slate-800 z-50">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-[12px] bg-[#312ECB] flex items-center justify-center text-white shadow-lg"><Zap className="fill-current" size={18} /></div>
+          <h1 className="text-[17px] font-black italic tracking-tighter text-[#312ECB] dark:text-white uppercase">SOCIALBOOST</h1>
         </div>
-        <div className="flex items-center gap-4">
-          <button onClick={toggleTheme} className="text-slate-400">{theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}</button>
-          <button onClick={() => router.push('/profile')} className="w-10 h-10 rounded-full bg-[#312ECB] text-white font-black">{user?.displayName?.[0] || 'U'}</button>
+        <div className="flex items-center gap-3">
+          <button onClick={toggleTheme} className="text-slate-400 p-1">{theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}</button>
+          <button onClick={() => router.push('/profile')} className="w-9 h-9 rounded-full bg-[#312ECB] text-white font-black text-xs">{user?.displayName?.[0] || 'U'}</button>
         </div>
       </header>
 
-      <div className="bg-white dark:bg-slate-800 px-6 py-3 flex items-center justify-between border-b dark:border-slate-700 z-40">
-        <button onClick={() => router.push('/add-funds')} className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-800">
-          <Wallet size={14} /> <span className="text-[11px] font-black">₹{walletBalance.toFixed(2)}</span> <PlusCircle size={14} />
+      <div className="bg-white dark:bg-slate-800 px-4 py-2 flex items-center justify-between border-b dark:border-slate-700 z-40">
+        <button onClick={() => router.push('/add-funds')} className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 px-2.5 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-800">
+          <Wallet size={12} /> <span className="text-[10px] font-black">₹{walletBalance.toFixed(2)}</span> <PlusCircle size={12} />
         </button>
-        <button onClick={() => router.push('/orders')} className="text-[11px] font-black uppercase text-[#312ECB] dark:text-blue-400 flex items-center gap-2"><History size={16} /> HISTORY</button>
+        <button onClick={() => router.push('/orders')} className="text-[10px] font-black uppercase text-[#312ECB] dark:text-blue-400 flex items-center gap-1.5"><History size={14} /> LOGS</button>
       </div>
 
-      <main className="flex-1 overflow-y-auto p-4 flex flex-col whatsapp-bg relative pb-24">
+      <main className="flex-1 overflow-y-auto p-3 flex flex-col whatsapp-bg relative pb-20">
         {activeBroadcast && (
           <div className="fixed inset-0 flex items-center justify-center z-[100] p-6 bg-black/40 backdrop-blur-sm">
-            <div className="w-full max-w-[350px] bg-white dark:bg-slate-900 rounded-[3rem] p-8 items-center text-center space-y-4 shadow-2xl">
-              <Megaphone size={32} className="text-[#312ECB] mx-auto" />
-              <p className="text-[15px] font-black text-slate-800 dark:text-white">{activeBroadcast.text}</p>
-              <Button onClick={() => setActiveBroadcast(null)} className="rounded-full bg-[#312ECB] w-full uppercase font-black">Close</Button>
+            <div className="w-full max-w-[320px] bg-white dark:bg-slate-900 rounded-[2.5rem] p-6 items-center text-center space-y-4 shadow-2xl">
+              <Megaphone size={28} className="text-[#312ECB] mx-auto" />
+              <p className="text-[13px] font-black text-slate-800 dark:text-white leading-relaxed">{activeBroadcast.text}</p>
+              <Button onClick={() => setActiveBroadcast(null)} className="rounded-xl h-11 bg-[#312ECB] w-full uppercase font-black text-[10px]">Okay</Button>
             </div>
           </div>
         )}
@@ -477,7 +472,7 @@ export default function ChatPage() {
           <MessageBubble key={m.id} sender={m.sender} text={m.text} options={m.options} onOptionClick={handleSend}
             isPaymentCard={m.isPaymentCard} paymentPrice={m.paymentPrice} rawPrice={m.rawPrice} onPaymentSubmit={(link, utr) => handleBundlePaymentSubmit(utr, link)}
             isSuccessCard={m.isSuccessCard} successDetails={m.successDetails} isBulkLinkCard={m.isBulkLinkCard} 
-            onBulkLinksSubmit={(l) => { setCurrentOrder(p => ({ ...p, type: 'bulk', bulkLinks: l })); setChatState('choosing_service'); botReply(`Select Service for Bulk Order (${globalDiscounts.bulk}% OFF):`, dynamicServices.map((s, i) => `${i + 1}. ${s.name}`)); }}
+            onBulkLinksSubmit={(l) => { setCurrentOrder(p => ({ ...p, type: 'bulk', bulkLinks: l })); setChatState('choosing_service'); botReply(`Select Service (${globalDiscounts.bulk}% OFF):`, dynamicServices.map((s, i) => `${i + 1}. ${s.name}`)); }}
             isComboCard={m.isComboCard} onComboSubmit={(items, link) => { 
               const invalid = items.find(it => {
                 const s = dynamicServices.find(ds => ds.id === it.serviceId);
@@ -485,7 +480,7 @@ export default function ChatPage() {
               });
               if (invalid) {
                 const s = dynamicServices.find(ds => ds.id === invalid.serviceId);
-                toast({ variant: "destructive", title: "Min Quantity Error", description: `${s?.name} requires min ${s?.minQuantity}.` });
+                toast({ variant: "destructive", title: "Qty Error", description: `${s?.name} min ${s?.minQuantity}.` });
                 return;
               }
               const comboItems = items.map(it => ({ service: dynamicServices.find(s => s.id === it.serviceId)!, quantity: it.quantity, link }));
@@ -493,7 +488,7 @@ export default function ChatPage() {
               setChatState('choosing_payment_method'); 
               const rawTotal = calculateRawPrice(comboItems, 'combo');
               const total = calculateTotalPrice(comboItems, 'combo');
-              botReply(`🎁 Real Price: ₹${rawTotal.toFixed(2)}\n🔥 Combo Total: ₹${total.toFixed(2)} (${globalDiscounts.combo}% OFF Applied)`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]); 
+              botReply(`🎁 Real: ₹${rawTotal.toFixed(2)}\n🔥 Combo: ₹${total.toFixed(2)} (${globalDiscounts.combo}% OFF)`, ["💳 PAY FROM WALLET", "📲 PAY VIA UPI QR"]); 
             }}
             isWalletCard={m.isWalletCard} onWalletSubmit={handleBundleWalletSubmit} timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} dynamicServices={dynamicServices} 
             discountPct={m.discountPct ?? 0}
@@ -502,47 +497,33 @@ export default function ChatPage() {
         {isTyping && <TypingIndicator />}
         <div ref={scrollRef} />
 
-        <div className="fixed bottom-24 right-6 z-50 flex flex-col items-end gap-3">
+        <div className="fixed bottom-20 right-4 z-50 flex flex-col items-end gap-2.5">
           {showSocialMenu && (
-            <div className="flex flex-col gap-3 mb-2 animate-in slide-in-from-bottom-5 fade-in duration-300">
+            <div className="flex flex-col gap-2.5 mb-1.5 animate-in slide-in-from-bottom-5 duration-300">
               {socialLinks?.instagram && (
-                <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="w-12 h-12 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 rounded-full flex items-center justify-center text-white shadow-xl transform transition-transform hover:scale-110">
-                  <Instagram size={24} />
-                </a>
-              )}
-              {socialLinks?.facebook && (
-                <a href={socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="w-12 h-12 bg-[#1877F2] rounded-full flex items-center justify-center text-white shadow-xl transform transition-transform hover:scale-110">
-                  <Facebook size={24} />
-                </a>
-              )}
-              {socialLinks?.youtube && (
-                <a href={socialLinks.youtube} target="_blank" rel="noopener noreferrer" className="w-12 h-12 bg-[#FF0000] rounded-full flex items-center justify-center text-white shadow-xl transform transition-transform hover:scale-110">
-                  <Youtube size={24} />
-                </a>
+                <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 rounded-full flex items-center justify-center text-white shadow-lg"><Instagram size={20} /></a>
               )}
               {socialLinks?.whatsapp && (
-                <a href={socialLinks.whatsapp} target="_blank" rel="noopener noreferrer" className="w-12 h-12 bg-[#25D366] rounded-full flex items-center justify-center text-white shadow-xl transform transition-transform hover:scale-110">
-                  <MessageCircle size={24} />
-                </a>
+                <a href={socialLinks.whatsapp} target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-[#25D366] rounded-full flex items-center justify-center text-white shadow-lg"><MessageCircle size={20} /></a>
               )}
             </div>
           )}
           <button 
             onClick={() => setShowSocialMenu(!showSocialMenu)}
             className={cn(
-              "w-16 h-16 rounded-full flex items-center justify-center text-white shadow-[0_15px_30px_rgba(49,46,203,0.3)] transition-all active:scale-90 hover:scale-105",
+              "w-12 h-12 rounded-full flex items-center justify-center text-white shadow-xl transition-all active:scale-90",
               showSocialMenu ? "bg-red-500 rotate-90" : "bg-[#312ECB]"
             )}
           >
-            {showSocialMenu ? <X size={28} /> : <Share2 size={28} />}
+            {showSocialMenu ? <X size={22} /> : <Share2 size={22} />}
           </button>
         </div>
       </main>
 
-      <footer className="p-3 bg-white dark:bg-slate-900 border-t dark:border-slate-800 z-50">
-        <div className="flex items-center gap-3">
-          <Input value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSend()} placeholder="Type 'Hi' for Menu..." className="flex-1 bg-[#F0F2F5] dark:bg-slate-800 rounded-full h-11 border-none font-bold" />
-          <Button onClick={() => handleSend()} size="icon" className="rounded-full h-12 w-12 bg-[#25D366] hover:bg-[#20bd5b] shadow-lg"><Send size={22} /></Button>
+      <footer className="p-2.5 bg-white dark:bg-slate-900 border-t dark:border-slate-800 z-50">
+        <div className="flex items-center gap-2">
+          <Input value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSend()} placeholder="Type 'Hi'..." className="flex-1 bg-[#F0F2F5] dark:bg-slate-800 rounded-full h-10 border-none font-bold text-sm px-4" />
+          <Button onClick={() => handleSend()} size="icon" className="rounded-full h-10 w-10 bg-[#25D366] hover:bg-[#20bd5b] shadow-md"><Send size={18} /></Button>
         </div>
       </footer>
     </div>
