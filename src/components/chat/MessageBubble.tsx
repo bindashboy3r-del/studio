@@ -1,3 +1,4 @@
+
 "use client";
 
 import { cn } from "@/lib/utils";
@@ -15,7 +16,10 @@ import {
   Plus,
   Rocket,
   PlusCircle,
-  CheckCircle2
+  CheckCircle2,
+  Package,
+  Info,
+  ChevronRight
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
@@ -24,7 +28,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { SMMService } from "@/app/lib/constants";
-import { useUser } from "@/firebase";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,6 +53,7 @@ interface MessageBubbleProps {
   isBulk?: boolean;
   dynamicServices?: SMMService[] | null;
   prefilledLinks?: string;
+  walletBalance?: number;
 }
 
 export function MessageBubble({ 
@@ -69,7 +73,8 @@ export function MessageBubble({
   quantity,
   isBulk,
   dynamicServices,
-  prefilledLinks = ""
+  prefilledLinks = "",
+  walletBalance = 0
 }: MessageBubbleProps) {
   const isUser = sender === 'user';
   const { toast } = useToast();
@@ -110,6 +115,8 @@ export function MessageBubble({
 
   const price = paymentPrice || 0;
   const finalRawPrice = rawPrice || 0;
+  const savings = finalRawPrice - price;
+  const linkCount = prefilledLinks ? prefilledLinks.split('\n').filter(l => l.trim()).length : (isBulk ? bulkLinks.length : 1);
 
   const upiId = "smmxpressbot@slc";
   const qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(`upi://pay?pa=${upiId}&pn=SocialBoost&am=${price.toFixed(2)}&cu=INR`)}&size=400&margin=1&format=png`;
@@ -174,6 +181,53 @@ export function MessageBubble({
   const updateComboQty = (id: string, val: string) => {
     setComboItems(comboItems.map(i => i.service.id === id ? { ...i, qty: val.replace(/[^0-9]/g, '') } : i));
   };
+
+  const OrderSummaryBreakdown = () => (
+    <div className="bg-slate-950/80 backdrop-blur-md rounded-[1.5rem] p-4 border border-white/5 shadow-3d-pressed space-y-3">
+      <div className="flex items-center gap-3 border-b border-white/5 pb-2.5">
+        <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400">
+          <Package size={16} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[11px] font-black uppercase text-white truncate">{serviceName || 'Package'}</p>
+          <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Qty: {quantity || 'N/A'}</p>
+        </div>
+        {isBulk && (
+          <Badge className="bg-purple-500/10 text-purple-400 border-none font-black text-[8px] px-2 h-5">
+            {linkCount} LINKS
+          </Badge>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        <div className="flex justify-between items-center">
+          <span className="text-[9px] font-bold text-slate-500 uppercase">Real Price</span>
+          <span className="text-[10px] font-bold text-slate-400 line-through">₹{finalRawPrice.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-[9px] font-bold text-emerald-500 uppercase">Discount ({discountPct}%)</span>
+          <span className="text-[10px] font-black text-emerald-400">- ₹{savings.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between items-center pt-1 border-t border-white/5">
+          <span className="text-[10px] font-black text-white uppercase tracking-tight">Net Payable</span>
+          <span className="text-[14px] font-black text-[#312ECB]">₹{price.toFixed(2)}</span>
+        </div>
+      </div>
+
+      <div className="bg-[#312ECB]/5 rounded-xl p-2.5 flex items-center justify-between border border-[#312ECB]/10">
+        <div className="flex items-center gap-2">
+          <Wallet size={12} className="text-[#312ECB]" />
+          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Your Wallet</span>
+        </div>
+        <span className={cn(
+          "text-[10px] font-black",
+          walletBalance >= price ? "text-emerald-400" : "text-red-400"
+        )}>
+          ₹{walletBalance.toFixed(2)}
+        </span>
+      </div>
+    </div>
+  );
 
   if (!mounted) return null;
 
@@ -328,114 +382,115 @@ export function MessageBubble({
             </div>
           </div>
         ) : isPaymentCard ? (
-          <div className="space-y-4 min-w-[220px]">
-            <div className="text-center space-y-1">
-              <div className="flex items-center justify-center gap-2 mb-1">
-                <Badge className="bg-emerald-500/20 text-emerald-400 border-none font-black text-[8px] px-2 shadow-3d-sm">
-                  <Percent size={10} className="mr-1" /> {discountPct}% OFF APPLIED
-                </Badge>
-              </div>
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-slate-500 line-through tracking-wider">Original Price: ₹{finalRawPrice.toFixed(2)}</span>
-                <h3 className="text-[18px] font-black text-[#312ECB] tracking-tighter">NOW ONLY: ₹{price.toFixed(2)}</h3>
-              </div>
+          <div className="space-y-5 min-w-[260px] py-1">
+            <div className="flex items-center justify-between px-1">
+              <h3 className="text-[12px] font-black uppercase text-white tracking-tight flex items-center gap-2">
+                <Info size={14} className="text-[#312ECB]" /> PAYMENT SUMMARY
+              </h3>
+              <Badge className="bg-[#312ECB]/10 text-[#312ECB] border-none font-black text-[8px] uppercase h-5">UPI / QR</Badge>
             </div>
 
-            <div className="bg-slate-950 p-3 rounded-[1.5rem] flex flex-col items-center gap-3 shadow-3d-pressed border border-white/10">
-              <div className="bg-white p-2 rounded-2xl shadow-3d border border-white/20">
-                <img src={qrUrl} alt="UPI QR" className="w-28 h-28" />
+            <OrderSummaryBreakdown />
+
+            <div className="bg-slate-950 p-4 rounded-[1.8rem] flex flex-col items-center gap-4 shadow-3d-pressed border border-white/5">
+              <div className="bg-white p-2.5 rounded-2xl shadow-3d border border-white/20">
+                <img src={qrUrl} alt="UPI QR" className="w-32 h-32" />
               </div>
-              <div className="flex w-full gap-2">
-                <Button onClick={() => { navigator.clipboard.writeText(upiId); toast({ title: "Copied!" }); }} variant="outline" className="flex-1 h-9 text-[8px] font-black uppercase rounded-xl border-white/10 shadow-3d active:shadow-3d-pressed">
-                  <Copy size={10} /> COPY UPI
+              <div className="flex w-full gap-2.5 px-1">
+                <Button onClick={() => { navigator.clipboard.writeText(upiId); toast({ title: "Copied!" }); }} variant="outline" className="flex-1 h-10 text-[9px] font-black uppercase rounded-xl border-white/10 shadow-3d active:shadow-3d-pressed text-slate-300">
+                  <Copy size={12} className="mr-1.5" /> COPY UPI
                 </Button>
-                <Button onClick={handleDownloadQR} disabled={isDownloading} variant="outline" className="flex-1 h-9 text-[8px] font-black uppercase rounded-xl border-white/10 shadow-3d active:shadow-3d-pressed text-[#312ECB]">
-                  <Download size={10} /> SAVE QR
+                <Button onClick={handleDownloadQR} disabled={isDownloading} variant="outline" className="flex-1 h-10 text-[9px] font-black uppercase rounded-xl border-white/10 shadow-3d active:shadow-3d-pressed text-[#312ECB]">
+                  <Download size={12} className="mr-1.5" /> SAVE QR
                 </Button>
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4 px-1">
               <div className="space-y-2">
                 <div className="space-y-1">
-                  <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-widest">{isBulk ? "All Links Saved" : "Post/Profile Link"}</label>
+                  <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-[0.2em]">{isBulk ? "Bulk Links Saved" : "Target Profile/Post Link"}</label>
                   {isBulk ? (
-                    <Textarea 
-                      placeholder="https://link1.com&#10;https://link2.com" 
-                      value={links} 
-                      readOnly
-                      className="min-h-[80px] rounded-xl bg-slate-900 border-none shadow-3d-pressed font-bold text-[10px] text-slate-400 opacity-70" 
-                    />
+                    <div className="bg-slate-900/50 p-3 rounded-xl border border-white/5 shadow-inner">
+                       <p className="text-[9px] font-bold text-slate-400 leading-tight italic">{linkCount} links submitted in this batch.</p>
+                    </div>
                   ) : (
-                    <Input placeholder="Enter link here" value={links} onChange={(e) => setLinks(e.target.value)} className="h-10 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-xs" />
+                    <div className="relative">
+                      <LinkIcon size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
+                      <Input placeholder="Enter link here" value={links} onChange={(e) => setLinks(e.target.value)} className="h-11 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-xs pl-9 text-white" />
+                    </div>
                   )}
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase text-red-500 ml-1 leading-none animate-pulse">Shi utr dalo varna payment verify nhi hoga</label>
-                  <Input placeholder="Enter 12-Digit UTR ID" value={utr} maxLength={12} onChange={(e) => setUtr(e.target.value.replace(/[^0-9]/g, ''))} className="h-10 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-black tracking-widest text-xs" />
+                <div className="space-y-1 pt-1">
+                  <label className="text-[9px] font-black uppercase text-red-500 ml-1 leading-none animate-pulse tracking-tighter">Shi utr dalo varna payment verify nhi hoga</label>
+                  <Input placeholder="Enter 12-Digit UTR ID" value={utr} maxLength={12} onChange={(e) => setUtr(e.target.value.replace(/[^0-9]/g, ''))} className="h-11 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-black tracking-[0.3em] text-xs text-center text-white" />
                 </div>
               </div>
               
-              <div className="flex flex-col gap-2 pt-1">
-                <Button onClick={() => onOptionClick?.(`SUBMIT_PAYMENT:${links}:${utr}`)} disabled={!links || utr.length !== 12} className="w-full h-12 bg-[#312ECB] font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10">
-                  SUBMIT PAYMENT
+              <div className="flex flex-col gap-3">
+                <Button onClick={() => onOptionClick?.(`SUBMIT_PAYMENT:${links}:${utr}`)} disabled={!links || utr.length !== 12} className="w-full h-14 bg-[#312ECB] font-black text-[11px] uppercase tracking-[0.2em] rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10">
+                  VERIFY & SUBMIT
                 </Button>
                 
-                <div className="flex flex-col items-center gap-1">
+                <div className="flex flex-col items-center gap-1.5 opacity-80">
                   <p className="text-[7px] font-black uppercase text-red-500 tracking-tighter">payment karne ke bad admin ko bheje</p>
                   <Button 
                     onClick={handleWhatsAppConfirmation}
-                    className="w-full h-10 bg-[#25D366] hover:bg-[#1EBE57] text-white font-black text-[9px] uppercase tracking-widest rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10 gap-2"
+                    className="w-full h-11 bg-[#25D366] hover:bg-[#1EBE57] text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10 gap-2"
                   >
-                    <MessageCircle size={14} /> Send to WhatsApp
+                    <MessageCircle size={16} /> Send to WhatsApp
                   </Button>
                 </div>
               </div>
             </div>
           </div>
         ) : isWalletCard ? (
-          <div className="space-y-4 min-w-[200px]">
-             <div className="flex flex-col items-center gap-2 p-4 bg-slate-950 rounded-[1.5rem] shadow-3d-pressed border border-white/10">
-                <div className="w-10 h-10 bg-[#312ECB] rounded-2xl flex items-center justify-center shadow-3d border border-white/10">
-                  <Wallet className="text-white" size={20} />
-                </div>
-                <div className="text-center">
-                  <Badge className="bg-pink-500/20 text-pink-400 border-none font-black text-[7px] mb-1">WALLET PAYMENT</Badge>
-                  <div className="flex flex-col items-center mt-1">
-                    <span className="text-[10px] font-bold text-slate-500 line-through">Real: ₹{finalRawPrice.toFixed(2)}</span>
-                    <p className="text-[20px] font-black text-[#312ECB] tracking-tighter">Pay: ₹{price.toFixed(2)}</p>
-                  </div>
-                </div>
+          <div className="space-y-5 min-w-[260px] py-1">
+             <div className="flex items-center justify-between px-1">
+                <h3 className="text-[12px] font-black uppercase text-white tracking-tight flex items-center gap-2">
+                  <Wallet size={14} className="text-[#312ECB]" /> CONFIRM ORDER
+                </h3>
+                <Badge className="bg-emerald-500/10 text-emerald-400 border-none font-black text-[8px] uppercase h-5">WALLET</Badge>
              </div>
+
+             <OrderSummaryBreakdown />
              
-             <div className="space-y-1">
-                <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-widest">{isBulk ? "Bulk Links Confirmed" : "Post/Profile Link"}</label>
-                <div className="relative">
-                  <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={12} />
+             <div className="space-y-3 px-1">
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-[0.2em]">{isBulk ? "Bulk Links Confirmed" : "Target Profile/Post Link"}</label>
                   {isBulk ? (
-                    <Textarea 
-                      value={links} 
-                      readOnly
-                      className="min-h-[80px] rounded-xl bg-slate-900 border-none shadow-3d-pressed font-bold text-[10px] text-slate-400 opacity-70 pl-8 pt-2.5" 
-                    />
+                    <div className="bg-slate-900/50 p-3 rounded-xl border border-white/5 shadow-inner">
+                       <p className="text-[9px] font-bold text-slate-400 leading-tight italic">{linkCount} links submitted in this batch.</p>
+                    </div>
                   ) : (
-                    <Input 
-                      placeholder="Enter link here" 
-                      value={links} 
-                      onChange={(e) => setLinks(e.target.value)} 
-                      className="h-10 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-xs pl-8" 
-                    />
+                    <div className="relative">
+                      <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={12} />
+                      <Input 
+                        placeholder="Enter link here" 
+                        value={links} 
+                        onChange={(e) => setLinks(e.target.value)} 
+                        className="h-11 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-xs pl-9 text-white" 
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-2">
+                  <Button 
+                    onClick={() => onOptionClick?.(`CONFIRM_WALLET:${links}`)} 
+                    disabled={!links || walletBalance < price}
+                    className={cn(
+                      "w-full h-14 font-black text-[11px] uppercase tracking-[0.2em] rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10 transition-all",
+                      walletBalance >= price ? "bg-[#312ECB] text-white" : "bg-red-500/20 text-red-400 cursor-not-allowed border-red-500/20"
+                    )}
+                  >
+                    {walletBalance >= price ? "PLACE ORDER NOW" : "INSUFFICIENT BALANCE"}
+                  </Button>
+                  {walletBalance < price && (
+                    <p className="text-center text-[8px] font-black uppercase text-red-500 mt-2 animate-pulse">Refill wallet to proceed</p>
                   )}
                 </div>
              </div>
-
-             <Button 
-               onClick={() => onOptionClick?.(`CONFIRM_WALLET:${links}`)} 
-               disabled={!links}
-               className="w-full h-12 bg-[#312ECB] font-black text-[10px] uppercase rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10"
-             >
-               CONFIRM ORDER
-             </Button>
           </div>
         ) : (
           <div className="space-y-1">

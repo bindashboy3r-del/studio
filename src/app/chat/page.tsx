@@ -207,7 +207,6 @@ export default function ChatPage() {
 
   const messagesQuery = useMemoFirebase(() => {
     if (!db || !currentUser || !sessionStart) return null;
-    // CRITICAL: We only query messages from the CURRENT session to keep UI clean
     return query(
       collection(db, "users", currentUser.uid, "chatMessages"), 
       where("timestamp", ">=", sessionStart),
@@ -240,10 +239,6 @@ export default function ChatPage() {
     }, 800);
   };
 
-  /**
-   * Smart Cleanup: Removes intermediate messages during flow switches.
-   * Preserves main menu and completed orders.
-   */
   const cleanupIntermediateChats = async () => {
     if (!db || !currentUser) return;
     const q = query(collection(db, "users", currentUser.uid, "chatMessages"));
@@ -252,7 +247,6 @@ export default function ChatPage() {
     
     snap.docs.forEach(d => {
       const data = d.data();
-      // Logic: Preserve orders, greeting, and permanent menu headers
       const isPersistent = data.orderId || data.isInitialGreeting || data.isPermanent;
       if (!isPersistent) {
         batch.delete(d.ref);
@@ -261,11 +255,9 @@ export default function ChatPage() {
     await batch.commit();
   };
 
-  // Initial Greet when Entering Chat (Post SessionStart)
   useEffect(() => {
     if (currentUser && !isMessagesLoading && !hasInitialGreeted.current && sessionStart) {
       hasInitialGreeted.current = true;
-      // We only greet if there are no current session messages
       if (!messages || messages.length === 0) {
         setChatState('initial');
         botReply("👋 Welcome to SocialBoost! Automation Active. Type 'Hi' to begin. 🚀", [], { isInitialGreeting: true, isPermanent: true });
@@ -280,7 +272,6 @@ export default function ChatPage() {
 
     const cleanText = text.toLowerCase();
 
-    // GLOBAL INTERRUPTS: Mode switching logic
     if (cleanText.includes("single order") || cleanText.includes("combo order") || cleanText.includes("bulk order")) {
       await cleanupIntermediateChats(); 
       await addMessage('user', text, [], { isPermanent: true }); 
@@ -304,7 +295,6 @@ export default function ChatPage() {
       return;
     }
 
-    // Process UI Card Submissions
     if (text.startsWith("SUBMIT_BULK_LINKS:")) {
       const linksStr = text.replace("SUBMIT_BULK_LINKS:", "");
       const linksArr = linksStr.split('|').filter(l => l.trim());
@@ -328,11 +318,18 @@ export default function ChatPage() {
       const paymentOptions: string[] = [];
       if (paymentConfig?.walletEnabled !== false) paymentOptions.push("💳 PAY FROM WALLET");
       if (paymentConfig?.upiEnabled !== false) paymentOptions.push("📲 PAY VIA UPI QR");
-      botReply(`✅ COMBO BUNDLE READY\n───────────────\nFinal Price: ₹${parseFloat(total).toFixed(2)}\n───────────────\nChoose Payment:`, paymentOptions);
+      
+      botReply(`✅ COMBO BUNDLE READY\n───────────────\nFinal Price: ₹${parseFloat(total).toFixed(2)}\n───────────────\nChoose Payment:`, paymentOptions, {
+        paymentPrice: parseFloat(total),
+        rawPrice: items.reduce((acc, it) => acc + (it.quantity/1000) * (it.service.pricePer1000 || 0), 0),
+        discountPct: globalDiscounts.combo,
+        serviceName: "Combo Bundle",
+        quantity: items[0].quantity,
+        isCombo: true
+      });
       return;
     }
 
-    // Final Order Submissions (Marked Permanent)
     if (text.startsWith("SUBMIT_PAYMENT:")) {
       const [, linksInput, utr] = text.split(":");
       await addMessage('user', `Payment Submitted (UTR: ${utr})`, [], { isPermanent: true });
@@ -428,7 +425,6 @@ export default function ChatPage() {
       return;
     }
 
-    // MAIN MENU Trigger
     if (cleanText === 'hi' || cleanText === 'menu') {
       await addMessage('user', text, [], { isPermanent: true });
       setChatState('choosing_order_type');
@@ -442,7 +438,6 @@ export default function ChatPage() {
 
     await addMessage('user', text);
 
-    // Contextual Handling
     const serviceMatch = dynamicServices.find((s, i) => cleanText === (i + 1).toString() || cleanText.includes(s.name.toLowerCase()));
     if (serviceMatch && chatState === 'choosing_service') {
       setCurrentOrder(p => ({ ...p, items: [{ service: serviceMatch, quantity: 0, link: '' }] }));
@@ -469,7 +464,10 @@ export default function ChatPage() {
         if (paymentConfig?.upiEnabled !== false) paymentOptions.push("📲 PAY VIA UPI QR");
         botReply(`✅ ${type.toUpperCase()} SUMMARY\nPrice: ₹${discounted.toFixed(2)}`, paymentOptions, { 
           rawPrice, paymentPrice: discounted, discountPct: disc, isBulk: type === 'bulk',
-          prefilledLinks: type === 'bulk' ? currentOrder.tempLinks?.join('\n') : ''
+          prefilledLinks: type === 'bulk' ? currentOrder.tempLinks?.join('\n') : '',
+          serviceName: currentOrder.items[0].service.name,
+          quantity: qty,
+          walletBalance: walletBalance
         });
       } else { botReply(`⚠️ Error: Minimum ${minNeeded} required.`); }
       return;
@@ -495,14 +493,16 @@ export default function ChatPage() {
           botReply(type === 'bulk' ? `Confirm Bulk Order?` : `Enter Link & Confirm?`, [], { 
             isWalletCard: true, paymentPrice: discounted, rawPrice, discountPct: disc,
             serviceName, quantity: qty, isBulk: type === 'bulk',
-            prefilledLinks: type === 'bulk' ? currentOrder.tempLinks?.join('\n') : ''
+            prefilledLinks: type === 'bulk' ? currentOrder.tempLinks?.join('\n') : '',
+            walletBalance: walletBalance
           });
         } else { botReply("❌ Low Balance!", ["💳 ADD FUNDS", "🏠 MENU"]); }
       } else if (cleanText.includes("upi")) {
         botReply(`Scan QR:`, [], { 
           isPaymentCard: true, paymentPrice: discounted, rawPrice, discountPct: disc,
           serviceName, quantity: qty, isBulk: type === 'bulk',
-          prefilledLinks: type === 'bulk' ? currentOrder.tempLinks?.join('\n') : ''
+          prefilledLinks: type === 'bulk' ? currentOrder.tempLinks?.join('\n') : '',
+          walletBalance: walletBalance
         });
       }
     }
@@ -556,7 +556,7 @@ export default function ChatPage() {
             isWalletCard={m.isWalletCard} isComboConfigCard={m.isComboConfigCard} isBulkLinkCard={m.isBulkLinkCard}
             timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} dynamicServices={dynamicServices} 
             discountPct={m.discountPct ?? 0} serviceName={m.serviceName} quantity={m.quantity}
-            isBulk={m.isBulk} prefilledLinks={m.prefilledLinks}
+            isBulk={m.isBulk} prefilledLinks={m.prefilledLinks} walletBalance={m.walletBalance || walletBalance}
           />
         ))}
         {isTyping && <TypingIndicator />}
