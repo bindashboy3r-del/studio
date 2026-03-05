@@ -19,7 +19,8 @@ import {
   CheckCircle2,
   Package,
   Info,
-  ChevronRight
+  ChevronRight,
+  TrendingDown
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,7 @@ interface MessageBubbleProps {
   dynamicServices?: SMMService[] | null;
   prefilledLinks?: string;
   walletBalance?: number;
+  isCombo?: boolean;
 }
 
 export function MessageBubble({ 
@@ -74,7 +76,8 @@ export function MessageBubble({
   isBulk,
   dynamicServices,
   prefilledLinks = "",
-  walletBalance = 0
+  walletBalance = 0,
+  isCombo
 }: MessageBubbleProps) {
   const isUser = sender === 'user';
   const { toast } = useToast();
@@ -93,7 +96,6 @@ export function MessageBubble({
 
   useEffect(() => { setMounted(true); }, []);
 
-  // Initialize Combo Items with Likes, Views, Comments if they exist
   useEffect(() => {
     if (isComboConfigCard && dynamicServices && comboItems.length === 0) {
       const likes = dynamicServices.find(s => s.name.toLowerCase().includes('like'));
@@ -143,9 +145,7 @@ export function MessageBubble({
     const adminNumber = "919116399517";
     const randomId = Math.floor(1000 + Math.random() * 9000);
     const displayId = `ORD-${randomId}`;
-    
     const message = `🚀 *NEW ORDER PLACED!*\n\n🆔 *Order ID:* #${displayId}\n📊 *Service:* ${serviceName || "Instagram Service"}\n🔢 *Quantity:* ${quantity || "N/A"}\n💰 *Price:* ₹${price.toFixed(2)}\n🔗 *Links:* ${links || "N/A"}\n💳 *Payment:* UPI (${utr || "N/A"})\n\nPlease process my order ASAP!`;
-    
     window.open(`https://wa.me/${adminNumber}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
@@ -159,7 +159,6 @@ export function MessageBubble({
     setBulkLinks(bulkLinks.filter((_, i) => i !== index));
   };
 
-  // Combo Logic
   const comboSubtotal = useMemo(() => {
     return comboItems.reduce((acc, item) => {
       const q = parseInt(item.qty) || 0;
@@ -183,53 +182,66 @@ export function MessageBubble({
   };
 
   const OrderSummaryBreakdown = () => (
-    <div className="bg-slate-950/80 backdrop-blur-md rounded-[1.5rem] p-4 border border-white/5 shadow-3d-pressed space-y-3">
-      <div className="flex items-center gap-3 border-b border-white/5 pb-2.5">
-        <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400">
-          <Package size={16} />
+    <div className="bg-slate-950/90 backdrop-blur-xl rounded-[1.8rem] p-5 border border-white/10 shadow-3d-pressed space-y-4">
+      <div className="flex items-center gap-3 border-b border-white/5 pb-3">
+        <div className="w-10 h-10 rounded-xl bg-[#312ECB]/20 flex items-center justify-center text-[#312ECB]">
+          <Package size={20} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[11px] font-black uppercase text-white truncate">{serviceName || 'Package'}</p>
-          <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Qty: {quantity || 'N/A'}</p>
-        </div>
-        {isBulk && (
-          <Badge className="bg-purple-500/10 text-purple-400 border-none font-black text-[8px] px-2 h-5">
-            {linkCount} LINKS
-          </Badge>
-        )}
-      </div>
-
-      <div className="space-y-1.5">
-        <div className="flex justify-between items-center">
-          <span className="text-[9px] font-bold text-slate-500 uppercase">Real Price</span>
-          <span className="text-[10px] font-bold text-slate-400 line-through">₹{finalRawPrice.toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between items-center">
-          <span className="text-[9px] font-bold text-emerald-500 uppercase">Discount ({discountPct}%)</span>
-          <span className="text-[10px] font-black text-emerald-400">- ₹{savings.toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between items-center pt-1 border-t border-white/5">
-          <span className="text-[10px] font-black text-white uppercase tracking-tight">Net Payable</span>
-          <span className="text-[14px] font-black text-[#312ECB]">₹{price.toFixed(2)}</span>
+          <p className="text-[13px] font-black uppercase text-white truncate tracking-tight">{serviceName || 'Package'}</p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Qty: {quantity || 'N/A'}</span>
+            {isBulk && (
+              <Badge className="bg-purple-500/10 text-purple-400 border-none font-black text-[8px] px-2 h-4">
+                {linkCount} LINKS
+              </Badge>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="bg-[#312ECB]/5 rounded-xl p-2.5 flex items-center justify-between border border-[#312ECB]/10">
-        <div className="flex items-center gap-2">
-          <Wallet size={12} className="text-[#312ECB]" />
-          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Your Wallet</span>
+      <div className="space-y-2.5">
+        <div className="flex justify-between items-center px-1">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Real Price</span>
+          <span className="text-[11px] font-bold text-slate-400 line-through">₹{finalRawPrice.toFixed(2)}</span>
         </div>
-        <span className={cn(
-          "text-[10px] font-black",
-          walletBalance >= price ? "text-emerald-400" : "text-red-400"
-        )}>
-          ₹{walletBalance.toFixed(2)}
-        </span>
+        <div className="flex justify-between items-center px-1">
+          <div className="flex items-center gap-1.5">
+            <TrendingDown size={14} className="text-emerald-400" />
+            <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Saved ({discountPct}%)</span>
+          </div>
+          <span className="text-[11px] font-black text-emerald-400">- ₹{savings.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between items-center pt-2.5 border-t border-white/10 px-1">
+          <span className="text-[11px] font-black text-white uppercase tracking-widest">Final Amount</span>
+          <span className="text-[18px] font-black text-[#312ECB] italic">₹{price.toFixed(2)}</span>
+        </div>
+      </div>
+
+      <div className="bg-emerald-500/5 rounded-2xl p-3.5 flex items-center justify-between border border-emerald-500/10 shadow-inner mt-2">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+            <Wallet size={14} />
+          </div>
+          <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.1em]">Wallet Balance</span>
+        </div>
+        <div className="text-right">
+          <p className={cn(
+            "text-[12px] font-black tracking-tight",
+            walletBalance >= price ? "text-emerald-400" : "text-red-400"
+          )}>
+            ₹{walletBalance.toFixed(2)}
+          </p>
+          {walletBalance < price && <p className="text-[7px] font-black uppercase text-red-500 mt-0.5 animate-pulse">Low Balance</p>}
+        </div>
       </div>
     </div>
   );
 
   if (!mounted) return null;
+
+  // Render logic for different card types
+  const hasPriceData = paymentPrice !== undefined && rawPrice !== undefined;
 
   return (
     <div className={cn("flex w-full mb-4", isUser ? "justify-end" : "justify-start")}>
@@ -491,6 +503,17 @@ export function MessageBubble({
                   )}
                 </div>
              </div>
+          </div>
+        ) : hasPriceData ? (
+          <div className="space-y-4 min-w-[260px] py-1">
+            <div className="flex items-center gap-2 px-1">
+              <CheckCircle2 size={16} className="text-emerald-500" />
+              <h3 className="text-[13px] font-black uppercase text-white tracking-tight">Order Summary</h3>
+            </div>
+            <OrderSummaryBreakdown />
+            {text && !text.includes('SUMMARY') && (
+              <p className="text-[11px] font-bold text-slate-300 px-1 mt-2">{text}</p>
+            )}
           </div>
         ) : (
           <div className="space-y-1">
