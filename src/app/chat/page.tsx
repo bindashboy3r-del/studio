@@ -414,6 +414,28 @@ export default function ChatPage() {
       return;
     }
 
+    // GLOBAL INTERRUPTS (Reset flow if user clicks a menu button anytime)
+    if (cleanText.includes("single order") || cleanText.includes("combo order") || cleanText.includes("bulk order")) {
+      await addMessage('user', text);
+      if (cleanText.includes("single order")) {
+        setChatState('choosing_service'); 
+        setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
+        botReply(`Pick a Service. You get ${globalDiscounts.single}% OFF!`, dynamicServices.map((s, i) => `${i + 1}. ${s.name}`));
+      } else if (cleanText.includes("combo order")) {
+        setChatState('configuring_combo'); 
+        setCurrentOrder({ type: 'combo', platform: 'instagram', items: [] });
+        botReply("Configure your custom combo bundle:", [], { 
+          isComboConfigCard: true, 
+          discountPct: globalDiscounts.combo 
+        });
+      } else if (cleanText.includes("bulk order")) {
+        setChatState('bulk_entering_links'); 
+        setCurrentOrder({ type: 'bulk', platform: 'instagram', items: [], tempLinks: [] });
+        botReply(`🚀 BULK MODE: Paste your links below (one per line). Type "DONE" when you are finished!`, ["DONE"]);
+      }
+      return;
+    }
+
     await addMessage('user', text);
 
     // MENU PRIORITY
@@ -424,31 +446,6 @@ export default function ChatPage() {
         `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)`, 
         `3. BULK ORDER (${globalDiscounts.bulk}% OFF)`
       ]);
-      return;
-    }
-
-    // FLOW HANDLERS
-    if (cleanText.includes("single order") && chatState === 'choosing_order_type') {
-      setChatState('choosing_service'); 
-      setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
-      botReply(`Pick a Service. You get ${globalDiscounts.single}% OFF!`, dynamicServices.map((s, i) => `${i + 1}. ${s.name}`));
-      return;
-    }
-
-    if (cleanText.includes("combo order") && chatState === 'choosing_order_type') {
-      setChatState('configuring_combo'); 
-      setCurrentOrder({ type: 'combo', platform: 'instagram', items: [] });
-      botReply("Configure your custom combo bundle:", [], { 
-        isComboConfigCard: true, 
-        discountPct: globalDiscounts.combo 
-      });
-      return;
-    }
-
-    if (cleanText.includes("bulk order") && chatState === 'choosing_order_type') {
-      setChatState('bulk_entering_links'); 
-      setCurrentOrder({ type: 'bulk', platform: 'instagram', items: [], tempLinks: [] });
-      botReply(`🚀 BULK MODE: Paste your links below (one per line). Type "DONE" when you are finished!`, ["DONE"]);
       return;
     }
 
@@ -496,7 +493,7 @@ export default function ChatPage() {
         const disc = globalDiscounts[type] || 0;
         const discounted = rawPrice * (1 - disc / 100);
         
-        const summary = `✅ ${type.toUpperCase()} SUMMARY\n───────────────\nService: ${currentOrder.items[0].service.name}\nQuantity: ${qty} ${type === 'bulk' ? `(x ${numLinks} links)` : ''}\nReal Price: ₹${rawPrice.toFixed(2)}\nDiscount: ${disc}%\nFinal Price: ₹${discounted.toFixed(2)}\n───────────────\n💳 Wallet: ₹${walletBalance.toFixed(0)}`;
+        const summary = `✅ ${type.toUpperCase() === 'SINGLE' ? 'SINGLE ORDER' : type.toUpperCase()} SUMMARY\n───────────────\nService: ${currentOrder.items[0].service.name}\nQuantity: ${qty} ${type === 'bulk' ? `(x ${numLinks} links)` : ''}\nReal Price: ₹${rawPrice.toFixed(2)}\nDiscount: ${disc}%\nFinal Price: ₹${discounted.toFixed(2)}\n───────────────\n💳 Wallet: ₹${walletBalance.toFixed(0)}`;
         
         const paymentOptions: string[] = [];
         if (paymentConfig?.walletEnabled !== false) paymentOptions.push("💳 PAY FROM WALLET");
