@@ -227,7 +227,7 @@ export default function ChatPage() {
 
   const addMessage = async (sender: 'user' | 'bot', text: string, options?: string[], extraData?: any) => {
     if (!currentUser || !db) return;
-    addDoc(collection(db, "users", currentUser.uid, "chatMessages"), { 
+    return addDoc(collection(db, "users", currentUser.uid, "chatMessages"), { 
       userId: currentUser.uid, 
       sender, 
       text, 
@@ -245,16 +245,22 @@ export default function ChatPage() {
     }, 800);
   };
 
-  // Utility to clear chats for current user
-  const clearCurrentChatHistory = async () => {
+  // Selective Cleanup: Deletes "faltu" intermediate messages
+  const cleanupIntermediateChats = async () => {
     if (!db || !currentUser) return;
-    const q = query(collection(db, "users", currentUser.uid, "chatMessages"));
+    // We find all messages from this session and delete them to keep it clean
+    const q = query(collection(db, "users", currentUser.uid, "chatMessages"), where("timestamp", ">=", sessionStart));
     const snap = await getDocs(q);
     const batch = writeBatch(db);
-    snap.docs.forEach(d => batch.delete(d.ref));
+    // Keep only the messages that are order confirmations or the very first mode selection
+    snap.docs.forEach(d => {
+      const data = d.data();
+      // Logic: Only delete if it's not a successful order placement card
+      if (!data.orderId) {
+        batch.delete(d.ref);
+      }
+    });
     await batch.commit();
-    // Reset local view
-    setSessionStart(Timestamp.now());
   };
 
   useEffect(() => {
@@ -439,9 +445,9 @@ export default function ChatPage() {
       return;
     }
 
-    // GLOBAL INTERRUPTS (Reset flow if user clicks a menu button anytime)
+    // GLOBAL INTERRUPTS: Mode switch deletes intermediate "faltu" chats
     if (cleanText.includes("single order") || cleanText.includes("combo order") || cleanText.includes("bulk order")) {
-      await clearCurrentChatHistory(); // DELETE FALTU CHATS
+      await cleanupIntermediateChats(); 
       await addMessage('user', text);
       
       if (cleanText.includes("single order")) {
@@ -458,7 +464,7 @@ export default function ChatPage() {
       } else if (cleanText.includes("bulk order")) {
         setChatState('bulk_adding_links'); 
         setCurrentOrder({ type: 'bulk', platform: 'instagram', items: [], tempLinks: [] });
-        botReply(`🚀 BULK MODE: Add your links below. Click SUBMIT when finished!`, [], { isBulkLinkCard: true });
+        botReply(`🚀 BULK MODE: Add links one by one. Click SUBMIT when finished!`, [], { isBulkLinkCard: true });
       }
       return;
     }
