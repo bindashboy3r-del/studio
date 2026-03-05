@@ -20,7 +20,9 @@ import {
   Info,
   ChevronRight,
   TrendingDown,
-  Loader2
+  Loader2,
+  QrCode,
+  History
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
@@ -48,6 +50,10 @@ interface MessageBubbleProps {
   isWalletCard?: boolean;
   isComboConfigCard?: boolean;
   isBulkLinkCard?: boolean;
+  isSuccessCard?: boolean;
+  showWhatsAppSuccess?: boolean;
+  utrId?: string;
+  orderId?: string;
   discountPct?: number;
   serviceName?: string;
   quantity?: number;
@@ -70,6 +76,10 @@ export function MessageBubble({
   isWalletCard,
   isComboConfigCard,
   isBulkLinkCard,
+  isSuccessCard,
+  showWhatsAppSuccess,
+  utrId: propUtr,
+  orderId,
   discountPct = 0,
   serviceName,
   quantity,
@@ -146,9 +156,7 @@ export function MessageBubble({
 
   const handleWhatsAppConfirmation = () => {
     const adminNumber = "919116399517";
-    const randomId = Math.floor(1000 + Math.random() * 9000);
-    const displayId = `ORD-${randomId}`;
-    const message = `🚀 *NEW ORDER PLACED!*\n\n🆔 *Order ID:* #${displayId}\n📊 *Service:* ${serviceName || "Instagram Service"}\n🔢 *Quantity:* ${quantity || "N/A"}\n💰 *Price:* ₹${price.toFixed(2)}\n🔗 *Links:* ${links || "N/A"}\n💳 *Payment:* UPI (${utr || "N/A"})\n\nPlease process my order ASAP!`;
+    const message = `🚀 *NEW ORDER PLACED!*\n\n🆔 *Order ID:* #${orderId || "N/A"}\n📊 *Service:* ${serviceName || "Instagram Service"}\n🔢 *Quantity:* ${quantity || "N/A"}\n💰 *Amount:* ₹${price.toFixed(2)}\n🔗 *Links:* ${links || prefilledLinks || "N/A"}\n💳 *UTR ID:* ${propUtr || utr || "N/A"}\n\nPlease process my order ASAP!`;
     window.open(`https://wa.me/${adminNumber}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
@@ -243,7 +251,6 @@ export function MessageBubble({
 
   if (!mounted) return null;
 
-  // Render logic for different card types
   const hasPriceData = paymentPrice !== undefined && rawPrice !== undefined;
 
   return (
@@ -398,15 +405,6 @@ export function MessageBubble({
           </div>
         ) : isPaymentCard ? (
           <div className="space-y-5 min-w-[260px] py-1">
-            <div className="flex items-center justify-between px-1">
-              <h3 className="text-[12px] font-black uppercase text-white tracking-tight flex items-center gap-2">
-                <Info size={14} className="text-[#312ECB]" /> PAYMENT SUMMARY
-              </h3>
-              <Badge className="bg-[#312ECB]/10 text-[#312ECB] border-none font-black text-[8px] uppercase h-5">UPI / QR</Badge>
-            </div>
-
-            <OrderSummaryBreakdown />
-
             <div className="bg-slate-950 p-4 rounded-[1.8rem] flex flex-col items-center gap-4 shadow-3d-pressed border border-white/5">
               <div className="bg-white p-2.5 rounded-2xl shadow-3d border border-white/20">
                 <img src={qrUrl} alt="UPI QR" className="w-32 h-32" />
@@ -446,16 +444,6 @@ export function MessageBubble({
                 <Button onClick={() => onOptionClick?.(`SUBMIT_PAYMENT:${links}:${utr}`)} disabled={!links || utr.length !== 12} className="w-full h-14 bg-[#312ECB] font-black text-[11px] uppercase tracking-[0.2em] rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10">
                   VERIFY & SUBMIT
                 </Button>
-                
-                <div className="flex flex-col items-center gap-1.5 opacity-80">
-                  <p className="text-[7px] font-black uppercase text-red-500 tracking-tighter">payment karne ke bad admin ko bheje</p>
-                  <Button 
-                    onClick={handleWhatsAppConfirmation}
-                    className="w-full h-11 bg-[#25D366] hover:bg-[#1EBE57] text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10 gap-2"
-                  >
-                    <MessageCircle size={16} /> Send to WhatsApp
-                  </Button>
-                </div>
               </div>
             </div>
           </div>
@@ -507,6 +495,58 @@ export function MessageBubble({
                 </div>
              </div>
           </div>
+        ) : isSuccessCard ? (
+          <div className="space-y-5 min-w-[280px] py-2">
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-2">
+                <CheckCircle2 className="text-emerald-500" size={32} />
+              </div>
+              <h3 className="text-[15px] font-black uppercase text-white tracking-tight">Congratulations!</h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Your order is placed</p>
+            </div>
+
+            <div className="bg-slate-950/80 rounded-[1.5rem] p-4 border border-white/5 space-y-3 shadow-inner">
+              <div className="flex justify-between">
+                <span className="text-[9px] font-bold text-slate-500 uppercase">Service:</span>
+                <span className="text-[10px] font-black text-[#312ECB] uppercase">{serviceName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[9px] font-bold text-slate-500 uppercase">Quantity:</span>
+                <span className="text-[10px] font-black text-white">{quantity}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[9px] font-bold text-slate-500 uppercase">Paid Amount:</span>
+                <span className="text-[10px] font-black text-emerald-400">₹{price.toFixed(2)}</span>
+              </div>
+              <div className="pt-2 border-t border-white/5">
+                <span className="text-[8px] font-bold text-slate-500 uppercase block mb-1">Target Link:</span>
+                <p className="text-[9px] font-medium text-slate-300 truncate">{links || prefilledLinks}</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex gap-2.5">
+                <Button onClick={() => onOptionClick?.("menu")} variant="outline" className="flex-1 h-11 border-white/10 bg-slate-950 text-white font-black text-[9px] uppercase tracking-widest rounded-xl shadow-3d active:shadow-3d-pressed">
+                  MENU
+                </Button>
+                <Button onClick={() => onOptionClick?.("OPEN_ORDERS")} variant="outline" className="flex-1 h-11 border-white/10 bg-slate-950 text-[#312ECB] font-black text-[9px] uppercase tracking-widest rounded-xl shadow-3d active:shadow-3d-pressed gap-2">
+                  <History size={12} /> HISTORY
+                </Button>
+              </div>
+
+              {showWhatsAppSuccess && (
+                <div className="pt-2">
+                  <p className="text-center text-[8px] font-black text-slate-500 uppercase mb-2">Send order details to admin</p>
+                  <Button 
+                    onClick={handleWhatsAppConfirmation}
+                    className="w-full h-12 bg-[#25D366] hover:bg-[#1EBE57] text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10 gap-2"
+                  >
+                    <MessageCircle size={18} /> SEND ON WHATSAPP
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
         ) : hasPriceData ? (
           <div className="space-y-4 min-w-[260px] py-1">
             <div className="flex items-center gap-2 px-1">
@@ -524,7 +564,7 @@ export function MessageBubble({
           </div>
         )}
 
-        {options && !isPaymentCard && !isWalletCard && !isComboConfigCard && !isBulkLinkCard && (
+        {options && !isPaymentCard && !isWalletCard && !isComboConfigCard && !isBulkLinkCard && !isSuccessCard && (
           <div className="mt-4 space-y-2">
             {options.map((opt, i) => (
               <button key={i} onClick={() => onOptionClick?.(opt)} className="w-full bg-slate-900 border border-white/5 p-3 rounded-2xl flex items-center justify-between group shadow-3d active:shadow-3d-pressed transition-all">

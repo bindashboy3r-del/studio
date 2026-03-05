@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -272,6 +271,12 @@ export default function ChatPage() {
 
     const cleanText = text.toLowerCase();
 
+    // Universal Shortcut for history/menu
+    if (cleanText === 'open_orders') {
+      setIsOrdersOpen(true);
+      return;
+    }
+
     if (cleanText.includes("single order") || cleanText.includes("combo order") || cleanText.includes("bulk order")) {
       await cleanupIntermediateChats(); 
       await addMessage('user', text, [], { isPermanent: true }); 
@@ -354,7 +359,6 @@ export default function ChatPage() {
       }
 
       const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}`;
-      // Set auto-complete time to 45 mins from now
       const autoCompleteAt = new Date(Date.now() + 45 * 60 * 1000);
 
       await addDoc(collection(db, "users", currentUser.uid, "orders"), {
@@ -364,7 +368,17 @@ export default function ChatPage() {
         autoCompleteAt: Timestamp.fromDate(autoCompleteAt)
       });
 
-      botReply(`✅ Details Submitted!\n\n🔢 Order ID: #${orderId}\n💰 Amount: ₹${totalPrice.toFixed(2)}\n\nAdmin 30-60 mins mein verify karke order start kar denge. 🚀`, [], { orderId, isPermanent: true });
+      botReply("Order Placed Successfully!", [], { 
+        orderId, 
+        isPermanent: true, 
+        isSuccessCard: true, 
+        showWhatsAppSuccess: true,
+        paymentPrice: totalPrice,
+        serviceName: serviceNames,
+        quantity: currentOrder.items[0]?.quantity || 0,
+        prefilledLinks: linksInput,
+        utrId: utr
+      });
       setChatState('idle');
       return;
     }
@@ -378,13 +392,16 @@ export default function ChatPage() {
       const numLinks = linksArr.length;
 
       let totalPrice = 0;
+      let serviceNames = "";
       if (type === 'combo') {
         const basePrice = currentOrder.items.reduce((acc, item) => acc + (item.quantity / 1000) * (item.service.pricePer1000 || 0), 0);
         totalPrice = basePrice * (1 - disc / 100);
+        serviceNames = "Combo Bundle";
       } else {
         const s = currentOrder.items[0].service;
         const qty = currentOrder.items[0].quantity;
         totalPrice = (qty / 1000) * (s.pricePer1000 || 0) * (1 - disc / 100) * numLinks;
+        serviceNames = s.name;
       }
       
       if (walletBalance >= totalPrice) {
@@ -394,7 +411,6 @@ export default function ChatPage() {
           const apiData = apiSnap.data();
           const batch = writeBatch(db);
           const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}`;
-          // Set auto-complete time to 45 mins from now
           const autoCompleteAt = new Date(Date.now() + 45 * 60 * 1000);
 
           if (type === 'combo') {
@@ -420,13 +436,23 @@ export default function ChatPage() {
           const userOrderRef = doc(collection(db, "users", currentUser.uid, "orders"));
           batch.update(userDocRef!, { balance: increment(-totalPrice) });
           batch.set(userOrderRef, {
-            orderId, service: type === 'combo' ? "Combo Bundle" : currentOrder.items[0].service.name,
+            orderId, service: serviceNames,
             quantity: currentOrder.items[0].quantity, price: totalPrice, status: 'Processing', type: 'API',
             links: linksArr, platform: 'instagram', createdAt: serverTimestamp(),
             autoCompleteAt: Timestamp.fromDate(autoCompleteAt)
           });
           await batch.commit();
-          botReply(`🎉 Order Placed Successfully!\n\n🆔 Order ID: ${orderId}\n💰 Paid: ₹${totalPrice.toFixed(2)}`, [], { orderId, isPermanent: true });
+          
+          botReply("Order Placed Successfully!", [], { 
+            orderId, 
+            isPermanent: true, 
+            isSuccessCard: true, 
+            showWhatsAppSuccess: false,
+            paymentPrice: totalPrice,
+            serviceName: serviceNames,
+            quantity: currentOrder.items[0].quantity,
+            prefilledLinks: linksInput
+          });
           setChatState('idle');
         } catch (e) { botReply("❌ Kuch technical issue hua."); } finally { setIsTyping(false); }
       } else { botReply("❌ Low Balance!"); }
@@ -562,6 +588,7 @@ export default function ChatPage() {
             key={m.id} sender={m.sender} text={m.text} options={m.options} onOptionClick={handleSend} 
             isPaymentCard={m.isPaymentCard} paymentPrice={m.paymentPrice} rawPrice={m.rawPrice}
             isWalletCard={m.isWalletCard} isComboConfigCard={m.isComboConfigCard} isBulkLinkCard={m.isBulkLinkCard}
+            isSuccessCard={m.isSuccessCard} showWhatsAppSuccess={m.showWhatsAppSuccess} utrId={m.utrId} orderId={m.orderId}
             timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} dynamicServices={dynamicServices} 
             discountPct={m.discountPct ?? 0} serviceName={m.serviceName} quantity={m.quantity}
             isBulk={m.isBulk} prefilledLinks={m.prefilledLinks} walletBalance={m.walletBalance || walletBalance}
