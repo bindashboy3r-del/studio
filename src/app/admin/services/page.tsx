@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { 
   ChevronLeft, 
@@ -18,7 +19,8 @@ import {
   Globe,
   Youtube,
   Facebook,
-  Twitter
+  Twitter,
+  LayoutGrid
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,6 +89,20 @@ export default function ServiceManagerPage() {
 
   const { data: services, isLoading: isServicesLoading } = useCollection<Service>(servicesQuery);
 
+  // Group services by platform (Category)
+  const groupedServices = useMemo(() => {
+    if (!services) return {};
+    const groups: Record<string, Service[]> = {};
+    services.forEach(s => {
+      const p = s.platform || 'other';
+      if (!groups[p]) groups[p] = [];
+      groups[p].push(s);
+    });
+    return groups;
+  }, [services]);
+
+  const activePlatforms = Object.keys(groupedServices) as Platform[];
+
   const [isAdding, setIsAdding] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -122,7 +138,7 @@ export default function ServiceManagerPage() {
         batch.set(ref, { ...s, updatedAt: serverTimestamp() }, { merge: true });
       });
       await batch.commit();
-      toast({ title: "Defaults Loaded", description: "Standard SMM services have been populated." });
+      toast({ title: "Defaults Loaded", description: "Standard services have been populated." });
     } catch (e) {
       toast({ variant: "destructive", title: "Seed Failed" });
     } finally {
@@ -147,7 +163,7 @@ export default function ServiceManagerPage() {
 
     setDoc(docRef, data)
       .then(() => {
-        toast({ title: "Service Added", description: `${newService.name} is now available.` });
+        toast({ title: "Service Added", description: `${newService.name} is now live in Category.` });
         setIsAdding(false);
         setNewService({ id: "", name: "", platform: 'instagram', isActive: true, pricePer1000: 0, minQuantity: 100, order: (services?.length || 0) + 1 });
       })
@@ -199,11 +215,11 @@ export default function ServiceManagerPage() {
 
   const getPlatformIcon = (platform: Platform) => {
     switch(platform) {
-      case 'instagram': return <Instagram size={16} className="text-pink-500" />;
-      case 'youtube': return <Youtube size={16} className="text-red-600" />;
-      case 'facebook': return <Facebook size={16} className="text-blue-600" />;
-      case 'twitter': return <Twitter size={16} className="text-sky-500" />;
-      default: return <Globe size={16} className="text-slate-400" />;
+      case 'instagram': return <Instagram size={20} className="text-pink-500" />;
+      case 'youtube': return <Youtube size={20} className="text-red-600" />;
+      case 'facebook': return <Facebook size={20} className="text-blue-600" />;
+      case 'twitter': return <Twitter size={20} className="text-sky-500" />;
+      default: return <Globe size={20} className="text-slate-400" />;
     }
   };
 
@@ -216,176 +232,174 @@ export default function ServiceManagerPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 font-body pb-20">
-      <header className="bg-white px-6 py-4 flex items-center justify-between border-b border-slate-100 sticky top-0 z-50">
+    <div className="min-h-screen bg-[#F8FAFC] font-body pb-20">
+      <header className="bg-white px-6 py-4 flex items-center justify-between border-b border-slate-100 sticky top-0 z-50 shadow-sm">
         <div className="flex items-center gap-3">
-          <button onClick={() => router.push("/admin")} className="p-2 hover:bg-slate-50 rounded-lg text-slate-400">
+          <button onClick={() => router.push("/admin")} className="p-2 hover:bg-slate-50 rounded-lg text-slate-400 transition-colors">
             <ChevronLeft size={20} />
           </button>
-          <h1 className="text-lg font-black tracking-tight text-[#111B21]">Service Management</h1>
+          <h1 className="text-lg font-black tracking-tight text-[#111B21] uppercase">Category Manager</h1>
         </div>
         <div className="flex items-center gap-3">
           <Button 
             variant="outline" 
             onClick={handleSeedDefaults} 
             disabled={isSeeding}
-            className="rounded-xl h-10 px-4 font-black uppercase text-[10px] tracking-widest gap-2 border-blue-100 text-[#312ECB]"
+            className="rounded-xl h-10 px-4 font-black uppercase text-[10px] tracking-widest gap-2 border-blue-100 text-[#312ECB] hover:bg-blue-50"
           >
             <Zap size={14} className={isSeeding ? "animate-pulse" : ""} /> {isSeeding ? "Loading..." : "Load Defaults"}
           </Button>
           <Dialog open={isAdding} onOpenChange={setIsAdding}>
             <DialogTrigger asChild>
               <Button className="bg-[#312ECB] hover:bg-[#2825A6] rounded-xl h-10 px-5 font-black uppercase text-[10px] tracking-widest gap-2 shadow-lg">
-                <Plus size={16} /> Add Custom
+                <Plus size={16} /> Add Service
               </Button>
             </DialogTrigger>
             <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-8 bg-white">
               <DialogHeader>
                 <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-3 text-slate-900">
-                  <Layers className="text-[#312ECB]" /> New SMM Service
+                  <Layers className="text-[#312ECB]" /> New Category Service
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Platform</label>
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Select Category (Platform)</label>
                   <Select 
                     value={newService.platform} 
                     onValueChange={(val: Platform) => setNewService({...newService, platform: val})}
                   >
-                    <SelectTrigger className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900">
-                      <SelectValue placeholder="Select Platform" />
+                    <SelectTrigger className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900 shadow-inner">
+                      <SelectValue placeholder="Pick Category" />
                     </SelectTrigger>
                     <SelectContent className="bg-white border-slate-100 rounded-xl">
                       {Object.entries(PLATFORMS).map(([val, label]) => (
-                        <SelectItem key={val} value={val} className="text-xs font-bold uppercase">{label}</SelectItem>
+                        <SelectItem key={val} value={val} className="text-xs font-bold uppercase">{label} Category</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Unique ID</label>
-                    <Input placeholder="yt_subscribers" value={newService.id || ""} onChange={e => setNewService({...newService, id: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Service ID</label>
+                    <Input placeholder="yt_subscribers" value={newService.id || ""} onChange={e => setNewService({...newService, id: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900 shadow-inner" />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Order (Position)</label>
-                    <Input type="number" value={newService.order || 0} onChange={e => setNewService({...newService, order: parseInt(e.target.value) || 0})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Position</label>
+                    <Input type="number" value={newService.order || 0} onChange={e => setNewService({...newService, order: parseInt(e.target.value) || 0})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900 shadow-inner" />
                   </div>
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Display Name</label>
-                  <Input placeholder="e.g. Subs (Non-Drop)" value={newService.name || ""} onChange={e => setNewService({...newService, name: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
+                  <Input placeholder="e.g. Subs (Non-Drop)" value={newService.name || ""} onChange={e => setNewService({...newService, name: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900 shadow-inner" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Price (₹ / 1k)</label>
-                    <Input type="number" value={newService.pricePer1000 || 0} onChange={e => setNewService({...newService, pricePer1000: parseFloat(e.target.value) || 0})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
+                    <Input type="number" value={newService.pricePer1000 || 0} onChange={e => setNewService({...newService, pricePer1000: parseFloat(e.target.value) || 0})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900 shadow-inner" />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Min Quantity</label>
-                    <Input type="number" value={newService.minQuantity || 100} onChange={e => setNewService({...newService, minQuantity: parseInt(e.target.value) || 0})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
+                    <Input type="number" value={newService.minQuantity || 100} onChange={e => setNewService({...newService, minQuantity: parseInt(e.target.value) || 0})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900 shadow-inner" />
                   </div>
                 </div>
               </div>
               <DialogFooter>
-                <Button onClick={handleAddService} className="w-full h-14 bg-[#312ECB] text-white font-black uppercase tracking-widest rounded-2xl">Create Service</Button>
+                <Button onClick={handleAddService} className="w-full h-14 bg-[#312ECB] text-white font-black uppercase tracking-widest rounded-2xl shadow-lg active:scale-95 transition-all">Add to Category</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto p-6 space-y-6">
-        <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-slate-100">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
-                <Layers size={24} />
+      <main className="max-w-4xl mx-auto p-6 space-y-10">
+        {activePlatforms.length > 0 ? activePlatforms.sort().map(platform => (
+          <section key={platform} className="space-y-4">
+            <div className="flex items-center justify-between px-2">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center shadow-sm border border-slate-100">
+                  {getPlatformIcon(platform)}
+                </div>
+                <div>
+                  <h2 className="text-xl font-black uppercase tracking-tight text-slate-900">{PLATFORMS[platform]} Category</h2>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">{groupedServices[platform].length} Services Active</p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-xl font-black uppercase tracking-tight text-slate-900">Services List</h2>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Organized by Platform & Order</p>
-              </div>
+              <Badge className="bg-slate-900 text-white border-none font-black text-[10px] uppercase h-6 px-3">{PLATFORMS[platform]}</Badge>
             </div>
-            <Badge className="bg-blue-50 text-[#312ECB] border-none font-black text-[10px] uppercase">{services?.length || 0} Total</Badge>
-          </div>
 
-          <div className="space-y-4">
-            {services?.map((service) => (
-              <div key={service.id} className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 flex flex-col md:flex-row md:items-center gap-6 group transition-all hover:shadow-md relative">
-                <div className="flex items-center gap-4 min-w-[50px]">
-                   <span className="text-[12px] font-black text-slate-300">#{service.order}</span>
-                </div>
-                
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[14px] font-black text-[#111B21]">{service.name}</span>
-                    <Badge variant="outline" className="text-[8px] font-black uppercase opacity-50 border-slate-200">{service.id}</Badge>
+            <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-slate-100 space-y-3">
+              {groupedServices[platform].sort((a, b) => (a.order || 0) - (b.order || 0)).map((service) => (
+                <div key={service.id} className="bg-slate-50 p-5 rounded-[1.8rem] border border-slate-100 flex flex-col md:flex-row md:items-center gap-6 group transition-all hover:bg-slate-100/50 relative">
+                  <div className="flex items-center gap-4 min-w-[40px]">
+                     <span className="text-[12px] font-black text-slate-300">#{service.order}</span>
                   </div>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    {getPlatformIcon(service.platform)}
-                    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{PLATFORMS[service.platform] || 'Global'}</p>
+                  
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[14px] font-black text-[#111B21]">{service.name}</span>
+                      <Badge variant="outline" className="text-[8px] font-black uppercase opacity-50 border-slate-200">{service.id}</Badge>
+                    </div>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Managed under {PLATFORMS[platform]} Hub</p>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-3 gap-3 w-full md:w-auto">
-                   <div className="space-y-1">
-                    <label className="text-[8px] font-black uppercase text-slate-400 tracking-widest ml-1">Pos</label>
-                    <div className="relative">
-                      <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
+                  <div className="grid grid-cols-3 gap-3 w-full md:w-auto">
+                     <div className="space-y-1">
+                      <label className="text-[8px] font-black uppercase text-slate-400 tracking-widest ml-1">Pos</label>
                       <Input 
                         type="number" 
                         defaultValue={service.order} 
                         onBlur={(e) => handleUpdateField(service, 'order', parseInt(e.target.value))}
-                        className="h-10 w-16 bg-white border-none rounded-xl pl-8 text-xs font-black text-slate-900 shadow-sm" 
+                        className="h-10 w-16 bg-white border-none rounded-xl text-center text-xs font-black text-slate-900 shadow-sm" 
                       />
                     </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black uppercase text-slate-400 tracking-widest ml-1">Price</label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 text-emerald-500" size={12} />
-                      <Input 
-                        type="number" 
-                        defaultValue={service.pricePer1000} 
-                        onBlur={(e) => handleUpdateField(service, 'pricePer1000', parseFloat(e.target.value))}
-                        className="h-10 w-20 bg-white border-none rounded-xl pl-6 text-xs font-black text-emerald-700 shadow-sm" 
-                      />
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black uppercase text-slate-400 tracking-widest ml-1">Price</label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 text-emerald-500" size={12} />
+                        <Input 
+                          type="number" 
+                          defaultValue={service.pricePer1000} 
+                          onBlur={(e) => handleUpdateField(service, 'pricePer1000', parseFloat(e.target.value))}
+                          className="h-10 w-20 bg-white border-none rounded-xl pl-6 text-xs font-black text-emerald-700 shadow-sm" 
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black uppercase text-slate-400 tracking-widest ml-1">Min</label>
+                      <div className="relative">
+                        <Hash className="absolute left-2 top-1/2 -translate-y-1/2 text-blue-500" size={12} />
+                        <Input 
+                          type="number" 
+                          defaultValue={service.minQuantity} 
+                          onBlur={(e) => handleUpdateField(service, 'minQuantity', parseInt(e.target.value))}
+                          className="h-10 w-20 bg-white border-none rounded-xl pl-6 text-xs font-black text-blue-700 shadow-sm" 
+                        />
+                      </div>
                     </div>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black uppercase text-slate-400 tracking-widest ml-1">Min</label>
-                    <div className="relative">
-                      <Hash className="absolute left-2 top-1/2 -translate-y-1/2 text-blue-500" size={12} />
-                      <Input 
-                        type="number" 
-                        defaultValue={service.minQuantity} 
-                        onBlur={(e) => handleUpdateField(service, 'minQuantity', parseInt(e.target.value))}
-                        className="h-10 w-20 bg-white border-none rounded-xl pl-6 text-xs font-black text-blue-700 shadow-sm" 
-                      />
-                    </div>
-                  </div>
+
+                  <button 
+                    onClick={() => handleDelete(service.id)} 
+                    disabled={deletingId === service.id}
+                    className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                  >
+                    {deletingId === service.id ? <Loader2 size={18} className="animate-spin text-red-500" /> : <Trash2 size={18} />}
+                  </button>
                 </div>
-
-                <button 
-                  onClick={() => handleDelete(service.id)} 
-                  disabled={deletingId === service.id}
-                  className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                >
-                  {deletingId === service.id ? <Loader2 size={18} className="animate-spin text-red-500" /> : <Trash2 size={18} />}
-                </button>
-              </div>
-            ))}
-
-            {services?.length === 0 && !isServicesLoading && (
-              <div className="py-20 text-center space-y-4">
-                <Layers size={48} className="mx-auto text-slate-200" />
-                <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">No services added yet</p>
-                <Button onClick={handleSeedDefaults} variant="link" className="text-[#312ECB] font-black text-[10px] uppercase">Click to load standard services</Button>
-              </div>
-            )}
+              ))}
+            </div>
+          </section>
+        )) : !isServicesLoading && (
+          <div className="py-24 text-center space-y-6">
+            <div className="w-20 h-20 bg-white rounded-[2rem] flex items-center justify-center mx-auto shadow-sm border border-slate-100">
+              <LayoutGrid size={40} className="text-slate-200" />
+            </div>
+            <div className="space-y-2">
+              <p className="text-[13px] font-black text-slate-400 uppercase tracking-[0.2em]">No Categories Active</p>
+              <Button onClick={handleSeedDefaults} variant="link" className="text-[#312ECB] font-black text-[11px] uppercase tracking-widest underline-offset-4">Click to load standard category services</Button>
+            </div>
           </div>
-        </div>
+        )}
       </main>
     </div>
   );
