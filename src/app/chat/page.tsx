@@ -15,6 +15,8 @@ import {
   writeBatch,
   increment,
   getDoc,
+  getDocs,
+  deleteDoc,
   Timestamp
 } from "firebase/firestore";
 import { MessageBubble } from "@/components/chat/MessageBubble";
@@ -56,7 +58,7 @@ type ChatState =
   | 'idle' 
   | 'initial'
   | 'choosing_order_type'
-  | 'bulk_entering_links'
+  | 'bulk_adding_links'
   | 'choosing_service' 
   | 'entering_quantity' 
   | 'configuring_combo'
@@ -243,6 +245,18 @@ export default function ChatPage() {
     }, 800);
   };
 
+  // Utility to clear chats for current user
+  const clearCurrentChatHistory = async () => {
+    if (!db || !currentUser) return;
+    const q = query(collection(db, "users", currentUser.uid, "chatMessages"));
+    const snap = await getDocs(q);
+    const batch = writeBatch(db);
+    snap.docs.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+    // Reset local view
+    setSessionStart(Timestamp.now());
+  };
+
   useEffect(() => {
     if (currentUser && !isMessagesLoading && !hasInitialGreeted.current && sessionStart) {
       hasInitialGreeted.current = true;
@@ -259,6 +273,17 @@ export default function ChatPage() {
     if (!manualText) setInputValue("");
 
     const cleanText = text.toLowerCase();
+
+    // BULK LINKS SUBMISSION FROM CARD
+    if (text.startsWith("SUBMIT_BULK_LINKS:")) {
+      const linksStr = text.replace("SUBMIT_BULK_LINKS:", "");
+      const linksArr = linksStr.split('|').filter(l => l.trim());
+      await addMessage('user', `Submitted ${linksArr.length} links for bulk order.`);
+      setCurrentOrder(p => ({ ...p, tempLinks: linksArr }));
+      setChatState('choosing_service');
+      botReply(`✅ ${linksArr.length} links saved! Now pick a service for these links:`, dynamicServices.map((s, i) => `${i + 1}. ${s.name}`));
+      return;
+    }
 
     // COMBO CONFIG SUBMISSION
     if (text.startsWith("SUBMIT_COMBO_CONFIG:")) {
@@ -416,7 +441,9 @@ export default function ChatPage() {
 
     // GLOBAL INTERRUPTS (Reset flow if user clicks a menu button anytime)
     if (cleanText.includes("single order") || cleanText.includes("combo order") || cleanText.includes("bulk order")) {
+      await clearCurrentChatHistory(); // DELETE FALTU CHATS
       await addMessage('user', text);
+      
       if (cleanText.includes("single order")) {
         setChatState('choosing_service'); 
         setCurrentOrder({ type: 'single', platform: 'instagram', items: [] });
@@ -429,9 +456,9 @@ export default function ChatPage() {
           discountPct: globalDiscounts.combo 
         });
       } else if (cleanText.includes("bulk order")) {
-        setChatState('bulk_entering_links'); 
+        setChatState('bulk_adding_links'); 
         setCurrentOrder({ type: 'bulk', platform: 'instagram', items: [], tempLinks: [] });
-        botReply(`🚀 BULK MODE: Paste your links below (one per line). Type "DONE" when you are finished!`, ["DONE"]);
+        botReply(`🚀 BULK MODE: Add your links below. Click SUBMIT when finished!`, [], { isBulkLinkCard: true });
       }
       return;
     }
@@ -446,23 +473,6 @@ export default function ChatPage() {
         `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)`, 
         `3. BULK ORDER (${globalDiscounts.bulk}% OFF)`
       ]);
-      return;
-    }
-
-    // BULK LINKS COLLECTION
-    if (chatState === 'bulk_entering_links') {
-      if (cleanText === "done") {
-        if (!currentOrder.tempLinks || currentOrder.tempLinks.length === 0) {
-          botReply("⚠️ Please add at least one link!");
-          return;
-        }
-        setChatState('choosing_service');
-        botReply(`✅ ${currentOrder.tempLinks.length} links saved! Now pick a service for these links:`, dynamicServices.map((s, i) => `${i + 1}. ${s.name}`));
-      } else {
-        const newLinks = text.split('\n').map(l => l.trim()).filter(l => l);
-        setCurrentOrder(p => ({ ...p, tempLinks: [...(p.tempLinks || []), ...newLinks] }));
-        botReply(`🔗 Saved ${newLinks.length} more link(s). Total: ${[...(currentOrder.tempLinks || []), ...newLinks].length}.\nAdd more or type "DONE".`, ["DONE"]);
-      }
       return;
     }
 
@@ -617,6 +627,7 @@ export default function ChatPage() {
             rawPrice={m.rawPrice}
             isWalletCard={m.isWalletCard} 
             isComboConfigCard={m.isComboConfigCard}
+            isBulkLinkCard={m.isBulkLinkCard}
             timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} 
             dynamicServices={dynamicServices} 
             discountPct={m.discountPct ?? 0} 

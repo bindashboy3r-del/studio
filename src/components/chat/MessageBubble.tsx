@@ -14,7 +14,9 @@ import {
   Layers,
   Trash2,
   Plus,
-  Rocket
+  Rocket,
+  PlusCircle,
+  CheckCircle2
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
@@ -42,6 +44,7 @@ interface MessageBubbleProps {
   rawPrice?: number;
   isWalletCard?: boolean;
   isComboConfigCard?: boolean;
+  isBulkLinkCard?: boolean;
   discountPct?: number;
   serviceName?: string;
   quantity?: number;
@@ -61,6 +64,7 @@ export function MessageBubble({
   rawPrice,
   isWalletCard,
   isComboConfigCard,
+  isBulkLinkCard,
   discountPct = 0,
   serviceName,
   quantity,
@@ -76,6 +80,10 @@ export function MessageBubble({
   const [mounted, setMounted] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
+  // Bulk Link State
+  const [bulkLinks, setBulkLinks] = useState<string[]>([]);
+  const [currentBulkLink, setCurrentBulkLink] = useState("");
+
   // Combo Config State
   const [comboItems, setComboItems] = useState<{service: SMMService, qty: string}[]>([]);
 
@@ -84,7 +92,6 @@ export function MessageBubble({
   // Initialize Combo Items with Likes, Views, Comments if they exist
   useEffect(() => {
     if (isComboConfigCard && dynamicServices && comboItems.length === 0) {
-      // Look for typical service types
       const likes = dynamicServices.find(s => s.name.toLowerCase().includes('like'));
       const views = dynamicServices.find(s => s.name.toLowerCase().includes('view'));
       const comments = dynamicServices.find(s => s.name.toLowerCase().includes('comment'));
@@ -94,7 +101,6 @@ export function MessageBubble({
       if (views) initial.push({ service: views, qty: "" });
       if (comments) initial.push({ service: comments, qty: "" });
       
-      // If none found, fallback to first 3
       if (initial.length === 0) {
         setComboItems(dynamicServices.slice(0, 3).map(s => ({ service: s, qty: "" })));
       } else {
@@ -137,6 +143,16 @@ export function MessageBubble({
     window.open(`https://wa.me/${adminNumber}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
+  const addBulkLink = () => {
+    if (!currentBulkLink.trim()) return;
+    setBulkLinks([...bulkLinks, currentBulkLink.trim()]);
+    setCurrentBulkLink("");
+  };
+
+  const removeBulkLink = (index: number) => {
+    setBulkLinks(bulkLinks.filter((_, i) => i !== index));
+  };
+
   // Combo Logic
   const comboSubtotal = useMemo(() => {
     return comboItems.reduce((acc, item) => {
@@ -169,7 +185,61 @@ export function MessageBubble({
         isUser ? "bubble-user" : "bubble-bot"
       )}>
         
-        {isComboConfigCard ? (
+        {isBulkLinkCard ? (
+          <div className="space-y-5 min-w-[280px] py-2">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-8 h-8 rounded-lg bg-[#312ECB]/20 flex items-center justify-center text-[#312ECB]">
+                <Layers size={16} />
+              </div>
+              <div>
+                <h3 className="text-[13px] font-black uppercase tracking-tight">Bulk Mode</h3>
+                <p className="text-[8px] font-black uppercase text-slate-500 tracking-widest">Add Multiple Links</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Input 
+                  placeholder="Paste Instagram link here"
+                  value={currentBulkLink}
+                  onChange={(e) => setCurrentBulkLink(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addBulkLink()}
+                  className="h-11 bg-slate-950 border-none rounded-xl text-xs font-bold text-white shadow-3d-pressed flex-1"
+                />
+                <Button onClick={addBulkLink} size="icon" className="h-11 w-11 rounded-xl bg-[#312ECB] shadow-3d active:shadow-3d-pressed shrink-0">
+                  <Plus size={20} />
+                </Button>
+              </div>
+
+              {bulkLinks.length > 0 && (
+                <div className="bg-slate-950/50 p-3 rounded-2xl border border-white/5 space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar">
+                  {bulkLinks.map((link, idx) => (
+                    <div key={idx} className="flex items-center justify-between bg-slate-900 p-2.5 rounded-xl border border-white/5 group">
+                      <span className="text-[9px] font-bold text-slate-400 truncate max-w-[180px]">{link}</span>
+                      <button onClick={() => removeBulkLink(idx)} className="text-red-500/50 hover:text-red-500 transition-colors shrink-0">
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <Button 
+              onClick={() => {
+                if (bulkLinks.length === 0) {
+                  toast({ variant: "destructive", title: "Error", description: "Pehle kam se kam ek link add karein." });
+                  return;
+                }
+                onOptionClick?.(`SUBMIT_BULK_LINKS:${bulkLinks.join('|')}`);
+              }}
+              disabled={bulkLinks.length === 0}
+              className="w-full h-12 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-3d active:shadow-3d-pressed flex items-center justify-center gap-2"
+            >
+              <CheckCircle2 size={16} /> SUBMIT {bulkLinks.length} LINKS
+            </Button>
+          </div>
+        ) : isComboConfigCard ? (
           <div className="space-y-5 min-w-[280px] py-2">
             <div className="flex items-center gap-2 mb-1">
               <div className="w-8 h-8 rounded-lg bg-[#312ECB]/20 flex items-center justify-center text-[#312ECB]">
@@ -249,7 +319,6 @@ export function MessageBubble({
                     toast({ variant: "destructive", title: "Wait!", description: "Link aur sahi quantity dalna jaruri hai." });
                     return;
                   }
-                  // Send a hidden message to trigger payment choosing
                   const itemsStr = comboItems.map(i => `${i.service.id},${i.qty}`).join('|');
                   onOptionClick?.(`SUBMIT_COMBO_CONFIG:${itemsStr}:${links}:${comboTotal}`);
                 }}
@@ -375,7 +444,7 @@ export function MessageBubble({
           </div>
         )}
 
-        {options && !isPaymentCard && !isWalletCard && !isComboConfigCard && (
+        {options && !isPaymentCard && !isWalletCard && !isComboConfigCard && !isBulkLinkCard && (
           <div className="mt-4 space-y-2">
             {options.map((opt, i) => (
               <button key={i} onClick={() => onOptionClick?.(opt)} className="w-full bg-slate-900 border border-white/5 p-3 rounded-2xl flex items-center justify-between group shadow-3d active:shadow-3d-pressed transition-all">
