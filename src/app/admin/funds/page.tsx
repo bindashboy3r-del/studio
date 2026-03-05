@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -231,7 +230,7 @@ export default function FundRequestsPage() {
               <TableRow className="border-slate-100">
                 <TableHead className="text-[10px] font-black uppercase py-6">User</TableHead>
                 <TableHead className="text-[10px] font-black uppercase py-6">Requested</TableHead>
-                <TableHead className="text-[10px] font-black uppercase py-6">Final Credit</TableHead>
+                <TableHead className="text-[10px] font-black uppercase py-6">Final Credit (With Bonus)</TableHead>
                 <TableHead className="text-[10px] font-black uppercase py-6">UTR ID</TableHead>
                 <TableHead className="text-[10px] font-black uppercase py-6">Status</TableHead>
                 <TableHead className="text-right text-[10px] font-black uppercase py-6">Actions</TableHead>

@@ -15,13 +15,21 @@ import {
   Copy,
   CheckCircle2,
   MessageCircle,
-  Download
+  Download,
+  Send
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useUser, useFirestore } from "@/firebase";
 import { doc, onSnapshot, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 export default function AddFundsPage() {
   const { user } = useUser();
@@ -35,6 +43,10 @@ export default function AddFundsPage() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [globalBonus, setGlobalBonus] = useState(0);
   const [paymentConfig, setPaymentConfig] = useState<any>(null);
+  
+  // Popup States
+  const [showConfirmPopup, setShowConfirmPopup] = useState(false);
+  const [whatsappMsg, setWhatsappMsg] = useState("");
 
   useEffect(() => {
     if (!db || !user) return;
@@ -109,25 +121,29 @@ export default function AddFundsPage() {
         createdAt: serverTimestamp()
       });
 
-      // WhatsApp Redirect with Details as requested (to be sent to admin)
-      const adminNumber = "919116399517";
       const username = user?.displayName || user?.email || "User";
-      const message = `🚀 *NEW PAYMENT SUBMITTED!*\n\n👤 *User Name:* ${username}\n🔢 *UTR ID:* ${utrId.trim()}\n💰 *Amount:* ₹${amount}\n\nKripya mera payment check karein aur balance add karein. Dhanyawad!`;
+      const msg = `🚀 *NEW PAYMENT SUBMITTED!*\n\n👤 *User Name:* ${username}\n🔢 *UTR ID:* ${utrId.trim()}\n💰 *Amount:* ₹${amount}\n\nKripya mera payment check karein aur balance add karein. Dhanyawad!`;
+      
+      setWhatsappMsg(msg);
+      setShowConfirmPopup(true);
       
       toast({ 
-        title: "Request Submitted!", 
-        description: "Redirecting to WhatsApp for verification..." 
+        title: "Request Logged!", 
+        description: "Please confirm sending details to admin." 
       });
 
-      // Opening WhatsApp
-      window.open(`https://wa.me/${adminNumber}?text=${encodeURIComponent(message)}`, '_blank');
-      
-      router.push('/chat');
     } catch (error: any) {
       toast({ variant: "destructive", title: "Failed", description: "Try again later." });
     } finally {
       setLoading(false);
     }
+  };
+
+  const confirmWhatsAppSend = () => {
+    const adminNumber = "919116399517";
+    window.open(`https://wa.me/${adminNumber}?text=${encodeURIComponent(whatsappMsg)}`, '_blank');
+    setShowConfirmPopup(false);
+    router.push('/chat');
   };
 
   const copyUpi = () => {
@@ -159,9 +175,12 @@ export default function AddFundsPage() {
         </div>
 
         {globalBonus > 0 && (
-          <div className="bg-emerald-500 rounded-lg p-2 text-white flex items-center gap-2 shadow-md">
-            <Zap className="fill-current animate-pulse" size={12} />
-            <p className="text-[9px] font-black uppercase">Get {globalBonus}% Extra Bonus!</p>
+          <div className="bg-emerald-500 rounded-lg p-2 text-white flex items-center justify-between shadow-md animate-in fade-in zoom-in">
+            <div className="flex items-center gap-2">
+              <Zap className="fill-current animate-pulse" size={12} />
+              <p className="text-[9px] font-black uppercase">Mega Offer: Get {globalBonus}% Extra Bonus!</p>
+            </div>
+            <Badge className="bg-white text-emerald-600 border-none text-[8px] font-black">ACTIVE</Badge>
           </div>
         )}
 
@@ -239,10 +258,6 @@ export default function AddFundsPage() {
               {loading ? <Loader2 className="animate-spin" size={12} /> : "Submit Request"}
               <CheckCircle2 size={12} />
             </Button>
-            
-            <p className="text-center text-[8px] font-black uppercase text-slate-400">
-              Details will be sent to admin automatically
-            </p>
           </div>
         </div>
 
@@ -257,6 +272,38 @@ export default function AddFundsPage() {
           <ChevronRight className="text-slate-300" size={14} />
         </button>
       </main>
+
+      {/* Confirmation Dialog */}
+      <Dialog open={showConfirmPopup} onOpenChange={setShowConfirmPopup}>
+        <DialogContent className="max-w-[340px] rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-white">
+          <div className="bg-[#312ECB] p-6 text-center text-white">
+            <MessageCircle size={40} className="mx-auto mb-2" />
+            <DialogTitle className="text-lg font-black uppercase tracking-tight">Send to Admin</DialogTitle>
+            <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest">Verify your payment details</p>
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2">
+              <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase">
+                <span>UTR ID:</span>
+                <span className="text-slate-900">{utrId}</span>
+              </div>
+              <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase">
+                <span>Amount:</span>
+                <span className="text-emerald-600">₹{amount}</span>
+              </div>
+            </div>
+            <p className="text-[11px] font-bold text-slate-500 text-center leading-relaxed">
+              Details have been logged. Click below to send confirmation to admin on WhatsApp.
+            </p>
+            <Button 
+              onClick={confirmWhatsAppSend}
+              className="w-full h-12 bg-[#25D366] hover:bg-[#1EBE57] text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-lg gap-2"
+            >
+              <Send size={16} /> SEND ON WHATSAPP
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

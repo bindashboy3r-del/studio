@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -36,7 +35,8 @@ import {
   Bell,
   MessageSquareText,
   Package,
-  Megaphone
+  Megaphone,
+  Gift
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { SMMService, Platform } from "@/app/lib/constants";
@@ -100,6 +100,7 @@ export default function ChatPage() {
 
   const [activeBroadcast, setActiveBroadcast] = useState<any>(null);
   const [globalDiscounts, setGlobalDiscounts] = useState({ single: 0, combo: 0, bulk: 0 });
+  const [bonusPercentage, setBonusPercentage] = useState(0);
   const [socialLinks, setSocialLinks] = useState<any>(null);
   const [paymentConfig, setPaymentConfig] = useState<any>(null);
   const [showSocialMenu, setShowSocialMenu] = useState(false);
@@ -110,7 +111,6 @@ export default function ChatPage() {
   const hasBroadcastShown = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Initialize session timestamp on mount to "clear" chat visually
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const now = new Date();
@@ -169,6 +169,10 @@ export default function ChatPage() {
       }
     });
 
+    const unsubFinance = onSnapshot(doc(db, "globalSettings", "finance"), (snap) => {
+      if (snap.exists()) setBonusPercentage(snap.data().bonusPercentage || 0);
+    });
+
     const unsubSocial = onSnapshot(doc(db, "globalSettings", "social"), (snap) => {
       if (snap.exists()) setSocialLinks(snap.data());
     });
@@ -182,7 +186,7 @@ export default function ChatPage() {
       setNotifications(items);
     });
 
-    return () => { unsubBroadcast(); unsubDiscounts(); unsubSocial(); unsubPayment(); unsubNotifs(); };
+    return () => { unsubBroadcast(); unsubDiscounts(); unsubFinance(); unsubSocial(); unsubPayment(); unsubNotifs(); };
   }, [db, currentUser]);
 
   const userOrdersQuery = useMemoFirebase(() => {
@@ -272,7 +276,6 @@ export default function ChatPage() {
 
     const cleanText = text.toLowerCase();
 
-    // Universal Shortcut for history/menu
     if (cleanText === 'open_orders') {
       setIsOrdersOpen(true);
       return;
@@ -572,9 +575,17 @@ export default function ChatPage() {
       </header>
 
       <div className="bg-slate-900/50 backdrop-blur-md px-4 py-2 flex items-center justify-between border-b border-white/5 z-40">
-        <button onClick={() => router.push('/add-funds')} className="flex items-center gap-2 bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-full border border-emerald-500/20 shadow-3d-sm active:shadow-3d-pressed">
-          <Wallet size={14} /><span className="text-[11px] font-black text-emerald-400">₹{walletBalance.toFixed(0)}</span><PlusCircle size={14} />
-        </button>
+        <div className="flex flex-col gap-1">
+          <button onClick={() => router.push('/add-funds')} className="flex items-center gap-2 bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-full border border-emerald-500/20 shadow-3d-sm active:shadow-3d-pressed">
+            <Wallet size={14} /><span className="text-[11px] font-black text-emerald-400">₹{walletBalance.toFixed(0)}</span><PlusCircle size={14} />
+          </button>
+          {bonusPercentage > 0 && (
+            <div className="flex items-center gap-1.5 px-2 animate-pulse">
+              <Gift size={10} className="text-pink-500" />
+              <span className="text-[8px] font-black text-pink-400 uppercase tracking-widest">Refill & Get {bonusPercentage}% Extra! 🎁</span>
+            </div>
+          )}
+        </div>
         <div className="flex items-center gap-3">
           <button onClick={() => setIsOrdersOpen(true)} className="text-[10px] font-black uppercase text-[#312ECB] flex items-center gap-1.5 shadow-3d-sm rounded-xl px-3 py-1.5 active:shadow-3d-pressed">
             <Package size={14} /> ORDERS
