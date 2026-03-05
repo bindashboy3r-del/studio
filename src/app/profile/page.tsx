@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -178,20 +177,20 @@ export default function ProfilePage() {
         </section>
 
         <section className="space-y-4">
-          <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-300 tracking-widest px-2">
+          <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-200 tracking-widest px-2">
             <HelpCircle size={14} className="text-emerald-500" /> SUPPORT & LEGAL
           </div>
           <div className="space-y-3">
-            <Button asChild variant="outline" className="w-full h-14 bg-slate-900 border-white/5 rounded-2xl font-black text-[10px] uppercase tracking-widest gap-3 shadow-lg active:shadow-inner text-white">
-              <a href="https://wa.me/919116399517" target="_blank" rel="noopener noreferrer">
+            <Button asChild variant="outline" className="w-full h-14 bg-slate-900 border-white/10 rounded-2xl font-black text-[10px] uppercase tracking-widest gap-3 shadow-lg active:shadow-inner text-white hover:bg-slate-800">
+              <a href="https://wa.me/919116399517" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-3 w-full h-full text-white">
                 <MessageCircle size={18} className="text-[#25D366]" /> WHATSAPP SUPPORT
               </a>
             </Button>
 
             <Dialog>
               <DialogTrigger asChild>
-                <Button variant="outline" className="w-full h-14 bg-slate-900 border-white/5 rounded-2xl font-black text-[10px] uppercase tracking-widest gap-3 shadow-lg active:shadow-inner text-white">
-                  <FileText size={18} className="text-blue-500" /> TERMS & CONDITIONS
+                <Button variant="outline" className="w-full h-14 bg-slate-900 border-white/10 rounded-2xl font-black text-[10px] uppercase tracking-widest gap-3 shadow-lg active:shadow-inner text-white hover:bg-slate-800">
+                  <FileText size={18} className="text-blue-500" /> <span className="text-white">TERMS & CONDITIONS</span>
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-[360px] rounded-[2.5rem] border-none shadow-2xl bg-[#030712] p-0 overflow-hidden">
@@ -204,21 +203,21 @@ export default function ProfilePage() {
                   <div className="space-y-6">
                     <div className="space-y-2 bg-white/5 p-4 rounded-2xl border border-white/5">
                       <h4 className="text-[10px] font-black text-[#312ECB] uppercase tracking-widest">1. Service Usage</h4>
-                      <p className="text-[12px] font-bold text-slate-300 leading-relaxed">
+                      <p className="text-[12px] font-bold text-slate-200 leading-relaxed">
                         SocialBoost is an automation tool for social media services. We are not affiliated with Instagram or Meta.
                       </p>
                     </div>
 
                     <div className="space-y-2 bg-white/5 p-4 rounded-2xl border border-white/5">
                       <h4 className="text-[10px] font-black text-[#312ECB] uppercase tracking-widest">2. Account Safety</h4>
-                      <p className="text-[12px] font-bold text-slate-300 leading-relaxed">
+                      <p className="text-[12px] font-bold text-slate-200 leading-relaxed">
                         We do not ask for your Instagram password. Ensure your account is <span className="text-red-500 uppercase">Public</span> before ordering any service.
                       </p>
                     </div>
 
                     <div className="space-y-2 bg-white/5 p-4 rounded-2xl border border-white/5">
                       <h4 className="text-[10px] font-black text-[#312ECB] uppercase tracking-widest">3. Refund Policy</h4>
-                      <p className="text-[12px] font-bold text-slate-300 leading-relaxed">
+                      <p className="text-[12px] font-bold text-slate-200 leading-relaxed">
                         Once payment is confirmed and order is placed, no refunds will be processed. All sales are final.
                       </p>
                     </div>

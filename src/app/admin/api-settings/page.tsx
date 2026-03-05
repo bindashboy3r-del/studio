@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -163,7 +162,7 @@ export default function ApiSettingsPage() {
         <section className="space-y-4">
           <div className="flex items-center justify-between px-2">
             <div>
-              <h2 className="text-xl font-black uppercase tracking-tight">API Providers</h2>
+              <h2 className="text-xl font-black uppercase tracking-tight text-slate-900">API Providers</h2>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Add multiple SMM panels</p>
             </div>
             <Button onClick={addProvider} className="bg-emerald-500 hover:bg-emerald-600 rounded-xl h-10 px-4 font-black uppercase text-[10px] tracking-widest gap-2">
@@ -173,7 +172,7 @@ export default function ApiSettingsPage() {
 
           <div className="grid gap-4">
             {providers.map((prov) => (
-              <Card key={prov.id} className="rounded-[2rem] border-slate-100 shadow-xl overflow-hidden">
+              <Card key={prov.id} className="rounded-[2rem] border-slate-100 shadow-xl overflow-hidden bg-white">
                 <CardHeader className="bg-slate-50/50 pb-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -181,7 +180,7 @@ export default function ApiSettingsPage() {
                       <Input 
                         value={prov.name} 
                         onChange={(e) => updateProvider(prov.id, { name: e.target.value })}
-                        className="h-8 w-48 bg-transparent border-none font-black text-sm p-0 focus-visible:ring-0"
+                        className="h-8 w-48 bg-transparent border-none font-black text-sm p-0 focus-visible:ring-0 text-slate-900"
                       />
                     </div>
                     <Button variant="ghost" size="icon" onClick={() => removeProvider(prov.id)} className="text-red-400 hover:text-red-600">
@@ -199,7 +198,7 @@ export default function ApiSettingsPage() {
                           placeholder="https://smmpanel.com/api/v2" 
                           value={prov.url}
                           onChange={(e) => updateProvider(prov.id, { url: e.target.value })}
-                          className="h-10 bg-slate-50 border-none rounded-xl pl-9 text-xs font-bold"
+                          className="h-10 bg-slate-50 border-none rounded-xl pl-9 text-xs font-bold text-slate-900"
                         />
                       </div>
                     </div>
@@ -212,7 +211,7 @@ export default function ApiSettingsPage() {
                           placeholder="Your Secret API Key" 
                           value={prov.key}
                           onChange={(e) => updateProvider(prov.id, { key: e.target.value })}
-                          className="h-10 bg-slate-50 border-none rounded-xl pl-9 text-xs font-bold"
+                          className="h-10 bg-slate-50 border-none rounded-xl pl-9 text-xs font-bold text-slate-900"
                         />
                       </div>
                     </div>
@@ -246,7 +245,7 @@ export default function ApiSettingsPage() {
               <Layers size={24} />
             </div>
             <div>
-              <h2 className="text-xl font-black uppercase tracking-tight">Service Routing</h2>
+              <h2 className="text-xl font-black uppercase tracking-tight text-slate-900">Service Routing</h2>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Assign panels to dynamic services</p>
             </div>
           </div>
@@ -260,7 +259,7 @@ export default function ApiSettingsPage() {
                     <div key={s.id} className="bg-slate-50 p-5 rounded-3xl border border-slate-100 flex flex-col md:flex-row md:items-center gap-4">
                       <div className="flex-1">
                         <p className="text-[13px] font-black text-slate-800">{s.name}</p>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Rate: ₹{s.pricePer1000}/1k</p>
+                        <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Rate: ₹{s.pricePer1000}/1k</p>
                       </div>
                       
                       <div className="flex flex-col sm:flex-row gap-2">
@@ -269,12 +268,12 @@ export default function ApiSettingsPage() {
                             value={mappings[s.id]?.providerId || ""} 
                             onValueChange={(val) => updateMapping(s.id, { providerId: val })}
                           >
-                            <SelectTrigger className="h-10 rounded-xl bg-white border-slate-100 font-black text-[10px] uppercase">
+                            <SelectTrigger className="h-10 rounded-xl bg-white border-slate-100 font-black text-[10px] uppercase text-slate-900">
                               <SelectValue placeholder="Pick Panel" />
                             </SelectTrigger>
-                            <SelectContent className="rounded-xl">
+                            <SelectContent className="rounded-xl bg-white">
                               {providers.map(p => (
-                                <SelectItem key={p.id} value={p.id} className="text-[10px] font-black uppercase">{p.name}</SelectItem>
+                                <SelectItem key={p.id} value={p.id} className="text-[10px] font-black uppercase text-slate-900">{p.name}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
@@ -284,7 +283,7 @@ export default function ApiSettingsPage() {
                             placeholder="Remote ID" 
                             value={mappings[s.id]?.remoteServiceId || ""}
                             onChange={(e) => updateMapping(s.id, { remoteServiceId: e.target.value })}
-                            className="h-10 bg-white border-slate-100 rounded-xl text-center font-black text-xs"
+                            className="h-10 bg-white border-slate-100 rounded-xl text-center font-black text-xs text-slate-900"
                           />
                         </div>
                       </div>

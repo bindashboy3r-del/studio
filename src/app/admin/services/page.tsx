@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -197,9 +196,9 @@ export default function ServiceManagerPage() {
                 <Plus size={16} /> Add Custom
               </Button>
             </DialogTrigger>
-            <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-8">
+            <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-8 bg-white">
               <DialogHeader>
-                <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
+                <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-3 text-slate-900">
                   <Layers className="text-[#312ECB]" /> New SMM Service
                 </DialogTitle>
               </DialogHeader>
@@ -207,25 +206,25 @@ export default function ServiceManagerPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Unique ID</label>
-                    <Input placeholder="ig_followers" value={newService.id || ""} onChange={e => setNewService({...newService, id: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                    <Input placeholder="ig_followers" value={newService.id || ""} onChange={e => setNewService({...newService, id: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Order (Position)</label>
-                    <Input type="number" value={newService.order || 0} onChange={e => setNewService({...newService, order: parseInt(e.target.value) || 0})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                    <Input type="number" value={newService.order || 0} onChange={e => setNewService({...newService, order: parseInt(e.target.value) || 0})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
                   </div>
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Display Name</label>
-                  <Input placeholder="e.g. Followers (High Quality)" value={newService.name || ""} onChange={e => setNewService({...newService, name: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                  <Input placeholder="e.g. Followers (High Quality)" value={newService.name || ""} onChange={e => setNewService({...newService, name: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Price (₹ / 1k)</label>
-                    <Input type="number" value={newService.pricePer1000 || 0} onChange={e => setNewService({...newService, pricePer1000: parseFloat(e.target.value) || 0})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                    <Input type="number" value={newService.pricePer1000 || 0} onChange={e => setNewService({...newService, pricePer1000: parseFloat(e.target.value) || 0})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Min Quantity</label>
-                    <Input type="number" value={newService.minQuantity || 100} onChange={e => setNewService({...newService, minQuantity: parseInt(e.target.value) || 0})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold" />
+                    <Input type="number" value={newService.minQuantity || 100} onChange={e => setNewService({...newService, minQuantity: parseInt(e.target.value) || 0})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
                   </div>
                 </div>
               </div>
@@ -245,7 +244,7 @@ export default function ServiceManagerPage() {
                 <Instagram size={24} />
               </div>
               <div>
-                <h2 className="text-xl font-black uppercase tracking-tight">Services List</h2>
+                <h2 className="text-xl font-black uppercase tracking-tight text-slate-900">Services List</h2>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ordered by your preference</p>
               </div>
             </div>
@@ -264,7 +263,7 @@ export default function ServiceManagerPage() {
                     <span className="text-[14px] font-black text-[#111B21]">{service.name}</span>
                     <Badge variant="outline" className="text-[8px] font-black uppercase opacity-50 border-slate-200">{service.id}</Badge>
                   </div>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Instagram Hub</p>
+                  <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Instagram Hub</p>
                 </div>
 
                 <div className="grid grid-cols-3 gap-3 w-full md:w-auto">
@@ -276,7 +275,7 @@ export default function ServiceManagerPage() {
                         type="number" 
                         defaultValue={service.order} 
                         onBlur={(e) => handleUpdateField(service, 'order', e.target.value)}
-                        className="h-10 w-16 bg-white border-none rounded-xl pl-8 text-xs font-black text-slate-700 shadow-sm" 
+                        className="h-10 w-16 bg-white border-none rounded-xl pl-8 text-xs font-black text-slate-900 shadow-sm" 
                       />
                     </div>
                   </div>
