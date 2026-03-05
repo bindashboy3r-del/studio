@@ -32,6 +32,8 @@ interface MessageBubbleProps {
   onWalletSubmit?: (link: string) => void;
   dynamicServices?: SMMService[] | null;
   discountPct?: number;
+  serviceName?: string;
+  quantity?: number;
 }
 
 export function MessageBubble({ 
@@ -44,8 +46,9 @@ export function MessageBubble({
   paymentPrice,
   rawPrice,
   isWalletCard,
-  onWalletSubmit,
-  discountPct = 0
+  discountPct = 0,
+  serviceName,
+  quantity
 }: MessageBubbleProps) {
   const isUser = sender === 'user';
   const { user } = useUser();
@@ -84,8 +87,11 @@ export function MessageBubble({
 
   const handleWhatsAppConfirmation = () => {
     const adminNumber = "919116399517";
-    const username = user?.displayName || user?.email || "User";
-    const message = `Hello Admin, I have made a payment.\n\n👤 Username: ${username}\n💰 Amount: ₹${price.toFixed(2)}\n🔢 UTR ID: ${utr || "N/A"}\n🔗 Link: ${link || "N/A"}\n\nPlease verify my payment.`;
+    const randomId = Math.floor(1000 + Math.random() * 9000);
+    const displayId = `ORD-${randomId}`;
+    
+    const message = `🚀 *NEW ORDER PLACED!*\n\n🆔 *Order ID:* #${displayId}\n📊 *Service:* ${serviceName || "Instagram Service"}\n🔢 *Quantity:* ${quantity || "N/A"}\n💰 *Price:* ₹${price.toFixed(2)}\n🔗 *Link:* ${link || "N/A"}\n💳 *Payment:* UPI (${utr || "N/A"})\n\nPlease process my order ASAP!`;
+    
     window.open(`https://wa.me/${adminNumber}?text=${encodeURIComponent(message)}`, '_blank');
   };
 

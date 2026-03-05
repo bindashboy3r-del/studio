@@ -337,10 +337,24 @@ export default function ChatPage() {
       const discounted = raw * (1 - globalDiscounts.single / 100);
 
       if (cleanText.includes("wallet")) {
-        if (walletBalance >= discounted) botReply(`Confirm Wallet Payment of ₹${discounted.toFixed(2)}?`, [], { isWalletCard: true, paymentPrice: discounted, rawPrice: raw, discountPct: globalDiscounts.single });
+        if (walletBalance >= discounted) botReply(`Confirm Wallet Payment of ₹${discounted.toFixed(2)}?`, [], { 
+          isWalletCard: true, 
+          paymentPrice: discounted, 
+          rawPrice: raw, 
+          discountPct: globalDiscounts.single,
+          serviceName: s?.name,
+          quantity: qty
+        });
         else botReply("❌ Low Balance! Please refill your wallet.", ["💳 ADD FUNDS", "🏠 MENU"]);
       } else if (cleanText.includes("upi")) {
-        botReply(`Scan the QR to Pay:`, [], { isPaymentCard: true, paymentPrice: discounted, rawPrice: raw, discountPct: globalDiscounts.single });
+        botReply(`Scan the QR to Pay:`, [], { 
+          isPaymentCard: true, 
+          paymentPrice: discounted, 
+          rawPrice: raw, 
+          discountPct: globalDiscounts.single,
+          serviceName: s?.name,
+          quantity: qty
+        });
       }
     }
   };
@@ -404,6 +418,8 @@ export default function ChatPage() {
             timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} 
             dynamicServices={dynamicServices} 
             discountPct={m.discountPct ?? 0} 
+            serviceName={m.serviceName}
+            quantity={m.quantity}
           />
         ))}
         {isTyping && <TypingIndicator />}
