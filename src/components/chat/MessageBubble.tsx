@@ -1,3 +1,4 @@
+
 "use client";
 
 import { cn } from "@/lib/utils";
@@ -156,7 +157,8 @@ export function MessageBubble({
 
   const handleWhatsAppConfirmation = () => {
     const adminNumber = "919116399517";
-    const message = `🚀 *NEW ORDER PLACED!*\n\n🆔 *Order ID:* #${orderId || "N/A"}\n📊 *Service:* ${serviceName || "Instagram Service"}\n🔢 *Quantity:* ${quantity || "N/A"}\n💰 *Amount:* ₹${price.toFixed(2)}\n🔗 *Links:* ${links || prefilledLinks || "N/A"}\n💳 *UTR ID:* ${propUtr || utr || "N/A"}\n\nPlease process my order ASAP!`;
+    const finalLinks = links || prefilledLinks;
+    const message = `🚀 *NEW ORDER PLACED!*\n\n🆔 *Order ID:* #${orderId || "N/A"}\n📊 *Service:* ${serviceName || "Instagram Service"}\n🔢 *Quantity:* ${quantity || "N/A"}\n💰 *Amount:* ₹${price.toFixed(2)}\n🔗 *Links:* ${finalLinks || "N/A"}\n💳 *UTR ID:* ${propUtr || utr || "N/A"}\n\nPlease process my order ASAP!`;
     window.open(`https://wa.me/${adminNumber}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
@@ -395,7 +397,7 @@ export function MessageBubble({
                     return;
                   }
                   const itemsStr = comboItems.map(i => `${i.service.id},${i.qty}`).join('|');
-                  onOptionClick?.(`SUBMIT_COMBO_CONFIG:${itemsStr}:${links}:${comboTotal}`);
+                  onOptionClick?.(`SUBMIT_COMBO_CONFIG###${itemsStr}###${links}###${comboTotal}`);
                 }}
                 className="w-full h-12 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-3d active:shadow-3d-pressed"
               >
@@ -441,7 +443,7 @@ export function MessageBubble({
               </div>
               
               <div className="flex flex-col gap-3">
-                <Button onClick={() => onOptionClick?.(`SUBMIT_PAYMENT:${links}:${utr}`)} disabled={!links || utr.length !== 12} className="w-full h-14 bg-[#312ECB] font-black text-[11px] uppercase tracking-[0.2em] rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10">
+                <Button onClick={() => onOptionClick?.(`SUBMIT_PAYMENT###${links}###${utr}`)} disabled={!links || utr.length !== 12} className="w-full h-14 bg-[#312ECB] font-black text-[11px] uppercase tracking-[0.2em] rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10">
                   VERIFY & SUBMIT
                 </Button>
               </div>
@@ -480,7 +482,7 @@ export function MessageBubble({
 
                 <div className="pt-2">
                   <Button 
-                    onClick={() => onOptionClick?.(`CONFIRM_WALLET:${links}`)} 
+                    onClick={() => onOptionClick?.(`CONFIRM_WALLET###${links}`)} 
                     disabled={!links || walletBalance < price}
                     className={cn(
                       "w-full h-14 font-black text-[11px] uppercase tracking-[0.2em] rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10 transition-all",
@@ -520,7 +522,7 @@ export function MessageBubble({
               </div>
               <div className="pt-2 border-t border-white/5">
                 <span className="text-[8px] font-bold text-slate-500 uppercase block mb-1">Target Link:</span>
-                <p className="text-[9px] font-medium text-slate-300 truncate">{links || prefilledLinks}</p>
+                <p className="text-[9px] font-medium text-slate-300 break-all">{links || prefilledLinks}</p>
               </div>
             </div>
 

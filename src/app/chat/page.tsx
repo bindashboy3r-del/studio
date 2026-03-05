@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -310,8 +311,8 @@ export default function ChatPage() {
       return;
     }
 
-    if (text.startsWith("SUBMIT_COMBO_CONFIG:")) {
-      const [, itemsStr, linksInput, total] = text.split(":");
+    if (text.startsWith("SUBMIT_COMBO_CONFIG###")) {
+      const [, itemsStr, linksInput, total] = text.split("###");
       await addMessage('user', "Proceeding with Combo Bundle...");
       const items = itemsStr.split('|').map(s => {
         const [id, q] = s.split(',');
@@ -335,8 +336,8 @@ export default function ChatPage() {
       return;
     }
 
-    if (text.startsWith("SUBMIT_PAYMENT:")) {
-      const [, linksInput, utr] = text.split(":");
+    if (text.startsWith("SUBMIT_PAYMENT###")) {
+      const [, linksInput, utr] = text.split("###");
       await addMessage('user', `Payment Submitted (UTR: ${utr})`, [], { isPermanent: true });
       
       const type = currentOrder.type || 'single';
@@ -383,8 +384,8 @@ export default function ChatPage() {
       return;
     }
 
-    if (text.startsWith("CONFIRM_WALLET:")) {
-      const [, linksInput] = text.split(":");
+    if (text.startsWith("CONFIRM_WALLET###")) {
+      const [, linksInput] = text.split("###");
       await addMessage('user', "Confirming Wallet Payment...", [], { isPermanent: true });
       const type = currentOrder.type || 'single';
       const disc = globalDiscounts[type] || 0;
