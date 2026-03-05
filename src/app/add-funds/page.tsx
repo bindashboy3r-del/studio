@@ -109,23 +109,25 @@ export default function AddFundsPage() {
         createdAt: serverTimestamp()
       });
 
+      // WhatsApp Redirect with Details as requested (to be sent to admin)
+      const adminNumber = "919116399517";
+      const username = user?.displayName || user?.email || "User";
+      const message = `🚀 *NEW PAYMENT SUBMITTED!*\n\n👤 *User Name:* ${username}\n🔢 *UTR ID:* ${utrId.trim()}\n💰 *Amount:* ₹${amount}\n\nKripya mera payment check karein aur balance add karein. Dhanyawad!`;
+      
       toast({ 
         title: "Request Submitted!", 
-        description: "Wallet will be credited in 30-60 mins." 
+        description: "Redirecting to WhatsApp for verification..." 
       });
+
+      // Opening WhatsApp
+      window.open(`https://wa.me/${adminNumber}?text=${encodeURIComponent(message)}`, '_blank');
+      
       router.push('/chat');
     } catch (error: any) {
       toast({ variant: "destructive", title: "Failed", description: "Try again later." });
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleWhatsAppConfirmation = () => {
-    const adminNumber = "919116399517";
-    const username = user?.displayName || user?.email || "User";
-    const message = `🚀 *NEW PAYMENT SUBMITTED!*\n\n👤 *User Name:* ${username}\n🔢 *UTR ID:* ${utrId || "N/A"}\n💰 *Amount:* ₹${amount || "0"}\n\nKripya mera payment check karein aur balance add karein. Dhanyawad!`;
-    window.open(`https://wa.me/${adminNumber}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
   const copyUpi = () => {
@@ -237,16 +239,10 @@ export default function AddFundsPage() {
               {loading ? <Loader2 className="animate-spin" size={12} /> : "Submit Request"}
               <CheckCircle2 size={12} />
             </Button>
-
-            <div className="flex flex-col items-center gap-1 mt-1">
-              <p className="text-[8px] font-black uppercase text-red-500 tracking-tighter">payment karne ke bad admin ko bheje</p>
-              <Button 
-                onClick={handleWhatsAppConfirmation}
-                className="w-full h-11 bg-[#25D366] hover:bg-[#1EBE57] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg gap-2 active:scale-95 transition-all"
-              >
-                <MessageCircle size={16} /> Send to WhatsApp
-              </Button>
-            </div>
+            
+            <p className="text-center text-[8px] font-black uppercase text-slate-400">
+              Details will be sent to admin automatically
+            </p>
           </div>
         </div>
 
