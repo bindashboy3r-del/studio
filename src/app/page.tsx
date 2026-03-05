@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -12,10 +11,9 @@ import { doc, setDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useRouter } from "next/navigation";
-import { Zap, Instagram, ShieldCheck, Rocket, Globe, Loader2, LogOut, ArrowRight } from "lucide-react";
+import { Zap, ShieldCheck, Rocket, Globe, Loader2, ArrowRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth, useFirestore, useUser } from "@/firebase";
-import { cn } from "@/lib/utils";
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -39,18 +37,11 @@ export default function AuthPage() {
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
       const userEmail = result.user.email?.toLowerCase();
-      if (userEmail === ADMIN_EMAIL.toLowerCase()) {
-        router.push("/admin");
-      } else {
-        router.push("/chat");
-      }
+      if (userEmail === ADMIN_EMAIL.toLowerCase()) router.push("/admin");
+      else router.push("/chat");
       toast({ title: "Welcome!", description: "Accessing your dashboard..." });
     } catch (error: any) {
-      toast({ 
-        variant: "destructive", 
-        title: "Login Error", 
-        description: error.message || "Invalid credentials." 
-      });
+      toast({ variant: "destructive", title: "Login Error", description: error.message || "Invalid credentials." });
       setLoading(false);
     }
   };
@@ -62,155 +53,52 @@ export default function AuthPage() {
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(result.user, { displayName });
-      
-      await setDoc(doc(db, "users", result.user.uid), {
-        id: result.user.uid,
-        email,
-        displayName,
-        balance: 0,
-        createdAt: new Date().toISOString()
-      });
-      
-      toast({ title: "Account Created!", description: "Accessing dashboard..." });
+      await setDoc(doc(db, "users", result.user.uid), { id: result.user.uid, email, displayName, balance: 0, createdAt: new Date().toISOString() });
+      toast({ title: "Account Created!", description: "Redirecting..." });
       router.push("/chat");
     } catch (error: any) {
-      toast({ 
-        variant: "destructive", 
-        title: "Registration Error", 
-        description: error.message || "Could not create account." 
-      });
+      toast({ variant: "destructive", title: "Registration Error", description: error.message || "Could not create account." });
       setLoading(false);
     }
   };
 
-  const handleContinue = () => {
-    if (!user) return;
-    const userEmail = user.email?.toLowerCase();
-    if (userEmail === ADMIN_EMAIL.toLowerCase()) {
-      router.push("/admin");
-    } else {
-      router.push("/chat");
-    }
-  };
-
-  const handleLogoutExisting = async () => {
-    if (auth) await signOut(auth);
-  };
-
-  if (isUserLoading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F0F2F5] dark:bg-slate-950">
-        <Loader2 className="w-8 h-8 text-[#312ECB] animate-spin mb-3" />
-        <p className="text-[8px] font-black uppercase tracking-[0.3em] text-slate-400">Verifying Session...</p>
-      </div>
-    );
-  }
+  if (isUserLoading) return <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950"><Loader2 className="w-10 h-10 text-[#312ECB] animate-spin mb-4" /><p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Authenticating...</p></div>;
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#F0F2F5] dark:bg-slate-950 p-4 font-body overflow-x-hidden">
-      <div className="w-full max-w-[340px] bg-white dark:bg-slate-900 rounded-[2rem] shadow-[0_15px_40px_rgba(0,0,0,0.06)] p-6 pb-8 flex flex-col items-center relative overflow-hidden border border-white/50 dark:border-slate-800">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC] dark:bg-slate-950 p-6 font-body overflow-x-hidden">
+      <div className="w-full max-w-[360px] bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-[0_20px_60px_rgba(0,0,0,0.05)] p-8 flex flex-col items-center relative overflow-hidden border border-white dark:border-slate-800">
         
-        <div className="absolute top-0 right-0 w-20 h-20 bg-[#312ECB]/5 rounded-full -mr-10 -mt-10 blur-3xl" />
+        <div className="absolute top-0 right-0 w-32 h-32 bg-[#312ECB]/5 rounded-full -mr-16 -mt-16 blur-3xl" />
 
-        <div className="w-12 h-12 bg-[#312ECB] rounded-xl flex items-center justify-center shadow-[0_10px_20px_rgba(49,46,203,0.2)] mb-5 relative z-10">
-          <Zap className="text-white fill-current" size={24} />
+        <div className="w-16 h-16 bg-[#312ECB] rounded-[1.5rem] flex items-center justify-center shadow-xl shadow-blue-500/20 mb-8 relative z-10">
+          <Zap className="text-white fill-current" size={32} />
         </div>
 
-        <div className="text-center space-y-1 mb-6 relative z-10">
-          <h1 className="text-[20px] font-black tracking-tighter text-[#111B21] dark:text-white uppercase leading-tight">
-            {user ? "WELCOME BACK" : "SOCIALBOOST"}
-          </h1>
-          <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-relaxed">
-            {user ? user.displayName || user.email : "The most powerful SMM automation."}
-          </p>
+        <div className="text-center space-y-2 mb-10 relative z-10">
+          <h1 className="text-[24px] font-black tracking-tighter text-[#111B21] dark:text-white uppercase leading-tight">{user ? "WELCOME BACK" : "SOCIALBOOST"}</h1>
+          <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-relaxed">{user ? user.displayName || user.email : "Powering SMM Automation"}</p>
         </div>
 
         {user ? (
-          <div className="w-full space-y-3 relative z-10">
-            <Button 
-              onClick={handleContinue}
-              className="w-full h-12 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[10px] uppercase tracking-[0.2em] rounded-xl shadow-lg gap-2"
-            >
-              Continue to Chat <ArrowRight size={14} />
-            </Button>
-            <button 
-              onClick={handleLogoutExisting}
-              className="w-full text-slate-400 font-black text-[9px] uppercase tracking-widest hover:text-red-500 transition-colors"
-            >
-              Switch Account
-            </button>
+          <div className="w-full space-y-4 relative z-10">
+            <Button onClick={() => user.email === ADMIN_EMAIL ? router.push("/admin") : router.push("/chat")} className="w-full h-14 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[11px] uppercase tracking-[0.2em] rounded-2xl shadow-lg gap-3 active:scale-95 transition-all">Go to Hub <ArrowRight size={16} /></Button>
+            <button onClick={() => signOut(auth!)} className="w-full text-slate-400 font-black text-[10px] uppercase tracking-widest hover:text-red-500 transition-colors">Switch Profile</button>
           </div>
         ) : (
-          <form onSubmit={isLogin ? handleLogin : handleSignup} className="w-full space-y-3.5 relative z-10">
-            {!isLogin && (
-              <div className="space-y-1">
-                <label className="text-[8px] font-black text-[#111B21] dark:text-slate-300 uppercase tracking-widest ml-1">Full Name</label>
-                <Input 
-                  type="text" 
-                  placeholder="Ex. Chetan Nagani" 
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  className="h-10 bg-slate-50 dark:bg-slate-800 border-none rounded-lg px-4 text-[11px] font-bold shadow-inner"
-                  required
-                />
-              </div>
-            )}
-
-            <div className="space-y-1">
-              <label className="text-[8px] font-black text-[#111B21] dark:text-slate-300 uppercase tracking-widest ml-1">Email Address</label>
-              <Input 
-                type="email" 
-                placeholder="name@example.com" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="h-10 bg-slate-50 dark:bg-slate-800 border-none rounded-lg px-4 text-[11px] font-bold shadow-inner"
-                required
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[8px] font-black text-[#111B21] dark:text-slate-300 uppercase tracking-widest ml-1">Password</label>
-              <Input 
-                type="password" 
-                placeholder="••••••••" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="h-10 bg-slate-50 dark:bg-slate-800 border-none rounded-lg px-4 text-[11px] font-bold shadow-inner"
-                required
-              />
-            </div>
-
-            <Button 
-              type="submit"
-              disabled={loading}
-              className="w-full h-12 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[10px] uppercase tracking-[0.2em] rounded-xl shadow-md transition-all active:scale-95 mt-1"
-            >
-              {loading ? <Loader2 className="animate-spin" size={14} /> : isLogin ? "ACCESS PORTAL" : "CREATE ACCOUNT"}
-            </Button>
+          <form onSubmit={isLogin ? handleLogin : handleSignup} className="w-full space-y-4 relative z-10">
+            {!isLogin && <div className="space-y-1.5"><label className="text-[10px] font-black uppercase text-slate-400 ml-1">Name</label><Input type="text" placeholder="John Doe" value={displayName} onChange={e => setDisplayName(e.target.value)} className="h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-5 text-sm font-bold shadow-inner" required /></div>}
+            <div className="space-y-1.5"><label className="text-[10px] font-black uppercase text-slate-400 ml-1">Email</label><Input type="email" placeholder="name@example.com" value={email} onChange={e => setEmail(e.target.value)} className="h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-5 text-sm font-bold shadow-inner" required /></div>
+            <div className="space-y-1.5"><label className="text-[10px] font-black uppercase text-slate-400 ml-1">Password</label><Input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} className="h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-5 text-sm font-bold shadow-inner" required /></div>
+            <Button type="submit" disabled={loading} className="w-full h-14 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[11px] uppercase tracking-[0.2em] rounded-2xl shadow-lg mt-4 active:scale-95 transition-all">{loading ? <Loader2 className="animate-spin" size={18} /> : isLogin ? "LOG IN" : "REGISTER"}</Button>
           </form>
         )}
 
-        {!user && (
-          <div className="mt-6 text-center relative z-10">
-            <button 
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-[10px] font-black text-[#312ECB] uppercase tracking-widest hover:opacity-80 transition-opacity"
-            >
-              {isLogin ? "CREATE FREE ACCOUNT" : "SIGN IN TO DASHBOARD"}
-            </button>
-          </div>
-        )}
+        {!user && <div className="mt-8 text-center relative z-10"><button onClick={() => setIsLogin(!isLogin)} className="text-[11px] font-black text-[#312ECB] uppercase tracking-widest hover:opacity-80 transition-opacity">{isLogin ? "Join SocialBoost" : "Already a member? Login"}</button></div>}
       </div>
 
-      <div className="mt-6 flex flex-col items-center space-y-2.5 opacity-30">
-        <p className="text-[8px] font-black text-[#111B21] dark:text-slate-500 uppercase tracking-[0.3em]">
-          CREATED BY CHETAN NAGANI
-        </p>
-        <div className="flex gap-3">
-          <ShieldCheck size={12} />
-          <Rocket size={12} />
-          <Globe size={12} />
-        </div>
+      <div className="mt-10 flex flex-col items-center space-y-4 opacity-30">
+        <div className="flex gap-6"><ShieldCheck size={16} /><Rocket size={16} /><Globe size={16} /></div>
+        <p className="text-[10px] font-black text-[#111B21] dark:text-slate-500 uppercase tracking-[0.4em]">PRO VERSION 2.5</p>
       </div>
     </div>
   );
