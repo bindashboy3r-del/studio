@@ -39,20 +39,23 @@ service cloud.firestore {
     // Fund Requests
     match /fundRequests/{requestId} {
       allow create: if isSignedIn();
-      allow read, list: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow get: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow list: if isSignedIn() && (isAdmin() || request.query.limit <= 100);
       allow update, delete: if isAdmin();
     }
 
     // Referral Transactions
     match /referralTransactions/{txId} {
-      allow read, list: if isSignedIn() && (isAdmin() || resource.data.referrerId == request.auth.uid);
+      allow read: if isSignedIn() && (isAdmin() || resource.data.referrerId == request.auth.uid);
+      allow list: if isSignedIn() && (isAdmin() || request.query.limit <= 100);
       allow write: if isAdmin();
     }
 
     // Withdrawals
     match /withdrawals/{withdrawalId} {
       allow create: if isSignedIn();
-      allow read, list: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow list: if isSignedIn() && (isAdmin() || request.query.limit <= 100);
       allow update, delete: if isAdmin();
     }
 

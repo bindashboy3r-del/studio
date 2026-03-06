@@ -14,7 +14,8 @@ import {
   writeBatch,
   increment,
   Timestamp,
-  deleteDoc
+  deleteDoc,
+  updateDoc
 } from "firebase/firestore";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
@@ -28,7 +29,9 @@ import {
   Bell,
   Package,
   Megaphone,
-  ExternalLink
+  ExternalLink,
+  CheckCircle2,
+  X
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { SMMService, Platform, PLATFORMS } from "@/app/lib/constants";
@@ -40,6 +43,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type ChatState = 
   | 'idle' 
@@ -139,10 +144,13 @@ export default function ChatPage() {
     });
 
     onSnapshot(doc(db, "globalSettings", "payment"), (snap) => { if (snap.exists()) setPaymentConfig(snap.data()); });
-    onSnapshot(collection(db, "users", currentUser.uid, "notifications"), (snap) => {
-      setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((n: any) => !n.read));
+    
+    const qNotif = query(collection(db, "users", currentUser.uid, "notifications"), orderBy("createdAt", "desc"));
+    const unsubNotif = onSnapshot(qNotif, (snap) => {
+      setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-    return () => unsubBroadcast();
+
+    return () => { unsubBroadcast(); unsubNotif(); };
   }, [db, currentUser]);
 
   const { data: messages, isLoading: isMessagesLoading } = useCollection(useMemoFirebase(() => db && currentUser && sessionStart ? query(collection(db, "users", currentUser.uid, "chatMessages"), where("timestamp", ">=", sessionStart), orderBy("timestamp", "asc")) : null, [db, currentUser, sessionStart]));
@@ -152,11 +160,19 @@ export default function ChatPage() {
   const clearTrailMessages = async () => {
     if (!currentUser || !db || !messages) return;
     const batch = writeBatch(db);
-    // Delete all messages except those marked as permanent (like greetings and main menus)
     messages.forEach(m => {
       if (!m.isPermanent) {
         batch.delete(doc(db, "users", currentUser.uid, "chatMessages", m.id));
       }
+    });
+    await batch.commit();
+  };
+
+  const markAllRead = async () => {
+    if (!db || !currentUser) return;
+    const batch = writeBatch(db);
+    notifications.forEach(n => {
+      if (!n.read) batch.update(doc(db, "users", currentUser.uid, "notifications", n.id), { read: true });
     });
     await batch.commit();
   };
@@ -189,7 +205,6 @@ export default function ChatPage() {
     const cleanText = text.toLowerCase();
     const isMajorOption = cleanText.includes('single') || cleanText.includes('combo') || cleanText.includes('bulk');
 
-    // If user clicks a top-level menu option, clear the trail below it
     if (isMajorOption) {
       await clearTrailMessages();
     }
@@ -336,6 +351,8 @@ export default function ChatPage() {
     }
   };
 
+  const unreadCount = notifications.filter(n => !n.read).length;
+
   return (
     <div className="flex flex-col h-[100dvh] max-w-lg mx-auto whatsapp-bg font-body overflow-hidden">
       <header className="glass-header px-3 py-1 flex items-center justify-between shadow-lg h-10 shrink-0">
@@ -344,7 +361,14 @@ export default function ChatPage() {
           <h1 className="text-[11px] font-black italic tracking-tighter text-white uppercase">SOCIALBOOST</h1>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setIsNotifOpen(true)} className="relative p-1 text-slate-400"><Bell size={14} />{notifications.length > 0 && <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full" />}</button>
+          <button onClick={() => { markAllRead(); setIsNotifOpen(true); }} className="relative p-1 text-slate-400">
+            <Bell size={14} />
+            {unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-red-500 text-white rounded-full flex items-center justify-center text-[7px] font-black border border-slate-900">
+                {unreadCount}
+              </span>
+            )}
+          </button>
           <button onClick={() => router.push('/profile')} className="w-6 h-6 rounded-lg bg-slate-800 text-white font-black text-[9px] shadow-3d-sm">{currentUser?.displayName?.[0] || 'U'}</button>
         </div>
       </header>
@@ -353,7 +377,7 @@ export default function ChatPage() {
         <button onClick={() => router.push('/add-funds')} className="flex items-center gap-1 bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/20">
           <Wallet size={8} /><span className="text-[8px] font-black">₹{walletBalance.toFixed(0)}</span><PlusCircle size={8} />
         </button>
-        <button onClick={() => setIsOrdersOpen(true)} className="text-[8px] font-black uppercase text-[#312ECB] flex items-center gap-1"><Package size={8} /> ORDERS</button>
+        <button onClick={() => router.push('/orders')} className="text-[8px] font-black uppercase text-[#312ECB] flex items-center gap-1"><Package size={8} /> ORDERS</button>
       </div>
 
       <main className="flex-1 overflow-y-auto p-2 flex flex-col relative custom-scrollbar bg-slate-950/20">
@@ -408,6 +432,36 @@ export default function ChatPage() {
              )}
              <Button onClick={() => setIsBroadcastOpen(false)} variant="ghost" className="w-full text-slate-500 font-black uppercase text-[8px] h-8">Close</Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isNotifOpen} onOpenChange={setIsNotifOpen}>
+        <DialogContent className="max-w-[320px] rounded-[2.5rem] border-none shadow-2xl bg-slate-950 p-0 overflow-hidden">
+          <header className="bg-[#312ECB] p-4 text-white flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Bell size={18} />
+              <DialogTitle className="font-black uppercase text-[10px] tracking-widest">Inbox</DialogTitle>
+            </div>
+            <button onClick={() => setIsNotifOpen(false)}><X size={18} /></button>
+          </header>
+          <ScrollArea className="h-[350px] p-4">
+            {notifications.length > 0 ? (
+              <div className="space-y-3">
+                {notifications.map((n) => (
+                  <div key={n.id} className={cn("p-3 rounded-2xl border transition-all", n.read ? "bg-slate-900/50 border-white/5" : "bg-white/5 border-[#312ECB]/20 shadow-lg")}>
+                    <h4 className="text-[11px] font-black text-[#312ECB] uppercase mb-1">{n.title}</h4>
+                    <p className="text-[10px] font-bold text-slate-300 leading-relaxed">{n.message}</p>
+                    <p className="text-[7px] font-black text-slate-500 uppercase mt-2">{n.createdAt?.toDate ? n.createdAt.toDate().toLocaleDateString() : 'Just now'}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full py-10 opacity-30">
+                <Bell size={40} className="mb-2" />
+                <p className="text-[9px] font-black uppercase">No notifications</p>
+              </div>
+            )}
+          </ScrollArea>
         </DialogContent>
       </Dialog>
     </div>
