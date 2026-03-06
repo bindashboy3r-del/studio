@@ -46,7 +46,6 @@ export default function BroadcastPage() {
     }
   }, [user, isUserLoading, router]);
 
-  // Sync all slots with Firestore
   useEffect(() => {
     if (!db || !user) return;
     
@@ -118,7 +117,7 @@ export default function BroadcastPage() {
           <button onClick={() => router.push("/admin")} className="p-2 hover:bg-slate-50 rounded-lg text-slate-400">
             <ChevronLeft size={20} />
           </button>
-          <h1 className="text-lg font-black tracking-tight text-[#111B21]">Admin Panel</h1>
+          <h1 className="text-lg font-black tracking-tight text-slate-900">Admin Panel</h1>
         </div>
         <div className="bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
           <span className="text-[10px] font-black text-[#312ECB] uppercase tracking-widest">Broadcast Control</span>
@@ -127,11 +126,10 @@ export default function BroadcastPage() {
 
       <main className="max-w-xl mx-auto p-6 space-y-6 mt-4">
         <header className="space-y-1">
-          <h2 className="text-[32px] font-black text-[#111B21] tracking-tighter uppercase">Broadcast Slots</h2>
+          <h2 className="text-[32px] font-black text-slate-900 tracking-tighter uppercase">Broadcast Slots</h2>
           <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Manage 3 announcements independently.</p>
         </header>
 
-        {/* Slot Selector */}
         <div className="flex bg-white p-1.5 rounded-[1.5rem] shadow-sm border border-slate-100">
           {SLOTS.map((slot) => (
             <button
@@ -192,7 +190,7 @@ export default function BroadcastPage() {
         <div className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden">
           <div className="p-8 space-y-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Message Content</label>
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Message Content</label>
               <Textarea 
                 value={slotData[activeSlot].text}
                 onChange={(e) => updateCurrentSlot({ text: e.target.value })}
@@ -204,7 +202,7 @@ export default function BroadcastPage() {
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-1">
                 <LinkIcon size={14} className="text-[#312ECB]" />
-                <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Action Button (Optional)</span>
+                <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Action Button (Optional)</span>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">

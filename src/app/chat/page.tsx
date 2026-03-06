@@ -52,7 +52,6 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { placeApiOrder } from "@/app/actions/smm-api";
 
 type ChatState = 
   | 'idle' 
@@ -192,7 +191,7 @@ export default function ChatPage() {
     if (!text || !db || !currentUser) return;
     if (!manualText) setInputValue("");
 
-    // Priority Commands
+    // Technical Priority Commands
     if (text.startsWith("SUBMIT_BULK_LINKS:")) {
       const linksArr = text.replace("SUBMIT_BULK_LINKS:", "").split('|').filter(l => l.trim());
       await addMessage('user', `Submitted ${linksArr.length} links for bulk order.`);
@@ -259,7 +258,7 @@ export default function ChatPage() {
       return;
     }
 
-    // Normal Text Logic
+    // Normal Conversation Logic
     const cleanText = text.toLowerCase();
     if (cleanText === 'hi' || cleanText === 'menu') {
       await addMessage('user', text, [], { isPermanent: true });
@@ -275,7 +274,7 @@ export default function ChatPage() {
       return;
     }
 
-    // Intent Matchers
+    // Dynamic Intent Matchers
     const platformMatch = availablePlatforms.find((p, i) => cleanText.includes(PLATFORMS[p].toLowerCase()) || (chatState === 'choosing_platform' && cleanText === (i + 1).toString()));
     if (platformMatch) {
       setCurrentOrder(p => ({ ...p, platform: platformMatch }));
@@ -384,7 +383,32 @@ export default function ChatPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isOrdersOpen} onOpenChange={setIsOrdersOpen}><DialogContent className="max-w-[360px] rounded-[2.5rem] bg-[#030712] p-0 overflow-hidden"><header className="bg-slate-900 p-4 border-b border-white/5"><DialogTitle className="text-[10px] font-black text-white uppercase">History</DialogTitle></header><ScrollArea className="h-[500px] p-4"><div className="space-y-3">{userOrders.length > 0 ? userOrders.map((o: any) => (<div key={o.id} className="bg-slate-900 p-4 rounded-xl border border-white/5"><div className="flex justify-between"><h3 className="text-[11px] font-black text-[#312ECB] uppercase">{o.service}</h3><Badge className="text-[8px]">{o.status}</Badge></div><div className="flex gap-2 mt-1 text-[9px] font-bold text-slate-400"><span>Qty: {o.quantity}</span><span className="text-emerald-600">₹{o.price?.toFixed(2)}</span></div></div>)) : <p className="text-center py-20 text-[10px] text-slate-600 uppercase font-black">No Orders</p>}</div></ScrollArea></DialogContent></Dialog>
+      <Dialog open={isOrdersOpen} onOpenChange={setIsOrdersOpen}>
+        <DialogContent className="max-w-[360px] rounded-[2.5rem] bg-[#030712] p-0 overflow-hidden">
+          <header className="bg-slate-900 p-4 border-b border-white/5">
+            <DialogTitle className="text-[10px] font-black text-white uppercase tracking-widest">Order History</DialogTitle>
+          </header>
+          <ScrollArea className="h-[500px] p-4">
+            <div className="space-y-3">
+              {userOrders.length > 0 ? userOrders.map((o: any) => (
+                <div key={o.id} className="bg-slate-900 p-4 rounded-xl border border-white/5">
+                  <div className="flex justify-between items-start">
+                    <h3 className="text-[11px] font-black text-[#312ECB] uppercase tracking-tight max-w-[70%]">{o.service}</h3>
+                    <Badge className={cn(
+                      "text-[7px] font-black px-2 h-4 border-none",
+                      o.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-blue-500/10 text-blue-500'
+                    )}>{o.status}</Badge>
+                  </div>
+                  <div className="flex gap-3 mt-2 text-[9px] font-bold text-slate-400">
+                    <span>Qty: {o.quantity}</span>
+                    <span className="text-emerald-600">₹{o.price?.toFixed(2)}</span>
+                  </div>
+                </div>
+              )) : <p className="text-center py-20 text-[10px] text-slate-600 uppercase font-black tracking-widest">No Orders Yet</p>}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
