@@ -16,16 +16,13 @@ import {
   TrendingUp,
   Info,
   Instagram,
-  Facebook,
-  Youtube,
   MessageCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
-import { doc, collection, addDoc, serverTimestamp, query, where, writeBatch, increment } from "firebase/firestore";
+import { useUser, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
+import { doc, collection, addDoc, serverTimestamp, writeBatch, increment } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 export default function ReferPage() {
@@ -41,12 +38,6 @@ export default function ReferPage() {
 
   const userRef = useMemoFirebase(() => user && db ? doc(db, "users", user.uid) : null, [db, user]);
   const { data: userData } = useDoc(userRef);
-
-  const statsQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return query(collection(db, "referralTransactions"), where("referrerId", "==", user.uid));
-  }, [db, user]);
-  const { data: transactions } = useCollection(statsQuery);
 
   const referralCode = userData?.referralCode || "SOCIAL";
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://socialboost.pro';
@@ -138,9 +129,9 @@ export default function ReferPage() {
             
             <div className="flex gap-2">
               <div className="flex-1 bg-slate-50 p-4 rounded-2xl border border-slate-100 font-bold text-[10px] text-slate-500 truncate select-all">{referralLink}</div>
-              <Button onClick={handleCopyLink} size="icon" className="h-12 w-12 rounded-2xl bg-[#312ECB] shadow-md shrink-0 active:scale-90 transition-transform">
+              <button onClick={handleCopyLink} className="h-12 w-12 rounded-2xl bg-[#312ECB] text-white shadow-md shrink-0 active:scale-90 transition-transform flex items-center justify-center">
                 <Copy size={18} />
-              </Button>
+              </button>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -159,8 +150,24 @@ export default function ReferPage() {
           <div className="flex items-center gap-2 mb-2"><Banknote className="text-emerald-500" size={18} /><h3 className="text-[11px] font-black text-slate-900 uppercase tracking-widest">Withdraw Earnings</h3></div>
           
           <div className="flex bg-slate-50 p-1 rounded-2xl border border-slate-100">
-            <button onClick={() => setWithdrawType('Wallet')} className={cn("flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all", withdrawType === 'Wallet' ? "bg-white shadow-sm text-[#312ECB]" : "text-slate-400")}>To SMM Wallet</button>
-            <button onClick={() => setWithdrawType('UPI')} className={cn("flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all", withdrawType === 'UPI' ? "bg-white shadow-sm text-[#312ECB]" : "text-slate-400")}>To UPI App</button>
+            <button 
+              onClick={() => setWithdrawType('Wallet')} 
+              className={cn(
+                "flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all", 
+                withdrawType === 'Wallet' ? "bg-white shadow-sm text-[#312ECB]" : "text-slate-400"
+              )}
+            >
+              To SMM Wallet
+            </button>
+            <button 
+              onClick={() => setWithdrawType('UPI')} 
+              className={cn(
+                "flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all", 
+                withdrawType === 'UPI' ? "bg-white shadow-sm text-[#312ECB]" : "text-slate-400"
+              )}
+            >
+              To UPI App
+            </button>
           </div>
 
           <div className="space-y-4">
@@ -181,16 +188,11 @@ export default function ReferPage() {
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 px-2"><Info className="text-[#312ECB]" size={14} /><h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Recent Commissions</h3></div>
-          <div className="space-y-3">
-            {transactions && transactions.length > 0 ? transactions.map((t: any) => (
-              <div key={t.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
-                <div><p className="text-[11px] font-black text-slate-900 uppercase">From {t.fromUserName || 'Referred User'}</p><p className="text-[8px] font-bold text-slate-400 uppercase">Deposit: ₹{t.depositAmount}</p></div>
-                <Badge className="bg-emerald-50 text-emerald-600 border-none text-[10px] font-black tracking-tight">+₹{t.commissionAmount.toFixed(2)}</Badge>
-              </div>
-            )) : <div className="text-center py-10 text-slate-300 text-[9px] font-black uppercase tracking-widest">No earnings yet. Start sharing!</div>}
-          </div>
+        <div className="bg-blue-50 p-5 rounded-3xl border border-blue-100 flex items-start gap-4">
+          <Info className="text-blue-600 shrink-0" size={20} />
+          <p className="text-[10px] font-bold text-blue-700 leading-relaxed uppercase">
+            Notice: Commission is added only when your referred friends add funds to their wallet.
+          </p>
         </div>
       </main>
     </div>

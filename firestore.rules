@@ -39,20 +39,23 @@ service cloud.firestore {
     // Fund Requests
     match /fundRequests/{requestId} {
       allow create: if isSignedIn();
-      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow get: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow list: if isSignedIn() && (isAdmin() || request.query.filters.userId == request.auth.uid);
       allow update, delete: if isAdmin();
     }
 
-    // Referral Transactions - Secure Access for history listing
+    // Referral Transactions - Secure Access
     match /referralTransactions/{txId} {
-      allow read: if isSignedIn() && (isAdmin() || resource.data.referrerId == request.auth.uid);
+      allow get: if isSignedIn() && (isAdmin() || resource.data.referrerId == request.auth.uid);
+      allow list: if isSignedIn() && (isAdmin() || request.query.filters.referrerId == request.auth.uid);
       allow write: if isAdmin();
     }
 
     // Withdrawals - User can create and see their own
     match /withdrawals/{withdrawalId} {
       allow create: if isSignedIn();
-      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow get: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow list: if isSignedIn() && (isAdmin() || request.query.filters.userId == request.auth.uid);
       allow update, delete: if isAdmin();
     }
 
