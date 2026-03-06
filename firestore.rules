@@ -60,6 +60,7 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Collection group rules for nested user data
     match /{path=**}/orders/{orderId} {
       allow read: if isAdmin();
     }
