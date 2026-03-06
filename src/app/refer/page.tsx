@@ -85,10 +85,10 @@ export default function ReferPage() {
     finally { setIsWithdrawing(false); }
   };
 
-  if (isUserLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-[#312ECB]" /></div>;
+  if (isUserLoading) return <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]"><Loader2 className="animate-spin text-[#312ECB]" /></div>;
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] font-body pb-20">
+    <div className="min-h-screen bg-[#F8FAFC] font-body pb-20 text-slate-950">
       <header className="bg-white px-4 py-3 flex items-center justify-between border-b border-gray-100 sticky top-0 z-50 shadow-sm">
         <button onClick={() => router.back()} className="flex items-center gap-1 text-[#312ECB] font-black uppercase text-[10px] tracking-widest">
           <ChevronLeft size={16} /> Back

@@ -150,11 +150,14 @@ export default function ChatPage() {
 
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollIntoView({ behavior: "smooth" }); }, [messages, isTyping]);
 
-  const clearRecentMessages = async () => {
+  const clearFlowMessages = async () => {
     if (!currentUser || !db || !messages) return;
     const batch = writeBatch(db);
+    // Delete all messages except the greeting and the platform/menu selector
     messages.forEach(m => {
-      batch.delete(doc(db, "users", currentUser.uid, "chatMessages", m.id));
+      if (!m.isPermanent) {
+        batch.delete(doc(db, "users", currentUser.uid, "chatMessages", m.id));
+      }
     });
     await batch.commit();
   };
@@ -183,18 +186,30 @@ export default function ChatPage() {
 
     const cleanText = text.toLowerCase();
 
-    // MAJOR CHOICE DETECTED: Platform Selection
-    const platformMatch = availablePlatforms.find((p, i) => cleanText.includes(PLATFORMS[p].toLowerCase()) || (chatState === 'choosing_platform' && cleanText === (i + 1).toString()));
+    // DETECTION: Is this a major menu switch?
+    const isOrderTypeChoice = cleanText.includes('single') || cleanText.includes('combo') || cleanText.includes('bulk');
     
-    // MAJOR CHOICE DETECTED: Order Type Selection
-    const isOrderTypeChoice = chatState === 'choosing_order_type' && (cleanText.includes('single') || cleanText.includes('combo') || cleanText.includes('bulk') || ['1','2','3'].includes(cleanText));
+    // If user clicks a top-level menu option, clear everything below it
+    if (isOrderTypeChoice) {
+      await clearFlowMessages();
+    }
 
-    // MAJOR CHOICE DETECTED: "Menu" or "Hi"
-    const isMenuTrigger = cleanText === 'hi' || cleanText === 'menu';
-
-    // If any major choice is made, clear previous clutter
-    if (platformMatch || isOrderTypeChoice || isMenuTrigger) {
-      await clearRecentMessages();
+    if (cleanText === 'hi' || cleanText === 'menu') {
+      await addMessage('user', text);
+      if (availablePlatforms.length > 1) {
+        setChatState('choosing_platform');
+        botReply("Select your platform to continue:", availablePlatforms.map((p, i) => `${i + 1}. ${PLATFORMS[p]}`), { isPermanent: true });
+      } else {
+        const p = availablePlatforms[0] || 'instagram';
+        setCurrentOrder(prev => ({ ...prev, platform: p }));
+        setChatState('choosing_order_type');
+        botReply(`Pick for ${PLATFORMS[p]}:`, [
+          `1. SINGLE ORDER (${globalDiscounts.single}% OFF)`, 
+          `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)`, 
+          `3. BULK ORDER (${globalDiscounts.bulk}% OFF)`
+        ], { isPermanent: true });
+      }
+      return;
     }
 
     // Command handling
@@ -264,39 +279,8 @@ export default function ChatPage() {
       return;
     }
 
-    // Logic for selections
-    if (platformMatch) {
-      await addMessage('user', PLATFORMS[platformMatch]);
-      setCurrentOrder(p => ({ ...p, platform: platformMatch, items: [] }));
-      setChatState('choosing_order_type');
-      botReply(`Pick for ${PLATFORMS[platformMatch]}:`, [
-        `1. SINGLE ORDER (${globalDiscounts.single}% OFF)`, 
-        `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)`, 
-        `3. BULK ORDER (${globalDiscounts.bulk}% OFF)`
-      ], { isPermanent: true });
-      return;
-    }
-
-    if (isMenuTrigger) {
-      await addMessage('user', text);
-      if (availablePlatforms.length > 1) {
-        setChatState('choosing_platform');
-        botReply("Select your platform to continue:", availablePlatforms.map((p, i) => `${i + 1}. ${PLATFORMS[p]}`), { isPermanent: true });
-      } else {
-        const p = availablePlatforms[0] || 'instagram';
-        setCurrentOrder(prev => ({ ...prev, platform: p }));
-        setChatState('choosing_order_type');
-        botReply(`Pick for ${PLATFORMS[p]}:`, [
-          `1. SINGLE ORDER (${globalDiscounts.single}% OFF)`, 
-          `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)`, 
-          `3. BULK ORDER (${globalDiscounts.bulk}% OFF)`
-        ], { isPermanent: true });
-      }
-      return;
-    }
-
-    if (chatState === 'choosing_order_type') {
-      if (cleanText.includes('single') || cleanText === '1') {
+    if (isOrderTypeChoice) {
+      if (cleanText.includes('single')) {
         await addMessage('user', "Single Order");
         setCurrentOrder(p => ({ ...p, type: 'single' }));
         setChatState('choosing_service');
@@ -304,17 +288,17 @@ export default function ChatPage() {
         botReply(`✅ SINGLE MODE\nChoose a service:`, filtered.map((s, i) => `${i + 1}. ${s.name}`));
         return;
       }
-      if (cleanText.includes('combo') || cleanText === '2') {
+      if (cleanText.includes('combo')) {
         await addMessage('user', "Combo Order");
         setCurrentOrder(p => ({ ...p, type: 'combo' }));
         botReply(`✅ COMBO MODE\nI'll help you build a package. Use the config card below:`, [], { isComboConfigCard: true, discountPct: globalDiscounts.combo });
         return;
       }
-      if (cleanText.includes('bulk') || cleanText === '3') {
+      if (cleanText.includes('bulk')) {
         await addMessage('user', "Bulk Order");
         setCurrentOrder(p => ({ ...p, type: 'bulk' }));
         setChatState('bulk_adding_links');
-        botReply(`✅ BULK MODE\nPlease add multiple target links first:`, [], { isBulkLinkCard: true });
+        botReply(`✅ BULK MODE\nPlease add multiple Target Links first:`, [], { isBulkLinkCard: true });
         return;
       }
     }
@@ -355,25 +339,25 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-[100dvh] max-w-lg mx-auto whatsapp-bg font-body overflow-hidden">
-      <header className="glass-header px-3 py-2 flex items-center justify-between shadow-lg h-12 shrink-0">
+      <header className="glass-header px-3 py-1.5 flex items-center justify-between shadow-lg h-10 shrink-0">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-xl bg-[#312ECB] flex items-center justify-center text-white"><Zap size={14} /></div>
-          <h1 className="text-[14px] font-black italic tracking-tighter text-white uppercase">SOCIALBOOST</h1>
+          <div className="w-6 h-6 rounded-lg bg-[#312ECB] flex items-center justify-center text-white shadow-3d"><Zap size={12} /></div>
+          <h1 className="text-[12px] font-black italic tracking-tighter text-white uppercase">SOCIALBOOST</h1>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setIsNotifOpen(true)} className="relative p-1 text-slate-400"><Bell size={16} />{notifications.length > 0 && <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full" />}</button>
-          <button onClick={() => router.push('/profile')} className="w-7 h-7 rounded-xl bg-slate-800 text-white font-black text-[10px]">{currentUser?.displayName?.[0] || 'U'}</button>
+          <button onClick={() => setIsNotifOpen(true)} className="relative p-1 text-slate-400"><Bell size={14} />{notifications.length > 0 && <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full" />}</button>
+          <button onClick={() => router.push('/profile')} className="w-6 h-6 rounded-lg bg-slate-800 text-white font-black text-[9px] shadow-3d-sm">{currentUser?.displayName?.[0] || 'U'}</button>
         </div>
       </header>
 
-      <div className="bg-slate-900/50 px-3 py-1 flex items-center justify-between border-b border-white/5 h-8 shrink-0">
-        <button onClick={() => router.push('/add-funds')} className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/20">
-          <Wallet size={10} /><span className="text-[9px] font-black">₹{walletBalance.toFixed(0)}</span><PlusCircle size={10} />
+      <div className="bg-slate-900/50 px-3 py-1 flex items-center justify-between border-b border-white/5 h-7 shrink-0">
+        <button onClick={() => router.push('/add-funds')} className="flex items-center gap-1 bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/20 shadow-inner">
+          <Wallet size={9} /><span className="text-[8px] font-black">₹{walletBalance.toFixed(0)}</span><PlusCircle size={9} />
         </button>
-        <button onClick={() => setIsOrdersOpen(true)} className="text-[8px] font-black uppercase text-[#312ECB] flex items-center gap-1"><Package size={10} /> ORDERS</button>
+        <button onClick={() => setIsOrdersOpen(true)} className="text-[8px] font-black uppercase text-[#312ECB] flex items-center gap-1"><Package size={9} /> ORDERS</button>
       </div>
 
-      <main className="flex-1 overflow-y-auto p-3 flex flex-col relative custom-scrollbar bg-slate-950/20">
+      <main className="flex-1 overflow-y-auto p-2 flex flex-col relative custom-scrollbar bg-slate-950/20">
         {messages?.map(m => (
           <MessageBubble 
             key={m.id} 
@@ -403,27 +387,27 @@ export default function ChatPage() {
         <div ref={scrollRef} />
       </main>
 
-      <footer className="p-2 bg-slate-900/80 backdrop-blur-xl border-t border-white/5 shrink-0">
-        <div className="flex items-center gap-2 bg-slate-950 rounded-2xl p-1 h-10">
-          <Input value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSend()} placeholder="Type your request..." className="flex-1 bg-transparent border-none font-bold text-xs h-full text-white placeholder:text-slate-600 focus-visible:ring-0" />
-          <Button onClick={() => handleSend()} size="icon" className="rounded-xl h-8 w-8 bg-[#312ECB]"><Send size={14} /></Button>
+      <footer className="p-1.5 bg-slate-900/80 backdrop-blur-xl border-t border-white/5 shrink-0">
+        <div className="flex items-center gap-2 bg-slate-950 rounded-xl p-1 h-9">
+          <Input value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSend()} placeholder="Ask something..." className="flex-1 bg-transparent border-none font-bold text-[11px] h-full text-white placeholder:text-slate-600 focus-visible:ring-0" />
+          <Button onClick={() => handleSend()} size="icon" className="rounded-lg h-7 w-7 bg-[#312ECB] shadow-3d active:shadow-3d-pressed"><Send size={12} /></Button>
         </div>
       </footer>
 
       <Dialog open={isBroadcastOpen} onOpenChange={setIsBroadcastOpen}>
-        <DialogContent className="max-w-[320px] rounded-[2rem] border-none shadow-2xl bg-[#030712] p-0 overflow-hidden">
-          <header className="bg-gradient-to-r from-[#312ECB] to-purple-600 p-4 text-white text-center">
-             <Megaphone size={20} className="mx-auto" />
-             <DialogTitle className="font-black uppercase text-[9px] tracking-widest mt-1">Update</DialogTitle>
+        <DialogContent className="max-w-[300px] rounded-[2rem] border-none shadow-2xl bg-[#030712] p-0 overflow-hidden">
+          <header className="bg-gradient-to-r from-[#312ECB] to-purple-600 p-3 text-white text-center">
+             <Megaphone size={18} className="mx-auto" />
+             <DialogTitle className="font-black uppercase text-[8px] tracking-widest mt-1">Official Update</DialogTitle>
           </header>
-          <div className="p-6 space-y-4 text-center">
-             <p className="text-[12px] font-bold text-slate-200 leading-relaxed italic">{activeBroadcast?.text}</p>
+          <div className="p-5 space-y-3 text-center">
+             <p className="text-[11px] font-bold text-slate-200 leading-relaxed italic">{activeBroadcast?.text}</p>
              {activeBroadcast?.buttonUrl && (
-               <Button asChild className="w-full h-10 bg-white text-slate-900 font-black uppercase text-[10px] rounded-xl gap-2">
-                 <a href={activeBroadcast.buttonUrl} target="_blank" rel="noopener noreferrer">{activeBroadcast.buttonText || "Open"} <ExternalLink size={12} /></a>
+               <Button asChild className="w-full h-9 bg-white text-slate-900 font-black uppercase text-[9px] rounded-lg gap-2 shadow-3d">
+                 <a href={activeBroadcast.buttonUrl} target="_blank" rel="noopener noreferrer">{activeBroadcast.buttonText || "Open"} <ExternalLink size={10} /></a>
                </Button>
              )}
-             <Button onClick={() => setIsBroadcastOpen(false)} variant="ghost" className="w-full text-slate-500 font-black uppercase text-[9px]">Close</Button>
+             <Button onClick={() => setIsBroadcastOpen(false)} variant="ghost" className="w-full text-slate-500 font-black uppercase text-[8px] h-8">Close</Button>
           </div>
         </DialogContent>
       </Dialog>
