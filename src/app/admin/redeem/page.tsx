@@ -10,7 +10,8 @@ import {
   Trash2, 
   RefreshCw,
   Save,
-  Users
+  Users,
+  X as CloseIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +26,8 @@ import {
   query, 
   orderBy 
 } from "firebase/firestore";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 import {
   Dialog,
   DialogContent,
@@ -33,7 +36,6 @@ import {
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { format } from "date-fns";
 
 export default function RedeemManagerPage() {
   const { user, isUserLoading } = useUser();
@@ -44,6 +46,7 @@ export default function RedeemManagerPage() {
   const [isAdding, setIsAdding] = useState(false);
   const [newCode, setNewCode] = useState({ code: "", amount: "", limit: "" });
   const [isSaving, setIsSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const codesQuery = useMemoFirebase(() => {
     if (!db) return null;
@@ -53,7 +56,8 @@ export default function RedeemManagerPage() {
 
   useEffect(() => {
     const ADMIN_EMAIL = "chetanmadhav4@gmail.com";
-    if (!isUserLoading && (!user || user.email !== ADMIN_EMAIL)) {
+    const ADMIN_ID = "s55uL0f8PmcypR75usVYOLwVs7O2";
+    if (!isUserLoading && (!user || (user.email !== ADMIN_EMAIL && user.uid !== ADMIN_ID))) {
       router.push("/admin/login");
     }
   }, [user, isUserLoading, router]);
@@ -66,36 +70,54 @@ export default function RedeemManagerPage() {
 
     setIsSaving(true);
     const codeId = newCode.code.trim().toUpperCase();
-    try {
-      await setDoc(doc(db, "redeemCodes", codeId), {
-        code: codeId,
-        amount: parseFloat(newCode.amount),
-        limit: parseInt(newCode.limit),
-        usedCount: 0,
-        usedBy: [],
-        createdAt: serverTimestamp(),
-        createdBy: user?.email
-      });
-      toast({ title: "Code Created!", description: `${codeId} is now active.` });
-      setNewCode({ code: "", amount: "", limit: "" });
-      setIsAdding(false);
-    } catch (e) {
-      toast({ variant: "destructive", title: "Failed to create code" });
-    } finally {
-      setIsSaving(false);
-    }
+    const docRef = doc(db, "redeemCodes", codeId);
+    const payload = {
+      code: codeId,
+      amount: parseFloat(newCode.amount),
+      limit: parseInt(newCode.limit),
+      usedCount: 0,
+      usedBy: [],
+      createdAt: serverTimestamp(),
+      createdBy: user?.email
+    };
+
+    setDoc(docRef, payload)
+      .then(() => {
+        toast({ title: "Code Created!", description: `${codeId} is now active.` });
+        setNewCode({ code: "", amount: "", limit: "" });
+        setIsAdding(false);
+      })
+      .catch((err) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: docRef.path,
+          operation: 'create',
+          requestResourceData: payload
+        }));
+      })
+      .finally(() => setIsSaving(false));
   };
 
   const handleDelete = async (id: string) => {
     if (!db) return;
     if (!confirm("Are you sure you want to delete this code?")) return;
-    try {
-      await deleteDoc(doc(db, "redeemCodes", id));
-      toast({ title: "Deleted" });
-    } catch (e) {
-      toast({ variant: "destructive", title: "Deletion failed" });
-    }
+    
+    setDeletingId(id);
+    const docRef = doc(db, "redeemCodes", id);
+    
+    deleteDoc(docRef)
+      .then(() => {
+        toast({ title: "Deleted Successfully" });
+      })
+      .catch((err) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: docRef.path,
+          operation: 'delete'
+        }));
+      })
+      .finally(() => setDeletingId(null));
   };
+
+  if (isUserLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><RefreshCw className="animate-spin text-[#312ECB]" /></div>;
 
   return (
     <div className="min-h-screen bg-slate-50 font-body pb-20 text-slate-950">
@@ -114,7 +136,7 @@ export default function RedeemManagerPage() {
           </DialogTrigger>
           <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-8 bg-white text-slate-950">
             <DialogHeader>
-              <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-3 text-slate-900">
+              <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-3 text-slate-950">
                 <Ticket className="text-[#312ECB]" /> Create Voucher
               </DialogTitle>
             </DialogHeader>
@@ -125,7 +147,7 @@ export default function RedeemManagerPage() {
                   placeholder="e.g. FREE100" 
                   value={newCode.code} 
                   onChange={e => setNewCode({...newCode, code: e.target.value.toUpperCase()})}
-                  className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" 
+                  className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-950" 
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -136,7 +158,7 @@ export default function RedeemManagerPage() {
                     placeholder="100" 
                     value={newCode.amount} 
                     onChange={e => setNewCode({...newCode, amount: e.target.value})}
-                    className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" 
+                    className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-950" 
                   />
                 </div>
                 <div className="space-y-1">
@@ -146,7 +168,7 @@ export default function RedeemManagerPage() {
                     placeholder="10" 
                     value={newCode.limit} 
                     onChange={e => setNewCode({...newCode, limit: e.target.value})}
-                    className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" 
+                    className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-950" 
                   />
                 </div>
               </div>
@@ -176,7 +198,7 @@ export default function RedeemManagerPage() {
                     <Ticket size={24} />
                   </div>
                   <div>
-                    <h3 className="text-lg font-black uppercase text-slate-900">{c.code}</h3>
+                    <h3 className="text-lg font-black uppercase text-slate-950">{c.code}</h3>
                     <div className="flex items-center gap-3 mt-1">
                       <span className="text-[11px] font-black text-emerald-600 uppercase">Amount: ₹{c.amount}</span>
                       <span className="text-slate-200">|</span>
@@ -190,9 +212,10 @@ export default function RedeemManagerPage() {
                   variant="ghost" 
                   size="icon" 
                   onClick={() => handleDelete(c.id)}
-                  className="text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                  disabled={deletingId === c.id}
+                  className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
                 >
-                  <Trash2 size={18} />
+                  {deletingId === c.id ? <RefreshCw className="animate-spin" size={18} /> : <Trash2 size={18} />}
                 </Button>
               </div>
             ))}

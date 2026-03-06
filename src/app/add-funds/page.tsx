@@ -21,6 +21,8 @@ import { Input } from "@/components/ui/input";
 import { useUser, useFirestore } from "@/firebase";
 import { doc, onSnapshot, collection, addDoc, serverTimestamp, getDoc, updateDoc, increment, arrayUnion, writeBatch } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 import {
   Dialog,
   DialogContent,
@@ -112,29 +114,35 @@ export default function AddFundsPage() {
     }
 
     setLoading(true);
-    try {
-      await addDoc(collection(db, "fundRequests"), {
-        userId: user.uid,
-        userEmail: user.email || '',
-        displayName: user.displayName || 'User',
-        amount: amtNum,
-        utrId: utrId.trim(),
-        status: 'Pending',
-        type: 'Manual',
-        createdAt: serverTimestamp()
-      });
+    const docRef = collection(db, "fundRequests");
+    const payload = {
+      userId: user.uid,
+      userEmail: user.email || '',
+      displayName: user.displayName || 'User',
+      amount: amtNum,
+      utrId: utrId.trim(),
+      status: 'Pending',
+      type: 'Manual',
+      createdAt: serverTimestamp()
+    };
 
-      const msg = `🚀 *NEW PAYMENT SUBMITTED!*\n\n👤 *User:* ${user.displayName || user.email}\n🔢 *UTR ID:* ${utrId.trim()}\n💰 *Amount:* ₹${amount}\n\nKripya mera payment verify karein.`;
-      setWhatsappMsg(msg);
-      setShowConfirmPopup(true);
-      toast({ title: "Request Logged!" });
-      setAmount("");
-      setUtrId("");
-    } catch (error: any) {
-      toast({ variant: "destructive", title: "Failed", description: "Server error." });
-    } finally {
-      setLoading(false);
-    }
+    addDoc(docRef, payload)
+      .then(() => {
+        const msg = `🚀 *NEW PAYMENT SUBMITTED!*\n\n👤 *User:* ${user.displayName || user.email}\n🔢 *UTR ID:* ${utrId.trim()}\n💰 *Amount:* ₹${amount}\n\nKripya mera payment verify karein.`;
+        setWhatsappMsg(msg);
+        setShowConfirmPopup(true);
+        toast({ title: "Request Logged!" });
+        setAmount("");
+        setUtrId("");
+      })
+      .catch((err) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: 'fundRequests',
+          operation: 'create',
+          requestResourceData: payload
+        }));
+      })
+      .finally(() => setLoading(false));
   };
 
   const handleRedeem = async () => {
@@ -166,14 +174,20 @@ export default function AddFundsPage() {
       }
 
       const batch = writeBatch(db);
+      
+      // Update code stats
       batch.update(codeRef, { 
         usedCount: increment(1), 
         usedBy: arrayUnion(user.uid) 
       });
-      batch.update(doc(db, "users", user.uid), { 
+      
+      // Update user balance
+      const userRef = doc(db, "users", user.uid);
+      batch.update(userRef, { 
         balance: increment(data.amount) 
       });
       
+      // Send notification
       const notifRef = doc(collection(db, "users", user.uid, "notifications"));
       batch.set(notifRef, {
         title: "🎁 Voucher Redeemed!",
@@ -185,8 +199,12 @@ export default function AddFundsPage() {
       await batch.commit();
       toast({ title: "Redeemed Successfully!", description: `₹${data.amount} aapke wallet mein add ho gaye hain.` });
       setRedeemCode("");
-    } catch (e) {
-      toast({ variant: "destructive", title: "Error", description: "Kuch technical issue hai." });
+    } catch (e: any) {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: `redeemCodes/${codeId}`,
+        operation: 'update'
+      }));
+      toast({ variant: "destructive", title: "Error", description: "Voucher redeem karne mein dikkat hui." });
     } finally {
       setIsRedeeming(false);
     }

@@ -26,16 +26,17 @@ service cloud.firestore {
         allow read, write: if isOwner(userId) || isAdmin();
       }
       
-      match /chatMessages/{msgId} {
+      match /notifications/{notifId} {
         allow read, write: if isOwner(userId) || isAdmin();
       }
-      
-      match /notifications/{notifId} {
+
+      // Allow creating chat messages for the user
+      match /chatMessages/{msgId} {
         allow read, write: if isOwner(userId) || isAdmin();
       }
     }
 
-    // Fund Requests: Optimized for list/get permissions
+    // Fund Requests: Root level rules for cleaner access
     match /fundRequests/{requestId} {
       allow create: if isSignedIn();
       allow get: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
@@ -46,7 +47,18 @@ service cloud.firestore {
     // Wallet redeem codes
     match /redeemCodes/{codeId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow create, delete: if isAdmin();
+      // Allow users to update ONLY usage-related fields during redemption
+      allow update: if isSignedIn() && (
+        isAdmin() || 
+        (
+          request.resource.data.amount == resource.data.amount &&
+          request.resource.data.limit == resource.data.limit &&
+          request.resource.data.usedCount == resource.data.usedCount + 1 &&
+          request.resource.data.usedBy.hasAll(resource.data.usedBy) &&
+          request.auth.uid in request.resource.data.usedBy
+        )
+      );
     }
 
     // Global announcements
@@ -66,7 +78,7 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Collection Group rule for Admin/User cross-access
+    // Collection Group rules for advanced tracking
     match /{path=**}/orders/{orderId} {
       allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
       allow update: if isAdmin();
