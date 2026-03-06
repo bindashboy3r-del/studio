@@ -58,7 +58,7 @@ export default function AddFundsPage() {
   const [showConfirmPopup, setShowConfirmPopup] = useState(false);
   const [whatsappMsg, setWhatsappMsg] = useState("");
 
-  // History Query
+  // History Query - Corrected to avoid permission conflicts
   const historyQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
     return query(

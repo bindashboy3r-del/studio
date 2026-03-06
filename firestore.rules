@@ -60,13 +60,9 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Collection group rules for nested user data
+    // Collection group rules for nested user data (Admin Tracker)
     match /{path=**}/orders/{orderId} {
       allow read: if isAdmin();
-    }
-    
-    match /{path=**}/fundRequests/{requestId} {
-      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
     }
   }
 }
