@@ -220,7 +220,7 @@ export default function ServiceManagerPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 font-body pb-20">
+    <div className="min-h-screen bg-slate-50 font-body pb-20 text-slate-950">
       <header className="bg-white px-6 py-4 flex items-center justify-between border-b border-slate-100 sticky top-0 z-50">
         <div className="flex items-center gap-3">
           <button onClick={() => router.push("/admin")} className="p-2 hover:bg-slate-50 rounded-lg text-slate-400"><ChevronLeft size={20} /></button>
@@ -232,7 +232,7 @@ export default function ServiceManagerPage() {
               <PlusCircle size={16} /> New Category
             </Button>
           </DialogTrigger>
-          <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-8 bg-white">
+          <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-8 bg-white text-slate-950">
             <DialogHeader>
               <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-3 text-slate-900">
                 <LayoutGrid className="text-[#312ECB]" /> Create Category
@@ -364,7 +364,7 @@ export default function ServiceManagerPage() {
       </main>
 
       <Dialog open={isAddingService} onOpenChange={setIsAddingService}>
-        <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-8 bg-white">
+        <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-8 bg-white text-slate-950">
           <DialogHeader>
             <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-3 text-slate-900">
               <Layers className="text-[#312ECB]" /> Add Service

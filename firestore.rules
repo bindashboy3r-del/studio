@@ -38,8 +38,7 @@ service cloud.firestore {
     // Fund Requests: Users read their own, Admin reads all
     match /fundRequests/{requestId} {
       allow create: if isSignedIn();
-      allow get: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
-      allow list: if isSignedIn() && (isAdmin() || request.query.limit <= 100); 
+      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
       allow update, delete: if isAdmin();
     }
 

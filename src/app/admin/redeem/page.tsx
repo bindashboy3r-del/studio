@@ -98,13 +98,13 @@ export default function RedeemManagerPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-body pb-20">
+    <div className="min-h-screen bg-slate-50 font-body pb-20 text-slate-950">
       <header className="bg-white px-6 py-4 flex items-center justify-between border-b border-slate-100 sticky top-0 z-50 shadow-sm">
         <div className="flex items-center gap-3">
           <button onClick={() => router.push("/admin")} className="p-2 hover:bg-slate-50 rounded-lg text-slate-400">
             <ChevronLeft size={20} />
           </button>
-          <h1 className="text-lg font-black tracking-tight text-[#111B21] uppercase">Redeem Codes</h1>
+          <h1 className="text-lg font-black tracking-tight text-slate-900 uppercase">Redeem Codes</h1>
         </div>
         <Dialog open={isAdding} onOpenChange={setIsAdding}>
           <DialogTrigger asChild>
@@ -112,7 +112,7 @@ export default function RedeemManagerPage() {
               <Plus size={16} /> New Code
             </Button>
           </DialogTrigger>
-          <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-8 bg-white">
+          <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-8 bg-white text-slate-950">
             <DialogHeader>
               <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-3 text-slate-900">
                 <Ticket className="text-[#312ECB]" /> Create Voucher

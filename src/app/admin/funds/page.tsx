@@ -192,7 +192,7 @@ export default function FundRequestsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 font-body">
+    <div className="min-h-screen bg-slate-50 p-6 font-body text-slate-950">
       <div className="max-w-6xl mx-auto space-y-6">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -200,7 +200,7 @@ export default function FundRequestsPage() {
               <ChevronLeft size={24} />
             </button>
             <div>
-              <h1 className="text-2xl font-black tracking-tight text-[#111B21]">PAYMENT APPROVALS</h1>
+              <h1 className="text-2xl font-black tracking-tight text-slate-900">PAYMENT APPROVALS</h1>
               <p className="text-[10px] font-black text-[#F59E0B] uppercase tracking-widest">Verify & Approve Fund Requests</p>
             </div>
           </div>
@@ -245,7 +245,7 @@ export default function FundRequestsPage() {
                 <TableRow key={req.id} className="border-slate-50 hover:bg-slate-50/50">
                   <TableCell>
                     <div className="flex flex-col">
-                      <span className="font-black text-[#111B21] text-sm">{req.displayName || 'Anonymous'}</span>
+                      <span className="font-black text-slate-900 text-sm">{req.displayName || 'Anonymous'}</span>
                       <span className="text-[10px] font-bold text-slate-500">{req.userEmail}</span>
                     </div>
                   </TableCell>
@@ -258,7 +258,7 @@ export default function FundRequestsPage() {
                           type="number"
                           value={creditAmounts[req.id] || ""}
                           onChange={(e) => setCreditAmounts({...creditAmounts, [req.id]: e.target.value})}
-                          className="h-10 w-24 bg-emerald-50 border-none rounded-xl text-sm font-black text-emerald-700"
+                          className="h-10 w-24 bg-emerald border-none rounded-xl text-sm font-black text-emerald-700"
                         />
                       </div>
                     ) : (

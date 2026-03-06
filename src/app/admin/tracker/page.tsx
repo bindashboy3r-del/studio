@@ -185,22 +185,22 @@ export default function TrackerPage() {
   };
 
   const OrderTable = ({ data }: { data: any[] }) => (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto text-slate-950">
       <Table>
         <TableHeader className="bg-slate-50">
           <TableRow className="border-slate-100 hover:bg-transparent">
-            <TableHead className="text-[9px] font-black uppercase py-4">Order Info</TableHead>
-            <TableHead className="text-[9px] font-black uppercase py-4">Service</TableHead>
-            <TableHead className="text-[9px] font-black uppercase py-4">API/Manual</TableHead>
-            <TableHead className="text-[9px] font-black uppercase py-4">Status</TableHead>
-            <TableHead className="text-right text-[9px] font-black uppercase py-4">Action</TableHead>
+            <TableHead className="text-[9px] font-black uppercase py-4 text-slate-600">Order Info</TableHead>
+            <TableHead className="text-[9px] font-black uppercase py-4 text-slate-600">Service</TableHead>
+            <TableHead className="text-[9px] font-black uppercase py-4 text-slate-600">API/Manual</TableHead>
+            <TableHead className="text-[9px] font-black uppercase py-4 text-slate-600">Status</TableHead>
+            <TableHead className="text-right text-[9px] font-black uppercase py-4 text-slate-600">Action</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {data.map((order) => (
             <TableRow key={order.id} className="border-slate-50 hover:bg-slate-50/50">
               <TableCell className="text-[10px] font-bold text-slate-400 uppercase">
-                <span className="text-[#111B21] font-black">{order.orderId || 'N/A'}</span><br/>
+                <span className="text-slate-900 font-black">{order.orderId || 'N/A'}</span><br/>
                 {isValid(order.createdAt) ? format(order.createdAt, 'dd MMM HH:mm') : 'N/A'}
               </TableCell>
               <TableCell>
@@ -229,10 +229,10 @@ export default function TrackerPage() {
               </TableCell>
               <TableCell className="text-right">
                 <Select onValueChange={(val) => updateStatus(order, val)}>
-                  <SelectTrigger className="w-[80px] h-8 text-[8px] font-black uppercase border-slate-200">
+                  <SelectTrigger className="w-[80px] h-8 text-[8px] font-black uppercase border-slate-200 text-slate-900">
                     <SelectValue placeholder="Action" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white text-slate-950">
                     <SelectItem value="Processing" className="text-[8px] font-black uppercase text-blue-600">Approve</SelectItem>
                     <SelectItem value="Completed" className="text-[8px] font-black uppercase text-emerald-600">Complete</SelectItem>
                     <SelectItem value="Cancelled" className="text-[8px] font-black uppercase text-red-600">Reject</SelectItem>
@@ -249,11 +249,11 @@ export default function TrackerPage() {
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><RefreshCw className="animate-spin text-blue-600" /></div>;
 
   return (
-    <div className="min-h-screen bg-slate-50 font-body pb-10">
+    <div className="min-h-screen bg-slate-50 font-body pb-10 text-slate-950">
       <header className="bg-white px-4 py-3 flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 sticky top-0 z-50 gap-3">
         <div className="flex items-center gap-2">
           <button onClick={() => router.push("/admin")} className="p-1.5 hover:bg-slate-50 rounded-lg text-slate-400"><ChevronLeft size={18} /></button>
-          <h1 className="text-sm font-black tracking-tight text-[#111B21] uppercase">Live Tracker</h1>
+          <h1 className="text-sm font-black tracking-tight text-slate-900 uppercase">Live Tracker</h1>
         </div>
         
         <div className="flex flex-wrap items-center gap-2">

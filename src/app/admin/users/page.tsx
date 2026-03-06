@@ -116,7 +116,7 @@ export default function AllUsersPage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 font-body">
+    <div className="min-h-screen bg-slate-50 p-6 font-body text-slate-950">
       <div className="max-w-5xl mx-auto space-y-6">
         <header className="flex items-center gap-4">
           <button 
@@ -126,7 +126,7 @@ export default function AllUsersPage() {
             <ChevronLeft size={24} />
           </button>
           <div>
-            <h1 className="text-2xl font-black tracking-tight text-[#111B21]">ALL USERS</h1>
+            <h1 className="text-2xl font-black tracking-tight text-slate-900">ALL USERS</h1>
             <p className="text-[10px] font-black text-[#312ECB] uppercase tracking-widest">Database & Contact List</p>
           </div>
         </header>
@@ -135,10 +135,10 @@ export default function AllUsersPage() {
           <Table>
             <TableHeader className="bg-slate-50">
               <TableRow className="border-slate-100 hover:bg-transparent">
-                <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">User Profile</TableHead>
-                <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Contact Info</TableHead>
-                <TableHead className="text-[10px] font-black uppercase tracking-widest py-6">Wallet Balance</TableHead>
-                <TableHead className="text-[10px] font-black uppercase tracking-widest py-6 text-right">Registered On</TableHead>
+                <TableHead className="text-[10px] font-black uppercase tracking-widest py-6 text-slate-600">User Profile</TableHead>
+                <TableHead className="text-[10px] font-black uppercase tracking-widest py-6 text-slate-600">Contact Info</TableHead>
+                <TableHead className="text-[10px] font-black uppercase tracking-widest py-6 text-slate-600">Wallet Balance</TableHead>
+                <TableHead className="text-[10px] font-black uppercase tracking-widest py-6 text-right text-slate-600">Registered On</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -177,9 +177,9 @@ export default function AllUsersPage() {
                             <Pencil size={14} />
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-[400px] rounded-[2.5rem] border-none shadow-2xl p-8">
+                        <DialogContent className="max-w-[400px] rounded-[2.5rem] border-none shadow-2xl p-8 bg-white text-slate-950">
                           <DialogHeader>
-                            <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
+                            <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-3 text-slate-900">
                               <Wallet className="text-[#312ECB]" /> Edit Balance
                             </DialogTitle>
                           </DialogHeader>
@@ -187,7 +187,7 @@ export default function AllUsersPage() {
                             <div className="space-y-1">
                               <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Current User</p>
                               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                                <p className="font-bold text-[#111B21]">{u.displayName || u.email}</p>
+                                <p className="font-bold text-slate-900">{u.displayName || u.email}</p>
                               </div>
                             </div>
                             <div className="space-y-2">
@@ -196,7 +196,7 @@ export default function AllUsersPage() {
                                 type="number"
                                 value={newBalance}
                                 onChange={(e) => setNewBalance(e.target.value)}
-                                className="h-14 bg-slate-50 border-none rounded-2xl px-5 text-lg font-black focus-visible:ring-1 focus-visible:ring-[#312ECB]/20"
+                                className="h-14 bg-slate-50 border-none rounded-2xl px-5 text-lg font-black focus-visible:ring-1 focus-visible:ring-[#312ECB]/20 text-slate-900"
                                 placeholder="0.00"
                               />
                             </div>
