@@ -71,8 +71,8 @@ export default function FundRequestsPage() {
       const newCreditAmounts: Record<string, string> = { ...creditAmounts };
       reqs.forEach(r => {
         if (!newCreditAmounts[r.id]) {
-          const totalWithBonus = r.amount * (1 + globalBonus / 100);
-          newCreditAmounts[r.id] = totalWithBonus.toFixed(0);
+          const totalWithBonus = Math.floor(r.amount * (1 + globalBonus / 100));
+          newCreditAmounts[r.id] = totalWithBonus.toString();
         }
       });
       setCreditAmounts(newCreditAmounts);
@@ -86,7 +86,6 @@ export default function FundRequestsPage() {
     if (!db || !admin || !isActuallyAdmin) return;
     setProcessingId(request.id);
     
-    // Explicitly re-check bonus if Approved
     const finalCreditStr = creditAmounts[request.id];
     const validatedAmount = action === 'Approved' ? (parseFloat(finalCreditStr) || request.amount) : 0;
 
@@ -103,7 +102,7 @@ export default function FundRequestsPage() {
         batch.update(doc(db, "users", request.userId), { balance: increment(validatedAmount) });
         batch.set(doc(collection(db, "users", request.userId, "notifications")), {
           title: '💰 Wallet Credited!', 
-          message: `₹${validatedAmount.toFixed(0)} added to your account. (Bonus Applied)`, 
+          message: `₹${validatedAmount} added to your account. (Bonus Applied)`, 
           read: false, 
           createdAt: serverTimestamp()
         });
@@ -116,7 +115,12 @@ export default function FundRequestsPage() {
           const referrerRef = doc(db, "users", referrerId);
           batch.update(referrerRef, { referralEarnings: increment(commission) });
           batch.set(doc(collection(db, "referralTransactions")), {
-            referrerId, fromUserId: request.userId, fromUserName: userData.displayName, depositAmount: request.amount, commissionAmount: commission, createdAt: serverTimestamp()
+            referrerId, 
+            fromUserId: request.userId, 
+            fromUserName: userData.displayName || 'User', 
+            depositAmount: request.amount, 
+            commissionAmount: commission, 
+            createdAt: serverTimestamp()
           });
         }
       }
@@ -170,8 +174,8 @@ export default function FundRequestsPage() {
                   <TableCell><code className="bg-slate-100 px-3 py-1 rounded-lg text-[11px] font-black text-slate-950">{req.utrId}</code></TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button size="sm" onClick={() => handleRequest(req, 'Approved')} disabled={processingId === req.id} className="bg-emerald-500 hover:bg-emerald-600 h-10 w-10 rounded-xl p-0 text-white"><Check size={18} /></Button>
-                      <Button size="sm" variant="destructive" onClick={() => handleRequest(req, 'Rejected')} disabled={processingId === req.id} className="h-10 w-10 rounded-xl p-0"><CloseIcon size={18} /></Button>
+                      <Button size="sm" onClick={() => handleRequest(req, 'Approved')} disabled={processingId === req.id} className="bg-emerald-500 hover:bg-emerald-600 h-10 w-10 rounded-xl p-0 text-white shadow-lg"><Check size={18} /></Button>
+                      <Button size="sm" variant="destructive" onClick={() => handleRequest(req, 'Rejected')} disabled={processingId === req.id} className="h-10 w-10 rounded-xl p-0 shadow-lg"><CloseIcon size={18} /></Button>
                     </div>
                   </TableCell>
                 </TableRow>

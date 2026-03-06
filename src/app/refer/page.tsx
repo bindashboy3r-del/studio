@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { 
   ChevronLeft, 
@@ -33,13 +33,19 @@ export default function ReferPage() {
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [withdrawType, setWithdrawType] = useState<'UPI' | 'Wallet'>('Wallet');
   const [upiId, setUpiId] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setBaseUrl(window.location.origin);
+    }
+  }, []);
 
   const userRef = useMemoFirebase(() => user && db ? doc(db, "users", user.uid) : null, [db, user]);
   const { data: userData } = useDoc(userRef);
 
   const referralCode = userData?.referralCode || "SOCIAL";
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://socialboost.pro';
-  const referralLink = `${baseUrl}?ref=${referralCode}`;
+  const referralLink = `${baseUrl || 'https://socialboost.pro'}?ref=${referralCode}`;
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(referralLink);
