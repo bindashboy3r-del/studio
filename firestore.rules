@@ -35,10 +35,11 @@ service cloud.firestore {
       }
     }
 
-    // Global collection for fund addition requests
+    // Fund Requests: Users read their own, Admin reads all
     match /fundRequests/{requestId} {
       allow create: if isSignedIn();
-      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow get: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow list: if isSignedIn() && (isAdmin() || request.query.limit <= 100); 
       allow update, delete: if isAdmin();
     }
 
@@ -48,7 +49,7 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Global announcements (publicly readable)
+    // Global announcements
     match /globalAnnouncements/{announcementId} {
       allow read: if true;
       allow write: if isAdmin();
@@ -66,7 +67,7 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Collection Group rule for Admin Order Tracker
+    // Collection Group rule for Admin/User cross-access
     match /{path=**}/orders/{orderId} {
       allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
       allow update: if isAdmin();

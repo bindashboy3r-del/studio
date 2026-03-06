@@ -84,7 +84,6 @@ export default function ServiceManagerPage() {
   const ADMIN_UID = "s55uL0f8PmcypR75usVYOLwVs7O2";
   const isActuallyAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase() || user?.uid === ADMIN_UID;
 
-  // Load Categories
   useEffect(() => {
     if (!db || !isActuallyAdmin) return;
     const unsub = onSnapshot(doc(db, "globalSettings", "categories"), (snap) => {
@@ -97,7 +96,6 @@ export default function ServiceManagerPage() {
     return () => unsub();
   }, [db, isActuallyAdmin]);
 
-  // Load Services
   const servicesQuery = useMemoFirebase(() => {
     if (!db || !isActuallyAdmin) return null;
     return query(collection(db, "services"), orderBy("order", "asc"));
@@ -142,11 +140,9 @@ export default function ServiceManagerPage() {
     setDeletingCategory(platform);
     
     try {
-      // 1. Update the category list
       const newList = enabledCategories.filter(p => p !== platform);
       await setDoc(doc(db, "globalSettings", "categories"), { list: newList });
 
-      // 2. Delete all services associated with this platform
       const q = query(collection(db, "services"), where("platform", "==", platform));
       const snap = await getDocs(q);
       const batch = writeBatch(db);
@@ -155,7 +151,6 @@ export default function ServiceManagerPage() {
 
       toast({ title: "Category Deleted", description: `Removed ${platformLabel} and all its services.` });
     } catch (e: any) {
-      console.error("Delete Category Error:", e);
       toast({ variant: "destructive", title: "Deletion Failed", description: e.message || "Database error." });
     } finally {
       setDeletingCategory(null);
@@ -170,7 +165,6 @@ export default function ServiceManagerPage() {
 
     const platform = newService.platform || 'other';
     const cleanIdInput = newService.id.toLowerCase().replace(/\s+/g, '_');
-    // UNIQUE ID: Prefix with platform to prevent cross-category collisions
     const finalDocId = `${platform}_${cleanIdInput}`;
     
     const docRef = doc(db, "services", finalDocId);
@@ -184,17 +178,9 @@ export default function ServiceManagerPage() {
 
     setDoc(docRef, data)
       .then(() => {
-        toast({ title: "Service Added", description: `${newService.name} is now live in ${PLATFORMS[platform as Platform] || platform}.` });
+        toast({ title: "Service Added", description: `${newService.name} is now live.` });
         setIsAddingService(false);
-        setNewService({ 
-          id: "", 
-          name: "", 
-          platform: platform as Platform, 
-          isActive: true, 
-          pricePer1000: 0, 
-          minQuantity: 100, 
-          order: (services?.length || 0) + 1 
-        });
+        setNewService({ id: "", name: "", platform: platform as Platform, isActive: true, pricePer1000: 0, minQuantity: 100, order: (services?.length || 0) + 1 });
       })
       .catch((err) => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
@@ -234,45 +220,43 @@ export default function ServiceManagerPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] font-body pb-20">
-      <header className="bg-white px-6 py-4 flex items-center justify-between border-b border-slate-100 sticky top-0 z-50 shadow-sm">
+    <div className="min-h-screen bg-slate-50 font-body pb-20">
+      <header className="bg-white px-6 py-4 flex items-center justify-between border-b border-slate-100 sticky top-0 z-50">
         <div className="flex items-center gap-3">
           <button onClick={() => router.push("/admin")} className="p-2 hover:bg-slate-50 rounded-lg text-slate-400"><ChevronLeft size={20} /></button>
-          <h1 className="text-lg font-black tracking-tight text-[#111B21] uppercase">Category Hub</h1>
+          <h1 className="text-lg font-black tracking-tight text-slate-900 uppercase">Category Hub</h1>
         </div>
-        <div className="flex items-center gap-3">
-          <Dialog open={isAddingCategory} onOpenChange={setIsAddingCategory}>
-            <DialogTrigger asChild>
-              <Button className="bg-[#312ECB] hover:bg-[#2825A6] rounded-xl h-10 px-5 font-black uppercase text-[10px] tracking-widest gap-2 shadow-lg">
-                <PlusCircle size={16} /> New Category
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="rounded-[2rem] border-none shadow-2xl p-8 bg-white">
-              <DialogHeader>
-                <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-3 text-slate-900">
-                  <LayoutGrid className="text-[#312ECB]" /> Create Category
-                </DialogTitle>
-              </DialogHeader>
-              <div className="grid grid-cols-2 gap-3 py-6">
-                {(Object.entries(PLATFORMS) as [Platform, string][]).map(([key, label]) => (
-                  <Button 
-                    key={key} 
-                    variant="outline" 
-                    disabled={enabledCategories.includes(key)}
-                    onClick={() => handleAddCategory(key)}
-                    className={cn(
-                      "h-16 rounded-2xl flex flex-col gap-1 border-slate-100 font-black text-[10px] uppercase text-slate-600",
-                      enabledCategories.includes(key) && "opacity-30 bg-slate-50"
-                    )}
-                  >
-                    {getPlatformIcon(key)}
-                    {label}
-                  </Button>
-                ))}
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
+        <Dialog open={isAddingCategory} onOpenChange={setIsAddingCategory}>
+          <DialogTrigger asChild>
+            <Button className="bg-[#312ECB] hover:bg-[#2825A6] rounded-xl h-10 px-5 font-black uppercase text-[10px] tracking-widest gap-2 shadow-lg">
+              <PlusCircle size={16} /> New Category
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-8 bg-white">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-3 text-slate-900">
+                <LayoutGrid className="text-[#312ECB]" /> Create Category
+              </DialogTitle>
+            </DialogHeader>
+            <div className="grid grid-cols-2 gap-3 py-6">
+              {(Object.entries(PLATFORMS) as [Platform, string][]).map(([key, label]) => (
+                <Button 
+                  key={key} 
+                  variant="outline" 
+                  disabled={enabledCategories.includes(key)}
+                  onClick={() => handleAddCategory(key)}
+                  className={cn(
+                    "h-16 rounded-2xl flex flex-col gap-1 border-slate-100 font-black text-[10px] uppercase text-slate-600",
+                    enabledCategories.includes(key) && "opacity-30 bg-slate-50"
+                  )}
+                >
+                  {getPlatformIcon(key)}
+                  {label}
+                </Button>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
       </header>
 
       <main className="max-w-3xl mx-auto p-6 space-y-6">
@@ -375,7 +359,6 @@ export default function ServiceManagerPage() {
               <LayoutGrid size={40} className="text-slate-200" />
             </div>
             <p className="text-[13px] font-black text-slate-400 uppercase tracking-[0.2em]">No Active Categories Found</p>
-            <p className="text-[10px] font-bold text-slate-300 uppercase">Click "New Category" to get started.</p>
           </div>
         )}
       </main>
@@ -384,7 +367,7 @@ export default function ServiceManagerPage() {
         <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-8 bg-white">
           <DialogHeader>
             <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-3 text-slate-900">
-              <Layers className="text-[#312ECB]" /> Add Service to {PLATFORMS[newService.platform as Platform] || newService.platform}
+              <Layers className="text-[#312ECB]" /> Add Service
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -400,12 +383,12 @@ export default function ServiceManagerPage() {
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Service Name</label>
-              <Input placeholder="Fast YouTube Likes" value={newService.name || ""} onChange={e => setNewService({...newService, name: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
+              <Input placeholder="Service Name" value={newService.name || ""} onChange={e => setNewService({...newService, name: e.target.value})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Price per 1k (₹)</label>
-                <Input type="number" placeholder="89" value={newService.pricePer1000 || ""} onChange={e => setNewService({...newService, pricePer1000: parseFloat(e.target.value) || 0})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
+                <Input type="number" placeholder="0" value={newService.pricePer1000 || ""} onChange={e => setNewService({...newService, pricePer1000: parseFloat(e.target.value) || 0})} className="h-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-900" />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Min Quantity</label>
