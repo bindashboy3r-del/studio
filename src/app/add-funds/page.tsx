@@ -8,36 +8,26 @@ import {
   Wallet, 
   Zap,
   Loader2,
-  AlertCircle,
-  History,
-  ShieldCheck,
-  ChevronRight,
   QrCode,
   Copy,
   CheckCircle2,
   MessageCircle,
   Download,
   Send,
-  Clock,
-  CheckCircle,
-  XCircle,
   Ticket
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { doc, onSnapshot, collection, addDoc, serverTimestamp, query, where, orderBy, getDoc, updateDoc, increment, arrayUnion, writeBatch } from "firebase/firestore";
+import { useUser, useFirestore } from "@/firebase";
+import { doc, onSnapshot, collection, addDoc, serverTimestamp, getDoc, updateDoc, increment, arrayUnion, writeBatch } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
 
 export default function AddFundsPage() {
   const { user, isUserLoading } = useUser();
@@ -56,17 +46,6 @@ export default function AddFundsPage() {
   
   const [showConfirmPopup, setShowConfirmPopup] = useState(false);
   const [whatsappMsg, setWhatsappMsg] = useState("");
-
-  const historyQuery = useMemoFirebase(() => {
-    if (!db || !user?.uid) return null;
-    return query(
-      collection(db, "fundRequests"), 
-      where("userId", "==", user.uid),
-      orderBy("createdAt", "desc")
-    );
-  }, [db, user?.uid]);
-
-  const { data: fundHistory, isLoading: isHistoryLoading } = useCollection(historyQuery);
 
   useEffect(() => {
     if (!db || !user) return;
@@ -287,35 +266,6 @@ export default function AddFundsPage() {
             <Button onClick={handleRedeem} disabled={isRedeeming || !redeemCode} className="h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl font-black text-[9px] uppercase px-6">
               {isRedeeming ? <Loader2 className="animate-spin" size={14} /> : "Redeem"}
             </Button>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-50 space-y-4">
-          <div className="flex items-center gap-2">
-            <History className="text-[#312ECB]" size={16} />
-            <h3 className="text-[10px] font-black uppercase tracking-widest text-[#111B21]">Recent Deposits</h3>
-          </div>
-          <div className="space-y-3">
-            {isHistoryLoading ? (
-              <div className="py-10 flex flex-col items-center gap-2"><Loader2 className="animate-spin text-[#312ECB]" size={20} /></div>
-            ) : fundHistory && fundHistory.length > 0 ? (
-              fundHistory.slice(0, 10).map((req: any) => (
-                <div key={req.id} className="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", req.status === 'Approved' ? "bg-emerald-100 text-emerald-600" : req.status === 'Rejected' ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600")}>
-                      {req.status === 'Approved' ? <CheckCircle size={16} /> : req.status === 'Rejected' ? <XCircle size={16} /> : <Clock size={16} />}
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-black text-slate-800">₹{req.finalCreditAmount || req.amount}</p>
-                      <p className="text-[8px] font-bold text-slate-400 uppercase">{req.utrId}</p>
-                    </div>
-                  </div>
-                  <Badge variant="outline" className={cn("text-[7px] font-black uppercase border-none px-2 h-4", req.status === 'Approved' ? "bg-emerald-50 text-emerald-600" : req.status === 'Rejected' ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600")}>{req.status}</Badge>
-                </div>
-              ))
-            ) : (
-              <div className="py-10 text-center text-slate-300 uppercase text-[9px] font-black">No Recent Deposits</div>
-            )}
           </div>
         </div>
       </main>
