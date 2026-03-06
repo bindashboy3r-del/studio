@@ -213,7 +213,7 @@ export default function BroadcastPage() {
                     value={slotData[activeSlot].buttonText || ""}
                     onChange={(e) => updateCurrentSlot({ buttonText: e.target.value })}
                     placeholder="e.g. Join Channel"
-                    className="h-11 bg-slate-50 border-none rounded-xl text-xs font-bold"
+                    className="h-11 bg-slate-50 border-none rounded-xl text-xs font-bold text-slate-900"
                   />
                 </div>
                 <div className="space-y-1">
@@ -222,7 +222,7 @@ export default function BroadcastPage() {
                     value={slotData[activeSlot].buttonUrl || ""}
                     onChange={(e) => updateCurrentSlot({ buttonUrl: e.target.value })}
                     placeholder="https://..."
-                    className="h-11 bg-slate-50 border-none rounded-xl text-xs font-bold"
+                    className="h-11 bg-slate-50 border-none rounded-xl text-xs font-bold text-slate-900"
                   />
                 </div>
               </div>

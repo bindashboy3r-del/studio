@@ -472,7 +472,7 @@ export function MessageBubble({
                       </div>
                     ) : (
                       <div className="relative">
-                        <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={12} />
+                        <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
                         <Input 
                           placeholder="Enter target link here" 
                           value={links} 
@@ -532,11 +532,8 @@ export function MessageBubble({
 
             <div className="space-y-3">
               <div className="flex gap-2.5">
-                <Button onClick={() => onOptionClick?.("menu")} variant="outline" className="flex-1 h-11 border-white/10 bg-slate-950 text-white font-black text-[9px] uppercase tracking-widest rounded-xl shadow-3d active:shadow-3d-pressed">
+                <Button onClick={() => onOptionClick?.("menu")} variant="outline" className="w-full h-11 border-white/10 bg-slate-950 text-white font-black text-[9px] uppercase tracking-widest rounded-xl shadow-3d active:shadow-3d-pressed">
                   MENU
-                </Button>
-                <Button onClick={() => onOptionClick?.("OPEN_ORDERS")} variant="outline" className="flex-1 h-11 border-white/10 bg-slate-950 text-[#312ECB] font-black text-[9px] uppercase tracking-widest rounded-xl shadow-3d active:shadow-3d-pressed gap-2">
-                  <History size={12} /> HISTORY
                 </Button>
               </div>
 
