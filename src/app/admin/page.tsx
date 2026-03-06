@@ -17,7 +17,7 @@ import {
   Percent,
   ShieldCheck,
   ChevronRight,
-  Ticket
+  Gift
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -37,7 +37,7 @@ export default function AdminHub() {
     { title: "Live Tracker", icon: <LayoutGrid size={20} />, color: "bg-emerald-500", path: "/admin/tracker", desc: "Monitor orders" },
     { title: "SMM Services", icon: <Layers size={20} />, color: "bg-blue-500", path: "/admin/services", desc: "Manage catalog" },
     { title: "Fund Approvals", icon: <Wallet size={20} />, color: "bg-amber-500", path: "/admin/funds", desc: "Verify payments" },
-    { title: "Redeem Codes", icon: <Ticket size={20} />, color: "bg-orange-500", path: "/admin/redeem", desc: "Create vouchers" },
+    { title: "Referral Hub", icon: <Gift size={20} />, color: "bg-emerald-600", path: "/admin/referrals", desc: "Manage Payouts" },
     { title: "Broadcasts", icon: <Megaphone size={20} />, color: "bg-[#312ECB]", path: "/admin/broadcast", desc: "Announcements" },
     { title: "Users List", icon: <Users size={20} />, color: "bg-slate-700", path: "/admin/users", desc: "Database access" },
     { title: "Payments", icon: <QrCode size={20} />, color: "bg-pink-500", path: "/admin/payment-settings", desc: "QR & UPI Setup" },
@@ -56,7 +56,7 @@ export default function AdminHub() {
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Management Console</p>
           </div>
         </div>
-        <button onClick={() => router.push("/profile")} className="w-10 h-10 rounded-2xl bg-[#312ECB]/10 dark:bg-white/5 flex items-center justify-center text-[#312ECB] dark:text-white font-black text-sm transition-all active:shadow-3d-pressed border border-[#312ECB]/10 shadow-3d-sm">{user.displayName?.[0] || 'A'}</button>
+        <button onClick={() => router.push("/profile")} className="w-10 h-10 rounded-2xl bg-[#312ECB]/10 dark:bg-white/5 flex items-center justify-center text-[#312ECB] dark:text-white font-black text-sm transition-all border border-[#312ECB]/10 shadow-3d-sm">{user.displayName?.[0] || 'A'}</button>
       </header>
 
       <main className="max-w-xl mx-auto p-6 space-y-6">
@@ -83,7 +83,7 @@ export default function AdminHub() {
           <Button 
             variant="ghost" 
             onClick={() => auth?.signOut()}
-            className="w-full h-14 rounded-3xl text-slate-400 dark:text-slate-500 hover:text-red-500 font-black text-[11px] uppercase tracking-[0.2em] gap-3 border-none bg-white dark:bg-slate-900 shadow-3d active:shadow-3d-pressed transition-all"
+            className="w-full h-14 rounded-3xl text-slate-400 dark:text-slate-500 hover:text-red-500 font-black text-[11px] uppercase tracking-[0.2em] gap-3 border-none bg-white dark:bg-slate-900 shadow-3d transition-all"
           >
             <LogOut size={16} /> Close Management Session
           </Button>

@@ -11,9 +11,13 @@
         "email": { "type": "string" },
         "displayName": { "type": "string" },
         "balance": { "type": "number", "default": 0 },
+        "referralCode": { "type": "string" },
+        "referredBy": { "type": "string", "description": "UID of the user who referred this person." },
+        "referralEarnings": { "type": "number", "default": 0, "description": "Total commission earned but not yet withdrawn." },
+        "totalReferralPaid": { "type": "number", "default": 0 },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "email", "createdAt"]
+      "required": ["id", "email", "createdAt", "referralCode"]
     },
     "FundRequest": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -30,21 +34,34 @@
       },
       "required": ["id", "userId", "amount", "utrId", "status", "createdAt"]
     },
-    "RedeemCode": {
+    "ReferralTransaction": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "RedeemCode",
+      "title": "ReferralTransaction",
       "type": "object",
-      "description": "A code that can be redeemed for wallet balance.",
+      "description": "Log of commission earned from a referred user's deposit.",
       "properties": {
         "id": { "type": "string" },
-        "code": { "type": "string" },
-        "amount": { "type": "number" },
-        "limit": { "type": "number" },
-        "usedCount": { "type": "number" },
-        "usedBy": { "type": "array", "items": { "type": "string" } },
+        "referrerId": { "type": "string" },
+        "fromUserId": { "type": "string" },
+        "depositAmount": { "type": "number" },
+        "commissionAmount": { "type": "number" },
         "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["code", "amount", "limit", "usedCount", "usedBy"]
+      }
+    },
+    "WithdrawalRequest": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "WithdrawalRequest",
+      "type": "object",
+      "description": "Request to withdraw referral earnings.",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["UPI", "Wallet"] },
+        "upiId": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
     },
     "SMMService": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -54,10 +71,10 @@
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
-        "platform": { "type": "string", "enum": ["instagram"] },
+        "platform": { "type": "string", "enum": ["instagram", "youtube", "facebook", "tiktok", "twitter"] },
         "pricePer1000": { "type": "number" },
         "minQuantity": { "type": "number" },
-        "order": { "type": "number", "description": "The display order of the service." },
+        "order": { "type": "number" },
         "isActive": { "type": "boolean", "default": true }
       },
       "required": ["id", "name", "platform", "pricePer1000", "minQuantity"]
@@ -73,7 +90,7 @@
         "definition": {
           "entityName": "User",
           "schema": { "$ref": "#/backend/entities/User" },
-          "description": "User profile and balance."
+          "description": "User profile, balance, and referral data."
         }
       },
       {
@@ -85,11 +102,19 @@
         }
       },
       {
-        "path": "/redeemCodes/{codeId}",
+        "path": "/referralTransactions/{txId}",
         "definition": {
-          "entityName": "RedeemCode",
-          "schema": { "$ref": "#/backend/entities/RedeemCode" },
-          "description": "Wallet redeem codes."
+          "entityName": "ReferralTransaction",
+          "schema": { "$ref": "#/backend/entities/ReferralTransaction" },
+          "description": "Logs of all commission earnings."
+        }
+      },
+      {
+        "path": "/withdrawals/{withdrawalId}",
+        "definition": {
+          "entityName": "WithdrawalRequest",
+          "schema": { "$ref": "#/backend/entities/WithdrawalRequest" },
+          "description": "Payout requests for referrals."
         }
       },
       {

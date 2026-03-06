@@ -14,12 +14,13 @@ import {
   MessageCircle,
   Download,
   Send,
-  Ticket
+  Gift,
+  ArrowRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useUser, useFirestore } from "@/firebase";
-import { doc, onSnapshot, collection, addDoc, serverTimestamp, getDoc, updateDoc, increment, arrayUnion, writeBatch } from "firebase/firestore";
+import { doc, onSnapshot, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
@@ -39,13 +40,10 @@ export default function AddFundsPage() {
 
   const [amount, setAmount] = useState("");
   const [utrId, setUtrId] = useState("");
-  const [redeemCode, setRedeemCode] = useState("");
   const [loading, setLoading] = useState(false);
-  const [isRedeeming, setIsRedeeming] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [globalBonus, setGlobalBonus] = useState(0);
   const [paymentConfig, setPaymentConfig] = useState<any>(null);
-  
   const [showConfirmPopup, setShowConfirmPopup] = useState(false);
   const [whatsappMsg, setWhatsappMsg] = useState("");
 
@@ -57,23 +55,14 @@ export default function AddFundsPage() {
     const unsubPayment = onSnapshot(doc(db, "globalSettings", "payment"), (snap) => {
       if (snap.exists()) setPaymentConfig(snap.data());
     });
-    return () => {
-      unsubFinance();
-      unsubPayment();
-    };
+    return () => { unsubFinance(); unsubPayment(); };
   }, [db, user]);
 
-  if (isUserLoading) {
-    return <div className="min-h-screen flex items-center justify-center bg-[#F0F2F5]"><Loader2 className="animate-spin text-[#312ECB]" /></div>;
-  }
+  if (isUserLoading) return <div className="min-h-screen flex items-center justify-center bg-[#F0F2F5]"><Loader2 className="animate-spin text-[#312ECB]" /></div>;
 
   const upiId = paymentConfig?.upiId || "smmxpressbot@slc";
   const merchantName = paymentConfig?.merchantName || "SocialBoost";
-  const customQrUrl = paymentConfig?.qrImageUrl;
-  
-  const upiLink = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&cu=INR`;
-  const generatedQr = `https://quickchart.io/qr?text=${encodeURIComponent(upiLink)}&size=400&margin=1&format=png`;
-  const finalQrUrl = customQrUrl || generatedQr;
+  const finalQrUrl = paymentConfig?.qrImageUrl || `https://quickchart.io/qr?text=${encodeURIComponent(`upi://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&cu=INR`)}&size=400&margin=1&format=png`;
 
   const handleDownloadQR = async () => {
     setIsDownloading(true);
@@ -89,125 +78,29 @@ export default function AddFundsPage() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       toast({ title: "QR Saved!" });
-    } catch (e) {
-      window.open(finalQrUrl, '_blank');
-    } finally {
-      setIsDownloading(false);
-    }
+    } catch (e) { window.open(finalQrUrl, '_blank'); } 
+    finally { setIsDownloading(false); }
   };
 
   const handleManualSubmit = async () => {
-    if (!user || !db || !amount || !utrId) {
-      toast({ variant: "destructive", title: "Missing Fields" });
-      return;
-    }
-
+    if (!user || !db || !amount || !utrId) { toast({ variant: "destructive", title: "Missing Fields" }); return; }
     const amtNum = parseFloat(amount);
-    if (amtNum < 5) {
-      toast({ variant: "destructive", title: "Amount Too Low", description: "Min ₹5 required." });
-      return;
-    }
-
-    if (utrId.length !== 12) {
-      toast({ variant: "destructive", title: "Invalid UTR", description: "UTR must be 12 digits." });
-      return;
-    }
+    if (amtNum < 5) { toast({ variant: "destructive", title: "Amount Too Low", description: "Min ₹5 required." }); return; }
+    if (utrId.length !== 12) { toast({ variant: "destructive", title: "Invalid UTR", description: "UTR must be 12 digits." }); return; }
 
     setLoading(true);
-    const docRef = collection(db, "fundRequests");
-    const payload = {
-      userId: user.uid,
-      userEmail: user.email || '',
-      displayName: user.displayName || 'User',
-      amount: amtNum,
-      utrId: utrId.trim(),
-      status: 'Pending',
-      type: 'Manual',
-      createdAt: serverTimestamp()
-    };
+    const payload = { userId: user.uid, userEmail: user.email || '', displayName: user.displayName || 'User', amount: amtNum, utrId: utrId.trim(), status: 'Pending', type: 'Manual', createdAt: serverTimestamp() };
 
-    addDoc(docRef, payload)
+    addDoc(collection(db, "fundRequests"), payload)
       .then(() => {
-        const msg = `🚀 *NEW PAYMENT SUBMITTED!*\n\n👤 *User:* ${user.displayName || user.email}\n🔢 *UTR ID:* ${utrId.trim()}\n💰 *Amount:* ₹${amount}\n\nKripya mera payment verify karein.`;
-        setWhatsappMsg(msg);
+        setWhatsappMsg(`🚀 *NEW PAYMENT SUBMITTED!*\n\n👤 *User:* ${user.displayName || user.email}\n🔢 *UTR ID:* ${utrId.trim()}\n💰 *Amount:* ₹${amount}\n\nKripya verify karein.`);
         setShowConfirmPopup(true);
-        toast({ title: "Request Logged!" });
-        setAmount("");
-        setUtrId("");
+        setAmount(""); setUtrId("");
       })
-      .catch((err) => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: 'fundRequests',
-          operation: 'create',
-          requestResourceData: payload
-        }));
+      .catch(() => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'fundRequests', operation: 'create', requestResourceData: payload }));
       })
       .finally(() => setLoading(false));
-  };
-
-  const handleRedeem = async () => {
-    if (!user || !db || !redeemCode) return;
-    setIsRedeeming(true);
-    const codeId = redeemCode.trim().toUpperCase();
-    
-    try {
-      const codeRef = doc(db, "redeemCodes", codeId);
-      const snap = await getDoc(codeRef);
-      
-      if (!snap.exists()) {
-        toast({ variant: "destructive", title: "Invalid Code", description: "Yeh code sahi nahi hai." });
-        setIsRedeeming(false);
-        return;
-      }
-
-      const data = snap.data();
-      if (data.usedCount >= data.limit) {
-        toast({ variant: "destructive", title: "Limit Reached", description: "Yeh code ab khatam ho chuka hai." });
-        setIsRedeeming(false);
-        return;
-      }
-
-      if (data.usedBy && data.usedBy.includes(user.uid)) {
-        toast({ variant: "destructive", title: "Already Used", description: "Aapne yeh code pehle hi redeem kar liya hai." });
-        setIsRedeeming(false);
-        return;
-      }
-
-      const batch = writeBatch(db);
-      
-      // Update code stats
-      batch.update(codeRef, { 
-        usedCount: increment(1), 
-        usedBy: arrayUnion(user.uid) 
-      });
-      
-      // Update user balance
-      const userRef = doc(db, "users", user.uid);
-      batch.update(userRef, { 
-        balance: increment(data.amount) 
-      });
-      
-      // Send notification
-      const notifRef = doc(collection(db, "users", user.uid, "notifications"));
-      batch.set(notifRef, {
-        title: "🎁 Voucher Redeemed!",
-        message: `₹${data.amount} added to your wallet via code: ${codeId}`,
-        read: false,
-        createdAt: serverTimestamp()
-      });
-
-      await batch.commit();
-      toast({ title: "Redeemed Successfully!", description: `₹${data.amount} aapke wallet mein add ho gaye hain.` });
-      setRedeemCode("");
-    } catch (e: any) {
-      errorEmitter.emit('permission-error', new FirestorePermissionError({
-        path: `redeemCodes/${codeId}`,
-        operation: 'update'
-      }));
-      toast({ variant: "destructive", title: "Error", description: "Voucher redeem karne mein dikkat hui." });
-    } finally {
-      setIsRedeeming(false);
-    }
   };
 
   return (
@@ -221,10 +114,19 @@ export default function AddFundsPage() {
       </header>
 
       <main className="max-w-md mx-auto p-3 space-y-2.5 mt-1">
-        <div className="bg-[#312ECB] rounded-[1.2rem] p-4 text-white shadow-lg flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center">
-            <QrCode size={16} />
+        <div onClick={() => router.push('/refer')} className="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-[1.2rem] p-4 text-white shadow-lg flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center border border-white/20"><Gift size={16} /></div>
+            <div>
+              <p className="text-[7px] font-black uppercase tracking-[0.3em] text-white/60">Passive Income</p>
+              <h2 className="text-[13px] font-black uppercase tracking-tight">Refer & Earn 5% Daily</h2>
+            </div>
           </div>
+          <ArrowRight size={16} />
+        </div>
+
+        <div className="bg-[#312ECB] rounded-[1.2rem] p-4 text-white shadow-lg flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center"><QrCode size={16} /></div>
           <div>
             <p className="text-[7px] font-black uppercase tracking-[0.3em] text-white/60">Wallet Refill</p>
             <h2 className="text-[15px] font-black uppercase tracking-tight">Scan & Pay</h2>
@@ -272,19 +174,6 @@ export default function AddFundsPage() {
             {loading ? <Loader2 className="animate-spin" size={12} /> : "Submit Request"}
             <CheckCircle2 size={12} />
           </Button>
-        </div>
-
-        <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-50 space-y-4">
-          <div className="flex items-center gap-2">
-            <Ticket className="text-orange-500" size={16} />
-            <h3 className="text-[10px] font-black uppercase tracking-widest text-[#111B21]">Redeem Voucher</h3>
-          </div>
-          <div className="flex gap-2">
-            <Input placeholder="ENTER CODE" value={redeemCode} onChange={e => setRedeemCode(e.target.value.toUpperCase())} className="h-12 bg-slate-50 border-none rounded-2xl px-4 text-sm font-black flex-1 text-[#111B21]" />
-            <Button onClick={handleRedeem} disabled={isRedeeming || !redeemCode} className="h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl font-black text-[9px] uppercase px-6">
-              {isRedeeming ? <Loader2 className="animate-spin" size={14} /> : "Redeem"}
-            </Button>
-          </div>
         </div>
       </main>
 
