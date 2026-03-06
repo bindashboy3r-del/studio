@@ -85,15 +85,15 @@ export default function ReferPage() {
     finally { setIsWithdrawing(false); }
   };
 
-  if (isUserLoading) return <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]"><Loader2 className="animate-spin text-[#312ECB]" /></div>;
+  if (isUserLoading) return <div className="min-h-screen flex items-center justify-center bg-[#030712]"><Loader2 className="animate-spin text-[#312ECB]" /></div>;
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] font-body pb-20 text-slate-950">
-      <header className="bg-white px-4 py-3 flex items-center justify-between border-b border-gray-100 sticky top-0 z-50 shadow-sm">
+    <div className="min-h-screen bg-[#030712] font-body pb-20 text-slate-100">
+      <header className="bg-slate-900 px-4 py-3 flex items-center justify-between border-b border-white/5 sticky top-0 z-50">
         <button onClick={() => router.back()} className="flex items-center gap-1 text-[#312ECB] font-black uppercase text-[10px] tracking-widest">
           <ChevronLeft size={16} /> Back
         </button>
-        <h1 className="text-[10px] font-black uppercase tracking-[0.3em] text-[#111B21]">Refer & Earn</h1>
+        <h1 className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Refer & Earn</h1>
         <div className="w-10" />
       </header>
 
@@ -117,13 +117,13 @@ export default function ReferPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-[1.5rem] p-5 shadow-sm border border-gray-100 space-y-4">
+        <div className="bg-slate-900 rounded-[1.5rem] p-5 border border-white/5 shadow-sm space-y-4">
           <div className="flex items-center gap-2">
             <Share2 size={16} className="text-[#312ECB]" />
-            <h3 className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Your Unique Link</h3>
+            <h3 className="text-[10px] font-black text-white uppercase tracking-widest">Your Unique Link</h3>
           </div>
           <div className="flex gap-2">
-            <div className="flex-1 bg-slate-50 p-3 rounded-xl border border-slate-100 font-bold text-[9px] text-slate-500 truncate">{referralLink}</div>
+            <div className="flex-1 bg-slate-950 p-3 rounded-xl border border-white/5 font-bold text-[9px] text-slate-400 truncate">{referralLink}</div>
             <button onClick={handleCopyLink} className="h-10 w-10 rounded-xl bg-[#312ECB] text-white shadow-md flex items-center justify-center shrink-0 active:scale-90 transition-transform">
               <Copy size={16} />
             </button>
@@ -138,16 +138,16 @@ export default function ReferPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-[1.5rem] p-5 shadow-sm border border-gray-100 space-y-4">
-          <div className="flex items-center gap-2 mb-1"><Banknote className="text-emerald-500" size={16} /><h3 className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Withdraw</h3></div>
-          <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100">
-            <button onClick={() => setWithdrawType('Wallet')} className={cn("flex-1 py-2 rounded-lg text-[8px] font-black uppercase transition-all", withdrawType === 'Wallet' ? "bg-white shadow-sm text-[#312ECB]" : "text-slate-400")}>Wallet</button>
-            <button onClick={() => setWithdrawType('UPI')} className={cn("flex-1 py-2 rounded-lg text-[8px] font-black uppercase transition-all", withdrawType === 'UPI' ? "bg-white shadow-sm text-[#312ECB]" : "text-slate-400")}>UPI App</button>
+        <div className="bg-slate-900 rounded-[1.5rem] p-5 border border-white/5 shadow-sm space-y-4">
+          <div className="flex items-center gap-2 mb-1"><Banknote className="text-emerald-500" size={16} /><h3 className="text-[10px] font-black text-white uppercase tracking-widest">Withdraw</h3></div>
+          <div className="flex bg-slate-950 p-1 rounded-xl border border-white/5">
+            <button onClick={() => setWithdrawType('Wallet')} className={cn("flex-1 py-2 rounded-lg text-[8px] font-black uppercase transition-all", withdrawType === 'Wallet' ? "bg-slate-800 shadow-sm text-white" : "text-slate-500")}>Wallet</button>
+            <button onClick={() => setWithdrawType('UPI')} className={cn("flex-1 py-2 rounded-lg text-[8px] font-black uppercase transition-all", withdrawType === 'UPI' ? "bg-slate-800 shadow-sm text-white" : "text-slate-500")}>UPI App</button>
           </div>
           <div className="space-y-3">
-            <Input type="number" placeholder="Amount (Min ₹10)" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} className="h-10 bg-slate-50 border-none rounded-xl px-4 font-black text-xs text-[#111B21]" />
+            <Input type="number" placeholder="Amount (Min ₹10)" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} className="h-10 bg-slate-950 border-none rounded-xl px-4 font-black text-xs text-white" />
             {withdrawType === 'UPI' && (
-              <Input placeholder="Your UPI ID" value={upiId} onChange={(e) => setUpiId(e.target.value)} className="h-10 bg-slate-50 border-none rounded-xl px-4 font-black text-xs text-[#111B21]" />
+              <Input placeholder="Your UPI ID" value={upiId} onChange={(e) => setUpiId(e.target.value)} className="h-10 bg-slate-950 border-none rounded-xl px-4 font-black text-xs text-white" />
             )}
             <Button onClick={handleWithdraw} disabled={isWithdrawing || !withdrawAmount} className="w-full h-12 bg-[#312ECB] text-white rounded-xl font-black text-[9px] uppercase shadow-lg gap-2 active:scale-95 transition-all">
               {isWithdrawing ? <Loader2 size={14} className="animate-spin" /> : <ArrowRightLeft size={14} />} 
@@ -156,9 +156,9 @@ export default function ReferPage() {
           </div>
         </div>
 
-        <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 flex items-start gap-3">
-          <Info className="text-blue-600 shrink-0" size={16} />
-          <p className="text-[9px] font-bold text-blue-700 leading-relaxed uppercase">
+        <div className="bg-blue-500/10 p-4 rounded-2xl border border-blue-500/20 flex items-start gap-3">
+          <Info className="text-blue-400 shrink-0" size={16} />
+          <p className="text-[9px] font-bold text-blue-300 leading-relaxed uppercase">
             Commission is added when referred friends add funds.
           </p>
         </div>

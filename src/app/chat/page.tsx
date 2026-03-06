@@ -14,7 +14,6 @@ import {
   writeBatch,
   increment,
   Timestamp,
-  getDocs,
   deleteDoc
 } from "firebase/firestore";
 import { MessageBubble } from "@/components/chat/MessageBubble";
@@ -150,10 +149,10 @@ export default function ChatPage() {
 
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollIntoView({ behavior: "smooth" }); }, [messages, isTyping]);
 
-  const clearFlowMessages = async () => {
+  const clearTrailMessages = async () => {
     if (!currentUser || !db || !messages) return;
     const batch = writeBatch(db);
-    // Delete all messages except the greeting and the platform/menu selector
+    // Delete all messages except those marked as permanent (like greetings and main menus)
     messages.forEach(m => {
       if (!m.isPermanent) {
         batch.delete(doc(db, "users", currentUser.uid, "chatMessages", m.id));
@@ -175,7 +174,10 @@ export default function ChatPage() {
   useEffect(() => {
     if (currentUser && !isMessagesLoading && !hasInitialGreeted.current && sessionStart) {
       hasInitialGreeted.current = true;
-      if (!messages?.length) { setChatState('initial'); botReply("Send 'Hi' to grow your social media! 🚀", [], { isInitialGreeting: true, isPermanent: true }); }
+      if (!messages?.length) { 
+        setChatState('initial'); 
+        botReply("Send 'Hi' to grow your social media! 🚀", [], { isInitialGreeting: true, isPermanent: true }); 
+      }
     }
   }, [currentUser, isMessagesLoading, messages, sessionStart]);
 
@@ -185,13 +187,11 @@ export default function ChatPage() {
     if (!manualText) setInputValue("");
 
     const cleanText = text.toLowerCase();
+    const isMajorOption = cleanText.includes('single') || cleanText.includes('combo') || cleanText.includes('bulk');
 
-    // DETECTION: Is this a major menu switch?
-    const isOrderTypeChoice = cleanText.includes('single') || cleanText.includes('combo') || cleanText.includes('bulk');
-    
-    // If user clicks a top-level menu option, clear everything below it
-    if (isOrderTypeChoice) {
-      await clearFlowMessages();
+    // If user clicks a top-level menu option, clear the trail below it
+    if (isMajorOption) {
+      await clearTrailMessages();
     }
 
     if (cleanText === 'hi' || cleanText === 'menu') {
@@ -212,7 +212,6 @@ export default function ChatPage() {
       return;
     }
 
-    // Command handling
     if (text.startsWith("SUBMIT_BULK_LINKS:")) {
       const linksArr = text.replace("SUBMIT_BULK_LINKS:", "").split('|').filter(l => l.trim());
       await addMessage('user', `Submitted ${linksArr.length} links.`);
@@ -279,7 +278,7 @@ export default function ChatPage() {
       return;
     }
 
-    if (isOrderTypeChoice) {
+    if (isMajorOption) {
       if (cleanText.includes('single')) {
         await addMessage('user', "Single Order");
         setCurrentOrder(p => ({ ...p, type: 'single' }));
@@ -339,10 +338,10 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-[100dvh] max-w-lg mx-auto whatsapp-bg font-body overflow-hidden">
-      <header className="glass-header px-3 py-1.5 flex items-center justify-between shadow-lg h-10 shrink-0">
+      <header className="glass-header px-3 py-1 flex items-center justify-between shadow-lg h-10 shrink-0">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-lg bg-[#312ECB] flex items-center justify-center text-white shadow-3d"><Zap size={12} /></div>
-          <h1 className="text-[12px] font-black italic tracking-tighter text-white uppercase">SOCIALBOOST</h1>
+          <h1 className="text-[11px] font-black italic tracking-tighter text-white uppercase">SOCIALBOOST</h1>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setIsNotifOpen(true)} className="relative p-1 text-slate-400"><Bell size={14} />{notifications.length > 0 && <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full" />}</button>
@@ -350,11 +349,11 @@ export default function ChatPage() {
         </div>
       </header>
 
-      <div className="bg-slate-900/50 px-3 py-1 flex items-center justify-between border-b border-white/5 h-7 shrink-0">
-        <button onClick={() => router.push('/add-funds')} className="flex items-center gap-1 bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/20 shadow-inner">
-          <Wallet size={9} /><span className="text-[8px] font-black">₹{walletBalance.toFixed(0)}</span><PlusCircle size={9} />
+      <div className="bg-slate-900/50 px-3 py-0.5 flex items-center justify-between border-b border-white/5 h-6 shrink-0">
+        <button onClick={() => router.push('/add-funds')} className="flex items-center gap-1 bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/20">
+          <Wallet size={8} /><span className="text-[8px] font-black">₹{walletBalance.toFixed(0)}</span><PlusCircle size={8} />
         </button>
-        <button onClick={() => setIsOrdersOpen(true)} className="text-[8px] font-black uppercase text-[#312ECB] flex items-center gap-1"><Package size={9} /> ORDERS</button>
+        <button onClick={() => setIsOrdersOpen(true)} className="text-[8px] font-black uppercase text-[#312ECB] flex items-center gap-1"><Package size={8} /> ORDERS</button>
       </div>
 
       <main className="flex-1 overflow-y-auto p-2 flex flex-col relative custom-scrollbar bg-slate-950/20">
@@ -387,16 +386,16 @@ export default function ChatPage() {
         <div ref={scrollRef} />
       </main>
 
-      <footer className="p-1.5 bg-slate-900/80 backdrop-blur-xl border-t border-white/5 shrink-0">
-        <div className="flex items-center gap-2 bg-slate-950 rounded-xl p-1 h-9">
-          <Input value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSend()} placeholder="Ask something..." className="flex-1 bg-transparent border-none font-bold text-[11px] h-full text-white placeholder:text-slate-600 focus-visible:ring-0" />
-          <Button onClick={() => handleSend()} size="icon" className="rounded-lg h-7 w-7 bg-[#312ECB] shadow-3d active:shadow-3d-pressed"><Send size={12} /></Button>
+      <footer className="p-1 bg-slate-900/80 backdrop-blur-xl border-t border-white/5 shrink-0">
+        <div className="flex items-center gap-2 bg-slate-950 rounded-xl p-1 h-8">
+          <Input value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSend()} placeholder="Ask something..." className="flex-1 bg-transparent border-none font-bold text-[10px] h-full text-white placeholder:text-slate-600 focus-visible:ring-0" />
+          <Button onClick={() => handleSend()} size="icon" className="rounded-lg h-6 w-6 bg-[#312ECB] shadow-3d"><Send size={10} /></Button>
         </div>
       </footer>
 
       <Dialog open={isBroadcastOpen} onOpenChange={setIsBroadcastOpen}>
         <DialogContent className="max-w-[300px] rounded-[2rem] border-none shadow-2xl bg-[#030712] p-0 overflow-hidden">
-          <header className="bg-gradient-to-r from-[#312ECB] to-purple-600 p-3 text-white text-center">
+          <header className="bg-[#312ECB] p-3 text-white text-center">
              <Megaphone size={18} className="mx-auto" />
              <DialogTitle className="font-black uppercase text-[8px] tracking-widest mt-1">Official Update</DialogTitle>
           </header>

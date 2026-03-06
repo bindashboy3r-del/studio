@@ -36,26 +36,23 @@ service cloud.firestore {
       }
     }
 
-    // Fund Requests - Open list for owners to avoid errors
+    // Fund Requests - Allow listing for the owner's query
     match /fundRequests/{requestId} {
       allow create: if isSignedIn();
-      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
-      allow list: if isSignedIn(); 
+      allow read, list: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
       allow update, delete: if isAdmin();
     }
 
-    // Referral Transactions - Open list for relevant users
+    // Referral Transactions
     match /referralTransactions/{txId} {
-      allow read: if isSignedIn() && (isAdmin() || resource.data.referrerId == request.auth.uid);
-      allow list: if isSignedIn();
+      allow read, list: if isSignedIn() && (isAdmin() || resource.data.referrerId == request.auth.uid);
       allow write: if isAdmin();
     }
 
     // Withdrawals
     match /withdrawals/{withdrawalId} {
       allow create: if isSignedIn();
-      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
-      allow list: if isSignedIn();
+      allow read, list: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
       allow update, delete: if isAdmin();
     }
 
