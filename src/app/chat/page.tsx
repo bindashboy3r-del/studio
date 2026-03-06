@@ -13,7 +13,6 @@ import {
   doc,
   writeBatch,
   increment,
-  getDocs,
   Timestamp
 } from "firebase/firestore";
 import { MessageBubble } from "@/components/chat/MessageBubble";
@@ -34,15 +33,12 @@ import { useRouter } from "next/navigation";
 import { SMMService, Platform, PLATFORMS } from "@/app/lib/constants";
 import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
 
 type ChatState = 
   | 'idle' 
@@ -148,9 +144,6 @@ export default function ChatPage() {
     return () => unsubBroadcast();
   }, [db, currentUser]);
 
-  const { data: rawOrders } = useCollection(useMemoFirebase(() => isOrdersOpen && currentUser && db ? collection(db, "users", currentUser.uid, "orders") : null, [db, currentUser, isOrdersOpen]));
-  const userOrders = useMemo(() => (rawOrders || []).map(o => ({ ...o, createdAt: o.createdAt?.toDate ? o.createdAt.toDate() : new Date() })).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()), [rawOrders]);
-
   const { data: messages, isLoading: isMessagesLoading } = useCollection(useMemoFirebase(() => db && currentUser && sessionStart ? query(collection(db, "users", currentUser.uid, "chatMessages"), where("timestamp", ">=", sessionStart), orderBy("timestamp", "asc")) : null, [db, currentUser, sessionStart]));
 
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollIntoView({ behavior: "smooth" }); }, [messages, isTyping]);
@@ -177,19 +170,22 @@ export default function ChatPage() {
     if (!text || !db || !currentUser) return;
     if (!manualText) setInputValue("");
 
+    const cleanText = text.toLowerCase();
+
+    // Command handling
     if (text.startsWith("SUBMIT_BULK_LINKS:")) {
       const linksArr = text.replace("SUBMIT_BULK_LINKS:", "").split('|').filter(l => l.trim());
       await addMessage('user', `Submitted ${linksArr.length} links.`);
       setCurrentOrder(p => ({ ...p, tempLinks: linksArr }));
       setChatState('choosing_service');
       const filtered = activeServices.filter(s => s.platform === currentOrder.platform);
-      botReply(`✅ Saved! Now pick a service:`, filtered.map((s, i) => `${i + 1}. ${s.name}`));
+      botReply(`✅ Links Saved! Now pick a service for ${PLATFORMS[currentOrder.platform]}:`, filtered.map((s, i) => `${i + 1}. ${s.name}`));
       return;
     }
 
     if (text.startsWith("SUBMIT_COMBO_CONFIG###")) {
       const [, itemsStr, linksInput, total] = text.split("###");
-      await addMessage('user', "Proceeding with Combo...");
+      await addMessage('user', "Proceeding with Combo package...");
       const items = itemsStr.split('|').map(s => {
         const [id, q] = s.split(',');
         const service = activeServices.find(ds => ds.id === id)!;
@@ -200,7 +196,7 @@ export default function ChatPage() {
       const opts: string[] = [];
       if (paymentConfig?.walletEnabled !== false) opts.push("💳 PAY FROM WALLET");
       if (paymentConfig?.upiEnabled !== false) opts.push("📲 PAY VIA UPI QR");
-      botReply(`✅ COMBO READY\nPrice: ₹${parseFloat(total).toFixed(2)}`, opts, { paymentPrice: parseFloat(total), serviceName: "Combo Bundle", isCombo: true, prefilledLinks: linksInput });
+      botReply(`✅ COMBO READY\nTotal Amount: ₹${parseFloat(total).toFixed(2)}`, opts, { paymentPrice: parseFloat(total), serviceName: "Combo Bundle", isCombo: true, prefilledLinks: linksInput });
       return;
     }
 
@@ -209,7 +205,7 @@ export default function ChatPage() {
       const parts = text.split("###");
       const linksInput = parts[1];
       const utr = parts[2] || "";
-      await addMessage('user', isWallet ? "Confirming..." : "Submitted Payment", [], { isPermanent: true });
+      await addMessage('user', isWallet ? "Confirming payment via wallet..." : "Submitted payment proof", [], { isPermanent: true });
       
       const type = currentOrder.type || 'single';
       const disc = globalDiscounts[type] || 0;
@@ -224,7 +220,7 @@ export default function ChatPage() {
         totalPrice = (qty / 1000) * (s.pricePer1000 || 0) * (1 - disc / 100) * linksArr.length; serviceNames = s.name;
       }
 
-      if (isWallet && walletBalance < totalPrice) { botReply("❌ Low Balance!"); return; }
+      if (isWallet && walletBalance < totalPrice) { botReply("❌ Insufficient Wallet Balance! Please refill."); return; }
 
       const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}`;
       const batch = writeBatch(db);
@@ -238,14 +234,13 @@ export default function ChatPage() {
       });
       await batch.commit();
 
-      botReply("Order Placed!", [], { orderId, isPermanent: true, isSuccessCard: true, showWhatsAppSuccess: !isWallet, paymentPrice: totalPrice, serviceName: serviceNames, quantity: qty, prefilledLinks: linksInput });
+      botReply("Order Placed Successfully! 🚀", [], { orderId, isPermanent: true, isSuccessCard: true, showWhatsAppSuccess: !isWallet, paymentPrice: totalPrice, serviceName: serviceNames, quantity: qty, prefilledLinks: linksInput });
       setChatState('idle');
       return;
     }
 
-    const cleanText = text.toLowerCase();
+    // Platform Selection Logic
     const platformMatch = availablePlatforms.find((p, i) => cleanText.includes(PLATFORMS[p].toLowerCase()) || (chatState === 'choosing_platform' && cleanText === (i + 1).toString()));
-
     if (platformMatch) {
       setCurrentOrder(p => ({ ...p, platform: platformMatch, items: [] }));
       setChatState('choosing_order_type');
@@ -257,49 +252,84 @@ export default function ChatPage() {
       return;
     }
 
+    // Main Menu / Hi
     if (cleanText === 'hi' || cleanText === 'menu') {
       if (availablePlatforms.length > 1) {
         setChatState('choosing_platform');
-        botReply("Choose Platform:", availablePlatforms.map((p, i) => `${i + 1}. ${PLATFORMS[p]}`), { isPermanent: true });
+        botReply("Select your platform to continue:", availablePlatforms.map((p, i) => `${i + 1}. ${PLATFORMS[p]}`), { isPermanent: true });
       } else {
         const p = availablePlatforms[0] || 'instagram';
         setCurrentOrder(prev => ({ ...prev, platform: p }));
         setChatState('choosing_order_type');
-        botReply(`Pick for ${PLATFORMS[p]}:`, [`1. SINGLE ORDER`, `2. COMBO ORDER`, `3. BULK ORDER`], { isPermanent: true });
+        botReply(`Pick for ${PLATFORMS[p]}:`, [
+          `1. SINGLE ORDER (${globalDiscounts.single}% OFF)`, 
+          `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)`, 
+          `3. BULK ORDER (${globalDiscounts.bulk}% OFF)`
+        ], { isPermanent: true });
       }
       return;
     }
 
+    // Order Type Selection (Single/Combo/Bulk)
+    if (chatState === 'choosing_order_type') {
+      if (cleanText.includes('single') || cleanText === '1') {
+        setCurrentOrder(p => ({ ...p, type: 'single' }));
+        setChatState('choosing_service');
+        const filtered = activeServices.filter(s => s.platform === currentOrder.platform);
+        botReply(`✅ SINGLE MODE\nChoose a service for ${PLATFORMS[currentOrder.platform]}:`, filtered.map((s, i) => `${i + 1}. ${s.name}`));
+        return;
+      }
+      if (cleanText.includes('combo') || cleanText === '2') {
+        setCurrentOrder(p => ({ ...p, type: 'combo' }));
+        botReply(`✅ COMBO MODE\nI'll help you build a package. Use the config card below:`, [], { isComboConfigCard: true, discountPct: globalDiscounts.combo });
+        return;
+      }
+      if (cleanText.includes('bulk') || cleanText === '3') {
+        setCurrentOrder(p => ({ ...p, type: 'bulk' }));
+        setChatState('bulk_adding_links');
+        botReply(`✅ BULK MODE\nPlease add multiple target links first:`, [], { isBulkLinkCard: true });
+        return;
+      }
+    }
+
+    // Service Selection
     const filtered = activeServices.filter(s => s.platform === currentOrder.platform);
     const serviceMatch = filtered.find((s, i) => cleanText.includes(s.name.toLowerCase()) || (chatState === 'choosing_service' && cleanText === (i + 1).toString()));
     
     if (serviceMatch) {
       setCurrentOrder(p => ({ ...p, items: [{ service: serviceMatch, quantity: 0, link: '' }] }));
       setChatState('entering_quantity');
-      botReply(`📊 Enter Quantity for ${serviceMatch.name}? (Min: ${serviceMatch.minQuantity})`);
+      botReply(`📊 How many ${serviceMatch.name} do you want? (Min: ${serviceMatch.minQuantity})`);
       return;
     }
 
     await addMessage('user', text);
     
+    // Quantity Input
     if (chatState === 'entering_quantity') {
       const q = parseInt(text);
-      if (isNaN(q) || q < currentOrder.items[0].service.minQuantity) { botReply(`⚠️ Min ${currentOrder.items[0].service.minQuantity} required.`); return; }
+      if (isNaN(q) || q < currentOrder.items[0].service.minQuantity) { botReply(`⚠️ Invalid quantity. Minimum ${currentOrder.items[0].service.minQuantity} is required.`); return; }
+      
       setCurrentOrder(p => ({ ...p, items: [{ ...p.items[0], quantity: q }] }));
       setChatState('choosing_payment_method');
+      
       const opts: string[] = [];
       if (paymentConfig?.walletEnabled !== false) opts.push("💳 PAY FROM WALLET");
       if (paymentConfig?.upiEnabled !== false) opts.push("📲 PAY VIA UPI QR");
-      const raw = (q/1000) * currentOrder.items[0].service.pricePer1000 * (currentOrder.type === 'bulk' ? (currentOrder.tempLinks?.length || 1) : 1);
+      
+      const multiplier = currentOrder.type === 'bulk' ? (currentOrder.tempLinks?.length || 1) : 1;
+      const raw = (q/1000) * currentOrder.items[0].service.pricePer1000 * multiplier;
       const disc = globalDiscounts[currentOrder.type || 'single'];
-      botReply(`✅ SUMMARY\nTotal: ₹${(raw * (1 - disc/100)).toFixed(2)}`, opts, { paymentPrice: raw * (1-disc/100), serviceName: currentOrder.items[0].service.name, quantity: q, walletBalance });
+      const finalPrice = raw * (1 - disc/100);
+      
+      botReply(`✅ ORDER SUMMARY\nTotal Amount: ₹${finalPrice.toFixed(2)}\n\nPlease select payment method:`, opts, { paymentPrice: finalPrice, rawPrice: raw, discountPct: disc, serviceName: currentOrder.items[0].service.name, quantity: q, walletBalance, prefilledLinks: currentOrder.tempLinks?.join('\n') || "" });
       return;
     }
   };
 
   return (
     <div className="flex flex-col h-[100dvh] max-w-lg mx-auto whatsapp-bg font-body overflow-hidden">
-      <header className="glass-header px-3 py-2 flex items-center justify-between shadow-lg">
+      <header className="glass-header px-3 py-2.5 flex items-center justify-between shadow-lg">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-[#312ECB] flex items-center justify-center text-white"><Zap size={16} /></div>
           <h1 className="text-[16px] font-black italic tracking-tighter text-white uppercase">SOCIALBOOST</h1>
@@ -319,7 +349,29 @@ export default function ChatPage() {
 
       <main className="flex-1 overflow-y-auto p-3 flex flex-col relative custom-scrollbar">
         {messages?.map(m => (
-          <MessageBubble key={m.id} sender={m.sender} text={m.text} options={m.options} onOptionClick={handleSend} isPaymentCard={m.isPaymentCard} paymentPrice={m.paymentPrice} isWalletCard={m.isWalletCard} isComboConfigCard={m.isComboConfigCard} isBulkLinkCard={m.isBulkLinkCard} isSuccessCard={m.isSuccessCard} showWhatsAppSuccess={m.showWhatsAppSuccess} orderId={m.orderId} timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} dynamicServices={m.dynamicServices || activeServices.filter(s => s.platform === currentOrder.platform)} discountPct={m.discountPct ?? 0} serviceName={m.serviceName} quantity={m.quantity} prefilledLinks={m.prefilledLinks} walletBalance={m.walletBalance || walletBalance} />
+          <MessageBubble 
+            key={m.id} 
+            sender={m.sender} 
+            text={m.text} 
+            options={m.options} 
+            onOptionClick={handleSend} 
+            isPaymentCard={m.paymentPrice && !m.isSuccessCard && !m.isWalletCard}
+            paymentPrice={m.paymentPrice}
+            rawPrice={m.rawPrice}
+            isWalletCard={m.options?.includes("💳 PAY FROM WALLET")}
+            isComboConfigCard={m.isComboConfigCard} 
+            isBulkLinkCard={m.isBulkLinkCard} 
+            isSuccessCard={m.isSuccessCard} 
+            showWhatsAppSuccess={m.showWhatsAppSuccess} 
+            orderId={m.orderId} 
+            timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} 
+            dynamicServices={m.dynamicServices || activeServices.filter(s => s.platform === currentOrder.platform)} 
+            discountPct={m.discountPct ?? 0} 
+            serviceName={m.serviceName} 
+            quantity={m.quantity} 
+            prefilledLinks={m.prefilledLinks} 
+            walletBalance={m.walletBalance || walletBalance} 
+          />
         ))}
         {isTyping && <TypingIndicator />}
         <div ref={scrollRef} />
@@ -327,7 +379,7 @@ export default function ChatPage() {
 
       <footer className="p-3 bg-slate-900/80 backdrop-blur-xl border-t border-white/5">
         <div className="flex items-center gap-2 bg-slate-950 rounded-2xl p-1">
-          <Input value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSend()} placeholder="Request..." className="flex-1 bg-transparent border-none font-bold text-sm h-10 text-white placeholder:text-slate-600 focus-visible:ring-0" />
+          <Input value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSend()} placeholder="Type your request..." className="flex-1 bg-transparent border-none font-bold text-sm h-10 text-white placeholder:text-slate-600 focus-visible:ring-0" />
           <Button onClick={() => handleSend()} size="icon" className="rounded-xl h-9 w-9 bg-[#312ECB]"><Send size={16} /></Button>
         </div>
       </footer>

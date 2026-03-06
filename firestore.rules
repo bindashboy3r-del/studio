@@ -36,23 +36,24 @@ service cloud.firestore {
       }
     }
 
-    // Fund Requests - Fixed Permission
+    // Fund Requests
     match /fundRequests/{requestId} {
       allow create: if isSignedIn();
-      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow get: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow list: if isSignedIn() && (isAdmin() || request.query.limit <= 100); 
       allow update, delete: if isAdmin();
     }
 
-    // Referral Transactions - Fixed Permission
+    // Referral Transactions
     match /referralTransactions/{txId} {
-      allow read: if isSignedIn() && (isAdmin() || resource.data.referrerId == request.auth.uid);
+      allow read: if isSignedIn();
       allow write: if isAdmin();
     }
 
-    // Withdrawals - Fixed Permission
+    // Withdrawals
     match /withdrawals/{withdrawalId} {
       allow create: if isSignedIn();
-      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow read: if isSignedIn();
       allow update, delete: if isAdmin();
     }
 
@@ -74,7 +75,7 @@ service cloud.firestore {
 
     // Orders Collection Group
     match /{path=**}/orders/{orderId} {
-      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow read: if isSignedIn();
       allow update: if isAdmin();
     }
   }
