@@ -40,7 +40,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
 export default function AddFundsPage() {
-  const { user } = useUser();
+  const { user, isUserLoading } = useUser();
   const db = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
@@ -58,13 +58,13 @@ export default function AddFundsPage() {
   const [whatsappMsg, setWhatsappMsg] = useState("");
 
   const historyQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
+    if (!db || !user?.uid) return null;
     return query(
       collection(db, "fundRequests"), 
       where("userId", "==", user.uid),
       orderBy("createdAt", "desc")
     );
-  }, [db, user?.uid]); // Stability fix for UID dependency
+  }, [db, user?.uid]);
 
   const { data: fundHistory, isLoading: isHistoryLoading } = useCollection(historyQuery);
 
@@ -81,6 +81,10 @@ export default function AddFundsPage() {
       unsubPayment();
     };
   }, [db, user]);
+
+  if (isUserLoading) {
+    return <div className="min-h-screen flex items-center justify-center bg-[#F0F2F5]"><Loader2 className="animate-spin text-[#312ECB]" /></div>;
+  }
 
   const upiId = paymentConfig?.upiId || "smmxpressbot@slc";
   const merchantName = paymentConfig?.merchantName || "SocialBoost";
@@ -276,7 +280,7 @@ export default function AddFundsPage() {
         <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-50 space-y-4">
           <div className="flex items-center gap-2">
             <Ticket className="text-orange-500" size={16} />
-            <h3 className="text-[10px] font-black uppercase tracking-widest">Redeem Voucher</h3>
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-[#111B21]">Redeem Voucher</h3>
           </div>
           <div className="flex gap-2">
             <Input placeholder="ENTER CODE" value={redeemCode} onChange={e => setRedeemCode(e.target.value.toUpperCase())} className="h-12 bg-slate-50 border-none rounded-2xl px-4 text-sm font-black flex-1 text-[#111B21]" />
@@ -289,7 +293,7 @@ export default function AddFundsPage() {
         <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-50 space-y-4">
           <div className="flex items-center gap-2">
             <History className="text-[#312ECB]" size={16} />
-            <h3 className="text-[10px] font-black uppercase tracking-widest">Recent Deposits</h3>
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-[#111B21]">Recent Deposits</h3>
           </div>
           <div className="space-y-3">
             {isHistoryLoading ? (

@@ -18,7 +18,7 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // User profiles and subcollections
+    // User profiles
     match /users/{userId} {
       allow read, write: if isOwner(userId) || isAdmin();
       
@@ -35,10 +35,10 @@ service cloud.firestore {
       }
     }
 
-    // Fund Requests: Users read their own (filtered), Admin reads all
+    // Fund Requests: Crucial fix for listing history
     match /fundRequests/{requestId} {
       allow create: if isSignedIn();
-      allow read: if isSignedIn() && (isAdmin() || (resource != null && resource.data.userId == request.auth.uid));
+      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
       allow update, delete: if isAdmin();
     }
 
@@ -54,13 +54,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // General app settings
+    // Settings & Services
     match /globalSettings/{settingsId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
 
-    // SMM Services catalog
     match /services/{serviceId} {
       allow read: if true;
       allow write: if isAdmin();
@@ -68,7 +67,7 @@ service cloud.firestore {
 
     // Collection Group rule for Admin/User cross-access
     match /{path=**}/orders/{orderId} {
-      allow read: if isSignedIn() && (isAdmin() || (resource != null && resource.data.userId == request.auth.uid));
+      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
       allow update: if isAdmin();
     }
   }
