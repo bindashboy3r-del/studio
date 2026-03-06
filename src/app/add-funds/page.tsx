@@ -89,7 +89,16 @@ export default function AddFundsPage() {
     if (utrId.length !== 12) { toast({ variant: "destructive", title: "Invalid UTR", description: "UTR must be 12 digits." }); return; }
 
     setLoading(true);
-    const payload = { userId: user.uid, userEmail: user.email || '', displayName: user.displayName || 'User', amount: amtNum, utrId: utrId.trim(), status: 'Pending', type: 'Manual', createdAt: serverTimestamp() };
+    const payload = { 
+      userId: user.uid, 
+      userEmail: user.email || '', 
+      displayName: user.displayName || 'User', 
+      amount: amtNum, 
+      utrId: utrId.trim(), 
+      status: 'Pending', 
+      type: 'Manual', 
+      createdAt: serverTimestamp() 
+    };
 
     addDoc(collection(db, "fundRequests"), payload)
       .then(() => {
@@ -118,7 +127,7 @@ export default function AddFundsPage() {
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center border border-white/20"><Gift size={16} /></div>
             <div>
-              <p className="text-[7px] font-black uppercase tracking-[0.3em] text-white/60">Passive Income</p>
+              <p className="text-[7px] font-black uppercase tracking-[0.3em] text-white/60">Referral Program</p>
               <h2 className="text-[13px] font-black uppercase tracking-tight">Refer & Earn 5% Daily</h2>
             </div>
           </div>
@@ -166,7 +175,7 @@ export default function AddFundsPage() {
               <Input type="number" placeholder="₹0.00" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-12 bg-slate-50 border-none rounded-2xl px-4 text-sm font-black text-[#111B21]" />
             </div>
             <div className="space-y-1">
-              <label className="text-[9px] font-black uppercase text-red-500 tracking-tight ml-1 animate-pulse">Shi utr dalo varna payment verify nhi hoga</label>
+              <label className="text-[9px] font-black uppercase text-red-500 tracking-tight ml-1 animate-pulse">Sahi UTR ID dalein varna verify nahi hoga</label>
               <Input type="text" placeholder="Enter 12-Digit UTR ID" value={utrId} maxLength={12} onChange={(e) => setUtrId(e.target.value.replace(/[^0-9]/g, ''))} className="h-12 bg-slate-50 border-none rounded-2xl px-4 text-sm font-black tracking-widest text-[#111B21]" />
             </div>
           </div>
@@ -181,7 +190,7 @@ export default function AddFundsPage() {
         <DialogContent className="max-w-[340px] rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-white">
           <div className="bg-[#312ECB] p-6 text-center text-white">
             <MessageCircle size={40} className="mx-auto mb-2" />
-            <DialogTitle className="text-lg font-black uppercase tracking-tight">Send to Admin</DialogTitle>
+            <DialogTitle className="text-lg font-black uppercase tracking-tight">Confirm with Admin</DialogTitle>
           </div>
           <div className="p-6 space-y-4">
             <Button onClick={() => { window.open(`https://wa.me/919116399517?text=${encodeURIComponent(whatsappMsg)}`, '_blank'); setShowConfirmPopup(false); }} className="w-full h-12 bg-[#25D366] hover:bg-[#1EBE57] text-white font-black text-[10px] uppercase rounded-2xl shadow-lg gap-2">
