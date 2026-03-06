@@ -64,7 +64,8 @@ export default function AddFundsPage() {
       where("userId", "==", user.uid),
       orderBy("createdAt", "desc")
     );
-  }, [db, user]);
+  }, [db, user?.uid]); // Stability fix for UID dependency
+
   const { data: fundHistory, isLoading: isHistoryLoading } = useCollection(historyQuery);
 
   useEffect(() => {
@@ -144,6 +145,8 @@ export default function AddFundsPage() {
       setWhatsappMsg(msg);
       setShowConfirmPopup(true);
       toast({ title: "Request Logged!" });
+      setAmount("");
+      setUtrId("");
     } catch (error: any) {
       toast({ variant: "destructive", title: "Failed", description: "Server error." });
     } finally {
@@ -257,11 +260,11 @@ export default function AddFundsPage() {
           <div className="space-y-3">
             <div className="space-y-1">
               <label className="text-[8px] font-black uppercase text-slate-400 tracking-widest ml-1">Amount (Min ₹5)</label>
-              <Input type="number" placeholder="₹0.00" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-12 bg-slate-50 border-none rounded-2xl px-4 text-sm font-black" />
+              <Input type="number" placeholder="₹0.00" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-12 bg-slate-50 border-none rounded-2xl px-4 text-sm font-black text-[#111B21]" />
             </div>
             <div className="space-y-1">
               <label className="text-[9px] font-black uppercase text-red-500 tracking-tight ml-1 animate-pulse">Shi utr dalo varna payment verify nhi hoga</label>
-              <Input type="text" placeholder="Enter 12-Digit UTR ID" value={utrId} maxLength={12} onChange={(e) => setUtrId(e.target.value.replace(/[^0-9]/g, ''))} className="h-12 bg-slate-50 border-none rounded-2xl px-4 text-sm font-black tracking-widest" />
+              <Input type="text" placeholder="Enter 12-Digit UTR ID" value={utrId} maxLength={12} onChange={(e) => setUtrId(e.target.value.replace(/[^0-9]/g, ''))} className="h-12 bg-slate-50 border-none rounded-2xl px-4 text-sm font-black tracking-widest text-[#111B21]" />
             </div>
           </div>
           <Button onClick={handleManualSubmit} disabled={loading || !amount || utrId.length !== 12} className="w-full h-12 bg-[#312ECB] hover:bg-[#2825A6] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg gap-2">
@@ -276,7 +279,7 @@ export default function AddFundsPage() {
             <h3 className="text-[10px] font-black uppercase tracking-widest">Redeem Voucher</h3>
           </div>
           <div className="flex gap-2">
-            <Input placeholder="ENTER CODE" value={redeemCode} onChange={e => setRedeemCode(e.target.value.toUpperCase())} className="h-12 bg-slate-50 border-none rounded-2xl px-4 text-sm font-black flex-1" />
+            <Input placeholder="ENTER CODE" value={redeemCode} onChange={e => setRedeemCode(e.target.value.toUpperCase())} className="h-12 bg-slate-50 border-none rounded-2xl px-4 text-sm font-black flex-1 text-[#111B21]" />
             <Button onClick={handleRedeem} disabled={isRedeeming || !redeemCode} className="h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl font-black text-[9px] uppercase px-6">
               {isRedeeming ? <Loader2 className="animate-spin" size={14} /> : "Redeem"}
             </Button>
@@ -298,12 +301,17 @@ export default function AddFundsPage() {
                     <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", req.status === 'Approved' ? "bg-emerald-100 text-emerald-600" : req.status === 'Rejected' ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600")}>
                       {req.status === 'Approved' ? <CheckCircle size={16} /> : req.status === 'Rejected' ? <XCircle size={16} /> : <Clock size={16} />}
                     </div>
-                    <div><p className="text-[11px] font-black text-slate-800">₹{req.finalCreditAmount || req.amount}</p><p className="text-[8px] font-bold text-slate-400 uppercase">{req.utrId}</p></div>
+                    <div>
+                      <p className="text-[11px] font-black text-slate-800">₹{req.finalCreditAmount || req.amount}</p>
+                      <p className="text-[8px] font-bold text-slate-400 uppercase">{req.utrId}</p>
+                    </div>
                   </div>
                   <Badge variant="outline" className={cn("text-[7px] font-black uppercase border-none px-2 h-4", req.status === 'Approved' ? "bg-emerald-50 text-emerald-600" : req.status === 'Rejected' ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600")}>{req.status}</Badge>
                 </div>
               ))
-            ) : <div className="py-10 text-center text-slate-300 uppercase text-[9px] font-black">No Recent Deposits</div>}
+            ) : (
+              <div className="py-10 text-center text-slate-300 uppercase text-[9px] font-black">No Recent Deposits</div>
+            )}
           </div>
         </div>
       </main>

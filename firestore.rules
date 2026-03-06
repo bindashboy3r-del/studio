@@ -35,10 +35,10 @@ service cloud.firestore {
       }
     }
 
-    // Fund Requests: Users read their own, Admin reads all
+    // Fund Requests: Users read their own (filtered), Admin reads all
     match /fundRequests/{requestId} {
       allow create: if isSignedIn();
-      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow read: if isSignedIn() && (isAdmin() || (resource != null && resource.data.userId == request.auth.uid));
       allow update, delete: if isAdmin();
     }
 
@@ -68,7 +68,7 @@ service cloud.firestore {
 
     // Collection Group rule for Admin/User cross-access
     match /{path=**}/orders/{orderId} {
-      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow read: if isSignedIn() && (isAdmin() || (resource != null && resource.data.userId == request.auth.uid));
       allow update: if isAdmin();
     }
   }

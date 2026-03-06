@@ -93,11 +93,6 @@ export default function FundRequestsPage() {
       setCreditAmounts(newCreditAmounts);
       setRequests(reqs);
       setLoading(false);
-    }, (error) => {
-      errorEmitter.emit('permission-error', new FirestorePermissionError({
-        path: 'fundRequests',
-        operation: 'list'
-      }));
     });
     
     return () => unsubscribe();
@@ -175,10 +170,7 @@ export default function FundRequestsPage() {
         });
       })
       .catch((err) => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: `fundRequests/${request.id}`,
-          operation: 'write'
-        }));
+        toast({ variant: "destructive", title: "Permission Error", description: "Admin rights required." });
       })
       .finally(() => {
         setProcessingId(null);
@@ -214,7 +206,7 @@ export default function FundRequestsPage() {
                   type="number"
                   value={globalBonus}
                   onChange={(e) => setGlobalBonus(e.target.value)}
-                  className="w-20 h-10 bg-slate-50 border-none rounded-xl text-sm font-black text-slate-900"
+                  className="w-20 h-10 bg-slate-50 border-none rounded-xl text-sm font-black text-slate-950"
                 />
               </div>
             </div>
@@ -245,7 +237,7 @@ export default function FundRequestsPage() {
                 <TableRow key={req.id} className="border-slate-50 hover:bg-slate-50/50">
                   <TableCell>
                     <div className="flex flex-col">
-                      <span className="font-black text-slate-900 text-sm">{req.displayName || 'Anonymous'}</span>
+                      <span className="font-black text-slate-950 text-sm">{req.displayName || 'Anonymous'}</span>
                       <span className="text-[10px] font-bold text-slate-500">{req.userEmail}</span>
                     </div>
                   </TableCell>
@@ -258,7 +250,7 @@ export default function FundRequestsPage() {
                           type="number"
                           value={creditAmounts[req.id] || ""}
                           onChange={(e) => setCreditAmounts({...creditAmounts, [req.id]: e.target.value})}
-                          className="h-10 w-24 bg-emerald border-none rounded-xl text-sm font-black text-emerald-700"
+                          className="h-10 w-24 bg-emerald-50 border-none rounded-xl text-sm font-black text-emerald-700"
                         />
                       </div>
                     ) : (
