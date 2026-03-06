@@ -26,6 +26,7 @@ import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@
 import { doc, collection, addDoc, serverTimestamp, query, where, writeBatch, increment } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 export default function ReferPage() {
   const { user, isUserLoading } = useUser();
