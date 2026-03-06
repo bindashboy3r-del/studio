@@ -1,13 +1,11 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { 
   ChevronLeft, 
   Gift, 
-  Users, 
-  Wallet, 
   Copy, 
   Share2, 
   ArrowRightLeft, 
@@ -49,7 +47,7 @@ export default function ReferPage() {
   };
 
   const shareOnWhatsApp = () => {
-    const msg = `🚀 *Hey! Build your social media with SocialBoost.* Get followers, likes & views instantly. Use my unique link to join and get bonuses: ${referralLink}`;
+    const msg = `🚀 *Grow your social media!* Join SocialBoost for instant followers and likes. Use my link: ${referralLink}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
@@ -80,7 +78,7 @@ export default function ReferPage() {
         const batch = writeBatch(db);
         batch.update(doc(db, "users", user.uid), { referralEarnings: increment(-amt) });
         await batch.commit();
-        toast({ title: "Payout Request Sent!", description: "Admin will verify and pay soon." });
+        toast({ title: "Payout Request Sent!" });
       }
       setWithdrawAmount(""); setUpiId("");
     } catch (e) { toast({ variant: "destructive", title: "Withdrawal Failed" }); }
@@ -100,98 +98,68 @@ export default function ReferPage() {
       </header>
 
       <main className="max-w-md mx-auto p-4 space-y-6 mt-2">
-        <div className="bg-[#312ECB] rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl">
+        <div className="bg-[#312ECB] rounded-[2rem] p-6 text-white relative overflow-hidden shadow-xl">
           <div className="relative z-10 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20"><Gift size={24} /></div>
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/20"><Gift size={20} /></div>
               <div>
-                <p className="text-[10px] font-black uppercase text-white/60 tracking-widest">Passive Income</p>
-                <h2 className="text-2xl font-black uppercase">5% Daily Rewards</h2>
+                <p className="text-[9px] font-black uppercase text-white/60 tracking-widest">Passive Income</p>
+                <h2 className="text-xl font-black uppercase">5% Commission</h2>
               </div>
             </div>
             <div className="pt-4 border-t border-white/10 flex justify-between items-end">
               <div>
-                <p className="text-[9px] font-black text-white/50 uppercase mb-1">Referral Earnings</p>
-                <p className="text-3xl font-black italic">₹{(userData?.referralEarnings || 0).toFixed(2)}</p>
+                <p className="text-[8px] font-black text-white/50 uppercase mb-1">Available Earnings</p>
+                <p className="text-2xl font-black italic">₹{(userData?.referralEarnings || 0).toFixed(2)}</p>
               </div>
               <TrendingUp className="text-emerald-400 mb-1" />
             </div>
           </div>
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10 blur-3xl" />
         </div>
 
-        <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 space-y-6">
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Share2 size={18} className="text-[#312ECB]" />
-              <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-widest">Your Unique Link</h3>
-            </div>
-            
-            <div className="flex gap-2">
-              <div className="flex-1 bg-slate-50 p-4 rounded-2xl border border-slate-100 font-bold text-[10px] text-slate-500 truncate select-all">{referralLink}</div>
-              <button onClick={handleCopyLink} className="h-12 w-12 rounded-2xl bg-[#312ECB] text-white shadow-md shrink-0 active:scale-90 transition-transform flex items-center justify-center">
-                <Copy size={18} />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <Button onClick={shareOnWhatsApp} className="h-12 bg-[#25D366] rounded-2xl font-black text-[9px] uppercase gap-2 shadow-lg hover:bg-[#1EBE57]">
-                <MessageCircle size={16} /> WhatsApp
-              </Button>
-              <Button onClick={handleCopyLink} className="h-12 bg-[#E1306C] rounded-2xl font-black text-[9px] uppercase gap-2 shadow-lg hover:opacity-90">
-                <Instagram size={16} /> Instagram
-              </Button>
-            </div>
-            <p className="text-center text-[8px] font-bold text-slate-400 uppercase">Share this link everywhere to track your referrals!</p>
+        <div className="bg-white rounded-[1.5rem] p-5 shadow-sm border border-gray-100 space-y-4">
+          <div className="flex items-center gap-2">
+            <Share2 size={16} className="text-[#312ECB]" />
+            <h3 className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Your Unique Link</h3>
           </div>
-        </div>
-
-        <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 space-y-6">
-          <div className="flex items-center gap-2 mb-2"><Banknote className="text-emerald-500" size={18} /><h3 className="text-[11px] font-black text-slate-900 uppercase tracking-widest">Withdraw Earnings</h3></div>
-          
-          <div className="flex bg-slate-50 p-1 rounded-2xl border border-slate-100">
-            <button 
-              onClick={() => setWithdrawType('Wallet')} 
-              className={cn(
-                "flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all", 
-                withdrawType === 'Wallet' ? "bg-white shadow-sm text-[#312ECB]" : "text-slate-400"
-              )}
-            >
-              To SMM Wallet
-            </button>
-            <button 
-              onClick={() => setWithdrawType('UPI')} 
-              className={cn(
-                "flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all", 
-                withdrawType === 'UPI' ? "bg-white shadow-sm text-[#312ECB]" : "text-slate-400"
-              )}
-            >
-              To UPI App
+          <div className="flex gap-2">
+            <div className="flex-1 bg-slate-50 p-3 rounded-xl border border-slate-100 font-bold text-[9px] text-slate-500 truncate">{referralLink}</div>
+            <button onClick={handleCopyLink} className="h-10 w-10 rounded-xl bg-[#312ECB] text-white shadow-md flex items-center justify-center shrink-0 active:scale-90 transition-transform">
+              <Copy size={16} />
             </button>
           </div>
-
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Withdraw Amount (Min ₹10)</label>
-              <Input type="number" placeholder="Enter Amount" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} className="h-12 bg-slate-50 border-none rounded-2xl px-5 font-black text-sm text-[#111B21]" />
-            </div>
-            {withdrawType === 'UPI' && (
-              <div className="space-y-1">
-                <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Your UPI ID</label>
-                <Input placeholder="e.g. user@paytm" value={upiId} onChange={(e) => setUpiId(e.target.value)} className="h-12 bg-slate-50 border-none rounded-2xl px-5 font-black text-sm text-[#111B21]" />
-              </div>
-            )}
-            <Button onClick={handleWithdraw} disabled={isWithdrawing || !withdrawAmount} className="w-full h-14 bg-[#312ECB] text-white rounded-2xl font-black text-[10px] uppercase shadow-lg gap-2 active:scale-95 transition-all">
-              {isWithdrawing ? <Loader2 size={16} className="animate-spin" /> : <ArrowRightLeft size={16} />} 
-              {withdrawType === 'Wallet' ? "Transfer to Wallet" : "Request UPI Payout"}
+          <div className="grid grid-cols-2 gap-2">
+            <Button onClick={shareOnWhatsApp} className="h-10 bg-[#25D366] rounded-xl font-black text-[8px] uppercase gap-2">
+              <MessageCircle size={14} /> WhatsApp
+            </Button>
+            <Button onClick={handleCopyLink} className="h-10 bg-[#E1306C] rounded-xl font-black text-[8px] uppercase gap-2">
+              <Instagram size={14} /> Instagram
             </Button>
           </div>
         </div>
 
-        <div className="bg-blue-50 p-5 rounded-3xl border border-blue-100 flex items-start gap-4">
-          <Info className="text-blue-600 shrink-0" size={20} />
-          <p className="text-[10px] font-bold text-blue-700 leading-relaxed uppercase">
-            Notice: Commission is added only when your referred friends add funds to their wallet.
+        <div className="bg-white rounded-[1.5rem] p-5 shadow-sm border border-gray-100 space-y-4">
+          <div className="flex items-center gap-2 mb-1"><Banknote className="text-emerald-500" size={16} /><h3 className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Withdraw</h3></div>
+          <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100">
+            <button onClick={() => setWithdrawType('Wallet')} className={cn("flex-1 py-2 rounded-lg text-[8px] font-black uppercase transition-all", withdrawType === 'Wallet' ? "bg-white shadow-sm text-[#312ECB]" : "text-slate-400")}>Wallet</button>
+            <button onClick={() => setWithdrawType('UPI')} className={cn("flex-1 py-2 rounded-lg text-[8px] font-black uppercase transition-all", withdrawType === 'UPI' ? "bg-white shadow-sm text-[#312ECB]" : "text-slate-400")}>UPI App</button>
+          </div>
+          <div className="space-y-3">
+            <Input type="number" placeholder="Amount (Min ₹10)" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} className="h-10 bg-slate-50 border-none rounded-xl px-4 font-black text-xs text-[#111B21]" />
+            {withdrawType === 'UPI' && (
+              <Input placeholder="Your UPI ID" value={upiId} onChange={(e) => setUpiId(e.target.value)} className="h-10 bg-slate-50 border-none rounded-xl px-4 font-black text-xs text-[#111B21]" />
+            )}
+            <Button onClick={handleWithdraw} disabled={isWithdrawing || !withdrawAmount} className="w-full h-12 bg-[#312ECB] text-white rounded-xl font-black text-[9px] uppercase shadow-lg gap-2 active:scale-95 transition-all">
+              {isWithdrawing ? <Loader2 size={14} className="animate-spin" /> : <ArrowRightLeft size={14} />} 
+              Submit Request
+            </Button>
+          </div>
+        </div>
+
+        <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 flex items-start gap-3">
+          <Info className="text-blue-600 shrink-0" size={16} />
+          <p className="text-[9px] font-bold text-blue-700 leading-relaxed uppercase">
+            Commission is added when referred friends add funds.
           </p>
         </div>
       </main>

@@ -5,7 +5,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { 
   ChevronLeft, 
-  Wallet, 
   Zap,
   Loader2,
   QrCode,
@@ -134,19 +133,11 @@ export default function AddFundsPage() {
           <ArrowRight size={16} />
         </div>
 
-        <div className="bg-[#312ECB] rounded-[1.2rem] p-4 text-white shadow-lg flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center"><QrCode size={16} /></div>
-          <div>
-            <p className="text-[7px] font-black uppercase tracking-[0.3em] text-white/60">Wallet Refill</p>
-            <h2 className="text-[15px] font-black uppercase tracking-tight">Scan & Pay</h2>
-          </div>
-        </div>
-
         {globalBonus > 0 && (
           <div className="bg-emerald-500 rounded-lg p-2 text-white flex items-center justify-between shadow-md">
             <div className="flex items-center gap-2">
               <Zap className="fill-current animate-pulse" size={12} />
-              <p className="text-[9px] font-black uppercase">Offer: Get {globalBonus}% Extra Bonus!</p>
+              <p className="text-[9px] font-black uppercase">Offer: Get {globalBonus}% Bonus!</p>
             </div>
             <Badge className="bg-white text-emerald-600 border-none text-[8px] font-black px-2">ACTIVE</Badge>
           </div>
@@ -159,7 +150,6 @@ export default function AddFundsPage() {
           <div className="flex gap-2 w-full">
             <button onClick={() => { navigator.clipboard.writeText(upiId); toast({ title: "Copied!" }); }} className="flex-1 flex items-center justify-center gap-2 py-2 bg-slate-50 rounded-xl border border-slate-100">
               <span className="text-[8px] font-black text-slate-500 uppercase">{upiId}</span>
-              <Copy size={10} className="text-[#312ECB]" />
             </button>
             <button onClick={handleDownloadQR} disabled={isDownloading} className="px-4 py-2 bg-[#312ECB]/10 text-[#312ECB] rounded-xl border border-[#312ECB]/20 flex items-center justify-center gap-2">
               {isDownloading ? <Loader2 size={12} className="animate-spin" /> : <Download size={14} />}
@@ -168,14 +158,14 @@ export default function AddFundsPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-[2rem] p-6 shadow-xl border border-gray-50 space-y-4">
+        <div className="bg-white rounded-[1.5rem] p-6 shadow-xl border border-gray-50 space-y-4">
           <div className="space-y-3">
             <div className="space-y-1">
               <label className="text-[8px] font-black uppercase text-slate-400 tracking-widest ml-1">Amount (Min ₹5)</label>
               <Input type="number" placeholder="₹0.00" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-12 bg-slate-50 border-none rounded-2xl px-4 text-sm font-black text-[#111B21]" />
             </div>
             <div className="space-y-1">
-              <label className="text-[9px] font-black uppercase text-red-500 tracking-tight ml-1 animate-pulse">Sahi UTR ID dalein varna verify nahi hoga</label>
+              <label className="text-[9px] font-black uppercase text-red-500 tracking-tight ml-1 animate-pulse">Shi UTR ID dalo varna verify nhi hoga</label>
               <Input type="text" placeholder="Enter 12-Digit UTR ID" value={utrId} maxLength={12} onChange={(e) => setUtrId(e.target.value.replace(/[^0-9]/g, ''))} className="h-12 bg-slate-50 border-none rounded-2xl px-4 text-sm font-black tracking-widest text-[#111B21]" />
             </div>
           </div>
@@ -187,13 +177,13 @@ export default function AddFundsPage() {
       </main>
 
       <Dialog open={showConfirmPopup} onOpenChange={setShowConfirmPopup}>
-        <DialogContent className="max-w-[340px] rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-white">
+        <DialogContent className="max-w-[340px] rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden bg-white">
           <div className="bg-[#312ECB] p-6 text-center text-white">
             <MessageCircle size={40} className="mx-auto mb-2" />
             <DialogTitle className="text-lg font-black uppercase tracking-tight">Confirm with Admin</DialogTitle>
           </div>
           <div className="p-6 space-y-4">
-            <Button onClick={() => { window.open(`https://wa.me/919116399517?text=${encodeURIComponent(whatsappMsg)}`, '_blank'); setShowConfirmPopup(false); }} className="w-full h-12 bg-[#25D366] hover:bg-[#1EBE57] text-white font-black text-[10px] uppercase rounded-2xl shadow-lg gap-2">
+            <Button onClick={() => { window.open(`https://wa.me/919116399517?text=${encodeURIComponent(whatsappMsg)}`, '_blank'); setShowConfirmPopup(false); }} className="w-full h-12 bg-[#25D366] hover:bg-[#1EBE57] text-white font-black text-[10px] uppercase rounded-xl shadow-lg gap-2">
               <Send size={16} /> SEND ON WHATSAPP
             </Button>
           </div>

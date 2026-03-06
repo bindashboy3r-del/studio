@@ -10,11 +10,7 @@ import {
   writeBatch,
   increment,
   serverTimestamp,
-  setDoc,
-  getDoc,
-  getDocs,
-  where,
-  limit
+  getDoc
 } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { 
@@ -28,7 +24,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ChevronLeft, RefreshCw, Check, X as CloseIcon, Zap, Save } from "lucide-react";
+import { ChevronLeft, RefreshCw, Check, X as CloseIcon } from "lucide-react";
 import { useFirestore, useUser } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -42,7 +38,6 @@ export default function FundRequestsPage() {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [creditAmounts, setCreditAmounts] = useState<Record<string, string>>({});
   const [globalBonus, setGlobalBonus] = useState("0");
-  const [isSavingSettings, setIsSavingSettings] = useState(false);
   const router = useRouter();
 
   const ADMIN_EMAIL = "chetanmadhav4@gmail.com";
@@ -103,29 +98,20 @@ export default function FundRequestsPage() {
       });
 
       if (action === 'Approved') {
-        // 1. Credit User Balance
         batch.update(doc(db, "users", request.userId), { balance: increment(validatedAmount) });
         batch.set(doc(collection(db, "users", request.userId, "notifications")), {
           title: '💰 Wallet Credited!', message: `₹${validatedAmount.toFixed(0)} added.`, read: false, createdAt: serverTimestamp()
         });
 
-        // 2. REFERRAL LOGIC (5% Commission)
         const userSnap = await getDoc(doc(db, "users", request.userId));
         const userData = userSnap.data();
         if (userData?.referredBy) {
           const referrerId = userData.referredBy;
-          const commission = request.amount * 0.05; // 5% of base amount
-          
+          const commission = request.amount * 0.05; 
           const referrerRef = doc(db, "users", referrerId);
           batch.update(referrerRef, { referralEarnings: increment(commission) });
-          
-          const txRef = doc(collection(db, "referralTransactions"));
-          batch.set(txRef, {
+          batch.set(doc(collection(db, "referralTransactions")), {
             referrerId, fromUserId: request.userId, fromUserName: userData.displayName, depositAmount: request.amount, commissionAmount: commission, createdAt: serverTimestamp()
-          });
-
-          batch.set(doc(collection(db, "users", referrerId, "notifications")), {
-            title: '🎁 Referral Bonus!', message: `Earned ₹${commission.toFixed(2)} from ${userData.displayName}'s deposit.`, read: false, createdAt: serverTimestamp()
           });
         }
       }
@@ -133,7 +119,7 @@ export default function FundRequestsPage() {
       await batch.commit();
       toast({ title: `Request ${action}` });
     } catch (e) {
-      toast({ variant: "destructive", title: "Error processing request" });
+      toast({ variant: "destructive", title: "Error processing" });
     } finally {
       setProcessingId(null);
     }
@@ -148,33 +134,32 @@ export default function FundRequestsPage() {
           <button onClick={() => router.push("/admin")} className="p-3 bg-white rounded-2xl text-slate-400 hover:text-[#312ECB] shadow-sm"><ChevronLeft size={24} /></button>
           <div>
             <h1 className="text-2xl font-black tracking-tight text-slate-950 uppercase">PAYMENT APPROVALS</h1>
-            <p className="text-[10px] font-black text-[#F59E0B] uppercase tracking-widest">Verify Deposits & Handle Referrals</p>
           </div>
         </header>
 
-        <main className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden">
+        <main className="bg-white rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden">
           <Table>
             <TableHeader className="bg-slate-50">
               <TableRow className="border-slate-100">
-                <TableHead className="text-[10px] font-black uppercase py-6 text-slate-600">User</TableHead>
-                <TableHead className="text-[10px] font-black uppercase py-6 text-slate-600">Requested</TableHead>
-                <TableHead className="text-[10px] font-black uppercase py-6 text-slate-600">Final Credit</TableHead>
-                <TableHead className="text-[10px] font-black uppercase py-6 text-slate-600">UTR ID</TableHead>
-                <TableHead className="text-[10px] font-black uppercase py-6 text-slate-600">Status</TableHead>
-                <TableHead className="text-right text-[10px] font-black uppercase py-6 text-slate-600">Actions</TableHead>
+                <TableHead className="text-[10px] font-black uppercase text-slate-950">User</TableHead>
+                <TableHead className="text-[10px] font-black uppercase text-slate-950">Requested</TableHead>
+                <TableHead className="text-[10px] font-black uppercase text-slate-950">Final Credit</TableHead>
+                <TableHead className="text-[10px] font-black uppercase text-slate-950">UTR ID</TableHead>
+                <TableHead className="text-[10px] font-black uppercase text-slate-950">Status</TableHead>
+                <TableHead className="text-right text-[10px] font-black uppercase text-slate-950">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {requests.map((req) => (
-                <TableRow key={req.id} className="border-slate-50 hover:bg-slate-50/50">
+                <TableRow key={req.id} className="border-slate-50">
                   <TableCell className="font-black text-sm text-slate-950">{req.displayName}<br/><span className="text-[10px] text-slate-400">{req.userEmail}</span></TableCell>
-                  <TableCell className="font-black text-slate-600">₹{req.amount}</TableCell>
+                  <TableCell className="font-black text-slate-950">₹{req.amount}</TableCell>
                   <TableCell>
                     {req.status === 'Pending' ? (
                       <Input type="number" value={creditAmounts[req.id] || ""} onChange={(e) => setCreditAmounts({...creditAmounts, [req.id]: e.target.value})} className="h-10 w-24 bg-emerald-50 border-none rounded-xl font-black text-emerald-700" />
                     ) : <span className="font-black text-emerald-600">₹{req.finalCreditAmount}</span>}
                   </TableCell>
-                  <TableCell><code className="bg-slate-100 px-3 py-1 rounded-lg text-[11px] font-black text-slate-700">{req.utrId}</code></TableCell>
+                  <TableCell><code className="bg-slate-100 px-3 py-1 rounded-lg text-[11px] font-black text-slate-950">{req.utrId}</code></TableCell>
                   <TableCell><Badge className={cn("text-[8px] font-black", req.status === 'Pending' ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600')}>{req.status}</Badge></TableCell>
                   <TableCell className="text-right">
                     {req.status === 'Pending' ? (
@@ -182,7 +167,7 @@ export default function FundRequestsPage() {
                         <Button size="sm" onClick={() => handleRequest(req, 'Approved')} disabled={processingId === req.id} className="bg-emerald-500 hover:bg-emerald-600 h-10 w-10 rounded-xl p-0 text-white"><Check size={18} /></Button>
                         <Button size="sm" variant="destructive" onClick={() => handleRequest(req, 'Rejected')} disabled={processingId === req.id} className="h-10 w-10 rounded-xl p-0"><CloseIcon size={18} /></Button>
                       </div>
-                    ) : <span className="text-[9px] font-black text-slate-300 uppercase">Processed</span>}
+                    ) : <span className="text-[9px] font-black text-slate-300 uppercase">Done</span>}
                   </TableCell>
                 </TableRow>
               ))}

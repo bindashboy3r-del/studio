@@ -9,14 +9,11 @@ import {
   orderBy, 
   serverTimestamp,
   where,
-  limit,
   onSnapshot,
   doc,
   writeBatch,
   increment,
-  getDoc,
   getDocs,
-  deleteDoc,
   Timestamp
 } from "firebase/firestore";
 import { MessageBubble } from "@/components/chat/MessageBubble";
@@ -25,17 +22,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { 
   Send, 
-  X,
   Zap,
   Wallet,
   PlusCircle,
-  Share2,
-  Instagram,
-  MessageCircle,
   Bell,
   Package,
   Megaphone,
-  Gift,
   ExternalLink
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -43,7 +35,6 @@ import { SMMService, Platform, PLATFORMS } from "@/app/lib/constants";
 import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
 import {
   Dialog,
   DialogContent,
@@ -61,7 +52,6 @@ type ChatState =
   | 'bulk_adding_links'
   | 'choosing_service' 
   | 'entering_quantity' 
-  | 'configuring_combo'
   | 'choosing_payment_method';
 
 interface OrderItem {
@@ -98,10 +88,7 @@ export default function ChatPage() {
 
   const [activeBroadcast, setActiveBroadcast] = useState<any>(null);
   const [globalDiscounts, setGlobalDiscounts] = useState({ single: 0, combo: 0, bulk: 0 });
-  const [bonusPercentage, setBonusPercentage] = useState(0);
-  const [socialLinks, setSocialLinks] = useState<any>(null);
   const [paymentConfig, setPaymentConfig] = useState<any>(null);
-  const [showSocialMenu, setShowSocialMenu] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [sessionStart, setSessionStart] = useState<Timestamp | null>(null);
   
@@ -154,12 +141,11 @@ export default function ChatPage() {
       if (snap.exists()) setGlobalDiscounts({ single: snap.data().single || 0, combo: snap.data().combo || 0, bulk: snap.data().bulk || 0 });
     });
 
-    onSnapshot(doc(db, "globalSettings", "finance"), (snap) => { if (snap.exists()) setBonusPercentage(snap.data().bonusPercentage || 0); });
-    onSnapshot(doc(db, "globalSettings", "social"), (snap) => { if (snap.exists()) setSocialLinks(snap.data()); });
     onSnapshot(doc(db, "globalSettings", "payment"), (snap) => { if (snap.exists()) setPaymentConfig(snap.data()); });
     onSnapshot(collection(db, "users", currentUser.uid, "notifications"), (snap) => {
       setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((n: any) => !n.read));
     });
+    return () => unsubBroadcast();
   }, [db, currentUser]);
 
   const { data: rawOrders } = useCollection(useMemoFirebase(() => isOrdersOpen && currentUser && db ? collection(db, "users", currentUser.uid, "orders") : null, [db, currentUser, isOrdersOpen]));
@@ -191,21 +177,19 @@ export default function ChatPage() {
     if (!text || !db || !currentUser) return;
     if (!manualText) setInputValue("");
 
-    // --- STEP 1: TECHNICAL COMMAND PRIORITY ---
-    // This prevents technical data (like combo items) from being misidentified as "YouTube" or "Instagram" platform jumps.
     if (text.startsWith("SUBMIT_BULK_LINKS:")) {
       const linksArr = text.replace("SUBMIT_BULK_LINKS:", "").split('|').filter(l => l.trim());
-      await addMessage('user', `Submitted ${linksArr.length} links for bulk order.`);
+      await addMessage('user', `Submitted ${linksArr.length} links.`);
       setCurrentOrder(p => ({ ...p, tempLinks: linksArr }));
       setChatState('choosing_service');
       const filtered = activeServices.filter(s => s.platform === currentOrder.platform);
-      botReply(`✅ ${linksArr.length} links saved! Now pick a service:`, filtered.map((s, i) => `${i + 1}. ${s.name}`));
+      botReply(`✅ Saved! Now pick a service:`, filtered.map((s, i) => `${i + 1}. ${s.name}`));
       return;
     }
 
     if (text.startsWith("SUBMIT_COMBO_CONFIG###")) {
       const [, itemsStr, linksInput, total] = text.split("###");
-      await addMessage('user', "Proceeding with Combo Bundle...");
+      await addMessage('user', "Proceeding with Combo...");
       const items = itemsStr.split('|').map(s => {
         const [id, q] = s.split(',');
         const service = activeServices.find(ds => ds.id === id)!;
@@ -216,15 +200,7 @@ export default function ChatPage() {
       const opts: string[] = [];
       if (paymentConfig?.walletEnabled !== false) opts.push("💳 PAY FROM WALLET");
       if (paymentConfig?.upiEnabled !== false) opts.push("📲 PAY VIA UPI QR");
-      botReply(`✅ COMBO READY\nPrice: ₹${parseFloat(total).toFixed(2)}`, opts, { 
-        paymentPrice: parseFloat(total), 
-        rawPrice: items.reduce((acc, it) => acc + (it.quantity/1000)*(it.service.pricePer1000||0), 0), 
-        discountPct: globalDiscounts.combo, 
-        serviceName: "Combo Bundle", 
-        quantity: items[0].quantity, 
-        isCombo: true,
-        prefilledLinks: linksInput
-      });
+      botReply(`✅ COMBO READY\nPrice: ₹${parseFloat(total).toFixed(2)}`, opts, { paymentPrice: parseFloat(total), serviceName: "Combo Bundle", isCombo: true, prefilledLinks: linksInput });
       return;
     }
 
@@ -233,7 +209,7 @@ export default function ChatPage() {
       const parts = text.split("###");
       const linksInput = parts[1];
       const utr = parts[2] || "";
-      await addMessage('user', isWallet ? "Confirming Wallet Payment..." : `Payment Submitted (UTR: ${utr})`, [], { isPermanent: true });
+      await addMessage('user', isWallet ? "Confirming..." : "Submitted Payment", [], { isPermanent: true });
       
       const type = currentOrder.type || 'single';
       const disc = globalDiscounts[type] || 0;
@@ -262,33 +238,18 @@ export default function ChatPage() {
       });
       await batch.commit();
 
-      botReply("Order Placed Successfully!", [], { orderId, isPermanent: true, isSuccessCard: true, showWhatsAppSuccess: !isWallet, paymentPrice: totalPrice, serviceName: serviceNames, quantity: qty, prefilledLinks: linksInput });
+      botReply("Order Placed!", [], { orderId, isPermanent: true, isSuccessCard: true, showWhatsAppSuccess: !isWallet, paymentPrice: totalPrice, serviceName: serviceNames, quantity: qty, prefilledLinks: linksInput });
       setChatState('idle');
       return;
     }
 
-    // --- STEP 2: DYNAMIC INTENT MATCHING (Path Jumping) ---
     const cleanText = text.toLowerCase();
-    
-    // Check if user mentioned a platform name to switch paths
-    const platformMatch = availablePlatforms.find((p, i) => 
-      cleanText.includes(PLATFORMS[p].toLowerCase()) || 
-      (chatState === 'choosing_platform' && cleanText === (i + 1).toString())
-    );
+    const platformMatch = availablePlatforms.find((p, i) => cleanText.includes(PLATFORMS[p].toLowerCase()) || (chatState === 'choosing_platform' && cleanText === (i + 1).toString()));
 
     if (platformMatch) {
-      // CLEANUP logic: If user was in the middle of something, restart
-      if (chatState !== 'choosing_platform' && chatState !== 'idle') {
-        const q = query(collection(db, "users", currentUser.uid, "chatMessages"), where("isPermanent", "!=", true));
-        const snap = await getDocs(q);
-        const batch = writeBatch(db);
-        snap.docs.forEach(d => batch.delete(d.ref));
-        await batch.commit();
-      }
-
       setCurrentOrder(p => ({ ...p, platform: platformMatch, items: [] }));
       setChatState('choosing_order_type');
-      botReply(`Choose boost style for ${PLATFORMS[platformMatch]}:`, [
+      botReply(`Pick for ${PLATFORMS[platformMatch]}:`, [
         `1. SINGLE ORDER (${globalDiscounts.single}% OFF)`, 
         `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)`, 
         `3. BULK ORDER (${globalDiscounts.bulk}% OFF)`
@@ -297,28 +258,15 @@ export default function ChatPage() {
     }
 
     if (cleanText === 'hi' || cleanText === 'menu') {
-      await addMessage('user', text, [], { isPermanent: true });
       if (availablePlatforms.length > 1) {
         setChatState('choosing_platform');
-        botReply("Choose your platform:", availablePlatforms.map((p, i) => `${i + 1}. ${PLATFORMS[p]}`), { isPermanent: true });
+        botReply("Choose Platform:", availablePlatforms.map((p, i) => `${i + 1}. ${PLATFORMS[p]}`), { isPermanent: true });
       } else {
         const p = availablePlatforms[0] || 'instagram';
         setCurrentOrder(prev => ({ ...prev, platform: p }));
         setChatState('choosing_order_type');
-        botReply(`Choose boost style for ${PLATFORMS[p]}:`, [
-          `1. SINGLE ORDER (${globalDiscounts.single}% OFF)`, 
-          `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)`, 
-          `3. BULK ORDER (${globalDiscounts.bulk}% OFF)`
-        ], { isPermanent: true });
+        botReply(`Pick for ${PLATFORMS[p]}:`, [`1. SINGLE ORDER`, `2. COMBO ORDER`, `3. BULK ORDER`], { isPermanent: true });
       }
-      return;
-    }
-
-    if (cleanText.includes("single order") || cleanText.includes("combo order") || cleanText.includes("bulk order")) {
-      const filtered = activeServices.filter(s => s.platform === currentOrder.platform);
-      if (cleanText.includes("single")) { setChatState('choosing_service'); botReply(`Pick a Service:`, filtered.map((s, i) => `${i + 1}. ${s.name}`)); }
-      else if (cleanText.includes("combo")) { setChatState('configuring_combo'); botReply("Configure combo:", [], { isComboConfigCard: true, discountPct: globalDiscounts.combo, dynamicServices: filtered }); }
-      else { setChatState('bulk_adding_links'); botReply(`BULK MODE: Add links and click SUBMIT.`, [], { isBulkLinkCard: true }); }
       return;
     }
 
@@ -332,7 +280,6 @@ export default function ChatPage() {
       return;
     }
 
-    // --- STEP 3: FALLBACK CONVERSATION ---
     await addMessage('user', text);
     
     if (chatState === 'entering_quantity') {
@@ -345,112 +292,61 @@ export default function ChatPage() {
       if (paymentConfig?.upiEnabled !== false) opts.push("📲 PAY VIA UPI QR");
       const raw = (q/1000) * currentOrder.items[0].service.pricePer1000 * (currentOrder.type === 'bulk' ? (currentOrder.tempLinks?.length || 1) : 1);
       const disc = globalDiscounts[currentOrder.type || 'single'];
-      botReply(`✅ SUMMARY\nPrice: ₹${(raw * (1 - disc/100)).toFixed(2)}`, opts, { rawPrice: raw, paymentPrice: raw * (1-disc/100), discountPct: disc, serviceName: currentOrder.items[0].service.name, quantity: q, walletBalance });
+      botReply(`✅ SUMMARY\nTotal: ₹${(raw * (1 - disc/100)).toFixed(2)}`, opts, { paymentPrice: raw * (1-disc/100), serviceName: currentOrder.items[0].service.name, quantity: q, walletBalance });
       return;
-    }
-
-    if (chatState === 'choosing_payment_method') {
-      const isWallet = cleanText.includes("wallet");
-      const isUpi = cleanText.includes("upi");
-      if (isWallet || isUpi) {
-        const type = currentOrder.type || 'single';
-        const disc = globalDiscounts[type];
-        const qty = currentOrder.items[0].quantity;
-        const num = type === 'bulk' ? (currentOrder.tempLinks?.length || 1) : 1;
-        const raw = (qty/1000) * currentOrder.items[0].service.pricePer1000 * num;
-        const final = raw * (1 - disc/100);
-        botReply(isWallet ? "Confirm Order?" : "Scan QR:", [], { 
-          isWalletCard: isWallet, 
-          isPaymentCard: isUpi, 
-          paymentPrice: final, 
-          rawPrice: raw, 
-          discountPct: disc, 
-          serviceName: currentOrder.items[0].service.name, 
-          quantity: qty, 
-          prefilledLinks: currentOrder.tempLinks?.join('\n') || '', 
-          walletBalance 
-        });
-      }
     }
   };
 
   return (
-    <div className="flex flex-col h-screen max-w-lg mx-auto whatsapp-bg font-body overflow-hidden">
-      <header className="glass-header px-4 py-3 flex items-center justify-between shadow-lg">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-2xl bg-[#312ECB] flex items-center justify-center text-white"><Zap size={18} /></div>
-          <h1 className="text-[18px] font-black italic tracking-tighter text-white uppercase">SOCIALBOOST</h1>
+    <div className="flex flex-col h-[100dvh] max-w-lg mx-auto whatsapp-bg font-body overflow-hidden">
+      <header className="glass-header px-3 py-2 flex items-center justify-between shadow-lg">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-xl bg-[#312ECB] flex items-center justify-center text-white"><Zap size={16} /></div>
+          <h1 className="text-[16px] font-black italic tracking-tighter text-white uppercase">SOCIALBOOST</h1>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => setIsNotifOpen(true)} className="relative p-2 text-slate-400"><Bell size={20} />{notifications.length > 0 && <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-slate-900" />}</button>
-          <button onClick={() => router.push('/profile')} className="w-9 h-9 rounded-2xl bg-slate-800 text-white font-black text-sm">{currentUser?.displayName?.[0] || 'U'}</button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setIsNotifOpen(true)} className="relative p-1.5 text-slate-400"><Bell size={18} />{notifications.length > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />}</button>
+          <button onClick={() => router.push('/profile')} className="w-8 h-8 rounded-xl bg-slate-800 text-white font-black text-xs">{currentUser?.displayName?.[0] || 'U'}</button>
         </div>
       </header>
 
-      <div className="bg-slate-900/50 px-4 py-2 flex items-center justify-between border-b border-white/5">
-        <button onClick={() => router.push('/add-funds')} className="flex items-center gap-2 bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-full border border-emerald-500/20">
-          <Wallet size={14} /><span className="text-[11px] font-black">₹{walletBalance.toFixed(0)}</span><PlusCircle size={14} />
+      <div className="bg-slate-900/50 px-3 py-1.5 flex items-center justify-between border-b border-white/5">
+        <button onClick={() => router.push('/add-funds')} className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 px-2.5 py-1 rounded-full border border-emerald-500/20">
+          <Wallet size={12} /><span className="text-[10px] font-black">₹{walletBalance.toFixed(0)}</span><PlusCircle size={12} />
         </button>
-        <button onClick={() => setIsOrdersOpen(true)} className="text-[10px] font-black uppercase text-[#312ECB] flex items-center gap-1.5 px-3 py-1.5"><Package size={14} /> ORDERS</button>
+        <button onClick={() => setIsOrdersOpen(true)} className="text-[9px] font-black uppercase text-[#312ECB] flex items-center gap-1"><Package size={12} /> ORDERS</button>
       </div>
 
-      <main className="flex-1 overflow-y-auto p-4 flex flex-col relative custom-scrollbar">
+      <main className="flex-1 overflow-y-auto p-3 flex flex-col relative custom-scrollbar">
         {messages?.map(m => (
-          <MessageBubble key={m.id} sender={m.sender} text={m.text} options={m.options} onOptionClick={handleSend} isPaymentCard={m.isPaymentCard} paymentPrice={m.paymentPrice} rawPrice={m.rawPrice} isWalletCard={m.isWalletCard} isComboConfigCard={m.isComboConfigCard} isBulkLinkCard={m.isBulkLinkCard} isSuccessCard={m.isSuccessCard} showWhatsAppSuccess={m.showWhatsAppSuccess} orderId={m.orderId} timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} dynamicServices={m.dynamicServices || activeServices.filter(s => s.platform === currentOrder.platform)} discountPct={m.discountPct ?? 0} serviceName={m.serviceName} quantity={m.quantity} prefilledLinks={m.prefilledLinks} walletBalance={m.walletBalance || walletBalance} />
+          <MessageBubble key={m.id} sender={m.sender} text={m.text} options={m.options} onOptionClick={handleSend} isPaymentCard={m.isPaymentCard} paymentPrice={m.paymentPrice} isWalletCard={m.isWalletCard} isComboConfigCard={m.isComboConfigCard} isBulkLinkCard={m.isBulkLinkCard} isSuccessCard={m.isSuccessCard} showWhatsAppSuccess={m.showWhatsAppSuccess} orderId={m.orderId} timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} dynamicServices={m.dynamicServices || activeServices.filter(s => s.platform === currentOrder.platform)} discountPct={m.discountPct ?? 0} serviceName={m.serviceName} quantity={m.quantity} prefilledLinks={m.prefilledLinks} walletBalance={m.walletBalance || walletBalance} />
         ))}
         {isTyping && <TypingIndicator />}
         <div ref={scrollRef} />
       </main>
 
-      <footer className="p-4 bg-slate-900/80 backdrop-blur-xl border-t border-white/5">
-        <div className="flex items-center gap-3 bg-slate-950 rounded-[1.8rem] p-1.5">
-          <Input value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSend()} placeholder="Type your Request..." className="flex-1 bg-transparent border-none font-bold text-sm h-11 text-white placeholder:text-slate-600 focus-visible:ring-0" />
-          <Button onClick={() => handleSend()} size="icon" className="rounded-2xl h-10 w-10 bg-[#312ECB]"><Send size={18} /></Button>
+      <footer className="p-3 bg-slate-900/80 backdrop-blur-xl border-t border-white/5">
+        <div className="flex items-center gap-2 bg-slate-950 rounded-2xl p-1">
+          <Input value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSend()} placeholder="Request..." className="flex-1 bg-transparent border-none font-bold text-sm h-10 text-white placeholder:text-slate-600 focus-visible:ring-0" />
+          <Button onClick={() => handleSend()} size="icon" className="rounded-xl h-9 w-9 bg-[#312ECB]"><Send size={16} /></Button>
         </div>
       </footer>
 
       <Dialog open={isBroadcastOpen} onOpenChange={setIsBroadcastOpen}>
-        <DialogContent className="max-w-[340px] rounded-[2.5rem] border-none shadow-2xl bg-[#030712] p-0 overflow-hidden">
-          <header className="bg-gradient-to-r from-[#312ECB] to-purple-600 p-6 text-white text-center">
-             <Megaphone size={24} className="mx-auto" />
-             <DialogTitle className="font-black uppercase text-[10px] tracking-widest mt-2">Special Update</DialogTitle>
+        <DialogContent className="max-w-[320px] rounded-[2rem] border-none shadow-2xl bg-[#030712] p-0 overflow-hidden">
+          <header className="bg-gradient-to-r from-[#312ECB] to-purple-600 p-4 text-white text-center">
+             <Megaphone size={20} className="mx-auto" />
+             <DialogTitle className="font-black uppercase text-[9px] tracking-widest mt-1">Update</DialogTitle>
           </header>
-          <div className="p-8 space-y-6 text-center">
-             <p className="text-[13px] font-bold text-slate-200 leading-relaxed italic">"{activeBroadcast?.text}"</p>
+          <div className="p-6 space-y-4 text-center">
+             <p className="text-[12px] font-bold text-slate-200 leading-relaxed italic">{activeBroadcast?.text}</p>
              {activeBroadcast?.buttonUrl && (
-               <Button asChild className="w-full h-12 bg-white text-slate-900 font-black uppercase tracking-widest rounded-2xl gap-2">
-                 <a href={activeBroadcast.buttonUrl} target="_blank" rel="noopener noreferrer">{activeBroadcast.buttonText || "Open Link"} <ExternalLink size={14} /></a>
+               <Button asChild className="w-full h-10 bg-white text-slate-900 font-black uppercase text-[10px] rounded-xl gap-2">
+                 <a href={activeBroadcast.buttonUrl} target="_blank" rel="noopener noreferrer">{activeBroadcast.buttonText || "Open"} <ExternalLink size={12} /></a>
                </Button>
              )}
-             <Button onClick={() => setIsBroadcastOpen(false)} variant="ghost" className="w-full text-slate-500 font-black uppercase text-[10px]">Close</Button>
+             <Button onClick={() => setIsBroadcastOpen(false)} variant="ghost" className="w-full text-slate-500 font-black uppercase text-[9px]">Close</Button>
           </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isOrdersOpen} onOpenChange={setIsOrdersOpen}>
-        <DialogContent className="max-w-[360px] rounded-[2.5rem] bg-[#030712] p-0 overflow-hidden">
-          <header className="bg-slate-900 p-4 border-b border-white/5">
-            <DialogTitle className="text-[10px] font-black text-white uppercase tracking-widest">Order History</DialogTitle>
-          </header>
-          <ScrollArea className="h-[500px] p-4">
-            <div className="space-y-3">
-              {userOrders.length > 0 ? userOrders.map((o: any) => (
-                <div key={o.id} className="bg-slate-900 p-4 rounded-xl border border-white/5">
-                  <div className="flex justify-between items-start">
-                    <h3 className="text-[11px] font-black text-[#312ECB] uppercase tracking-tight max-w-[70%]">{o.service}</h3>
-                    <Badge className={cn(
-                      "text-[7px] font-black px-2 h-4 border-none",
-                      o.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-blue-500/10 text-blue-500'
-                    )}>{o.status}</Badge>
-                  </div>
-                  <div className="flex gap-3 mt-2 text-[9px] font-bold text-slate-400">
-                    <span>Qty: {o.quantity}</span>
-                    <span className="text-emerald-600">₹{o.price?.toFixed(2)}</span>
-                  </div>
-                </div>
-              )) : <p className="text-center py-20 text-[10px] text-slate-600 uppercase font-black tracking-widest">No Orders Yet</p>}
-            </div>
-          </ScrollArea>
         </DialogContent>
       </Dialog>
     </div>
