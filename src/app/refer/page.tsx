@@ -49,7 +49,6 @@ export default function ReferPage() {
   const { data: transactions } = useCollection(statsQuery);
 
   const referralCode = userData?.referralCode || "SOCIAL";
-  // Generate unique link based on current domain
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://socialboost.pro';
   const referralLink = `${baseUrl}?ref=${referralCode}`;
 
@@ -110,7 +109,6 @@ export default function ReferPage() {
       </header>
 
       <main className="max-w-md mx-auto p-4 space-y-6 mt-2">
-        {/* Earnings Card */}
         <div className="bg-[#312ECB] rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl">
           <div className="relative z-10 space-y-4">
             <div className="flex items-center gap-3">
@@ -131,7 +129,6 @@ export default function ReferPage() {
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10 blur-3xl" />
         </div>
 
-        {/* Unique Link & Sharing */}
         <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 space-y-6">
           <div className="space-y-4">
             <div className="flex items-center gap-2">
@@ -158,7 +155,6 @@ export default function ReferPage() {
           </div>
         </div>
 
-        {/* Withdrawal Section */}
         <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 space-y-6">
           <div className="flex items-center gap-2 mb-2"><Banknote className="text-emerald-500" size={18} /><h3 className="text-[11px] font-black text-slate-900 uppercase tracking-widest">Withdraw Earnings</h3></div>
           
@@ -185,7 +181,6 @@ export default function ReferPage() {
           </div>
         </div>
 
-        {/* Logs */}
         <div className="space-y-4">
           <div className="flex items-center gap-2 px-2"><Info className="text-[#312ECB]" size={14} /><h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Recent Commissions</h3></div>
           <div className="space-y-3">

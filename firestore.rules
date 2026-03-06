@@ -36,23 +36,23 @@ service cloud.firestore {
       }
     }
 
-    // Fund Requests - Fixed for history and admin verification
+    // Fund Requests
     match /fundRequests/{requestId} {
       allow create: if isSignedIn();
-      allow read: if isSignedIn() && (isAdmin() || (resource != null && resource.data.userId == request.auth.uid));
+      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
       allow update, delete: if isAdmin();
     }
 
     // Referral Transactions - Secure Access for history listing
     match /referralTransactions/{txId} {
-      allow read: if isSignedIn() && (isAdmin() || (resource != null && resource.data.referrerId == request.auth.uid));
+      allow read: if isSignedIn() && (isAdmin() || resource.data.referrerId == request.auth.uid);
       allow write: if isAdmin();
     }
 
     // Withdrawals - User can create and see their own
     match /withdrawals/{withdrawalId} {
       allow create: if isSignedIn();
-      allow read: if isSignedIn() && (isAdmin() || (resource != null && resource.data.userId == request.auth.uid));
+      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
       allow update, delete: if isAdmin();
     }
 
@@ -74,7 +74,7 @@ service cloud.firestore {
 
     // Orders Collection Group (for Admin Tracker)
     match /{path=**}/orders/{orderId} {
-      allow read: if isSignedIn() && (isAdmin() || (resource != null && resource.data.userId == request.auth.uid));
+      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
       allow update: if isAdmin();
     }
   }
