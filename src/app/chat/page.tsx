@@ -13,7 +13,9 @@ import {
   doc,
   writeBatch,
   increment,
-  Timestamp
+  Timestamp,
+  getDocs,
+  deleteDoc
 } from "firebase/firestore";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
@@ -148,6 +150,15 @@ export default function ChatPage() {
 
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollIntoView({ behavior: "smooth" }); }, [messages, isTyping]);
 
+  const clearRecentMessages = async () => {
+    if (!currentUser || !db || !messages) return;
+    const batch = writeBatch(db);
+    messages.forEach(m => {
+      batch.delete(doc(db, "users", currentUser.uid, "chatMessages", m.id));
+    });
+    await batch.commit();
+  };
+
   const addMessage = async (sender: 'user' | 'bot', text: string, options?: string[], extraData?: any) => {
     if (!currentUser || !db) return;
     return addDoc(collection(db, "users", currentUser.uid, "chatMessages"), { sender, text, options: options || [], timestamp: serverTimestamp(), userId: currentUser.uid, ...extraData });
@@ -155,7 +166,7 @@ export default function ChatPage() {
 
   const botReply = async (text: string, options?: string[], extraData?: any) => {
     setIsTyping(true);
-    setTimeout(async () => { await addMessage('bot', text, options, extraData); setIsTyping(false); }, 800);
+    setTimeout(async () => { await addMessage('bot', text, options, extraData); setIsTyping(false); }, 600);
   };
 
   useEffect(() => {
@@ -172,6 +183,20 @@ export default function ChatPage() {
 
     const cleanText = text.toLowerCase();
 
+    // MAJOR CHOICE DETECTED: Platform Selection
+    const platformMatch = availablePlatforms.find((p, i) => cleanText.includes(PLATFORMS[p].toLowerCase()) || (chatState === 'choosing_platform' && cleanText === (i + 1).toString()));
+    
+    // MAJOR CHOICE DETECTED: Order Type Selection
+    const isOrderTypeChoice = chatState === 'choosing_order_type' && (cleanText.includes('single') || cleanText.includes('combo') || cleanText.includes('bulk') || ['1','2','3'].includes(cleanText));
+
+    // MAJOR CHOICE DETECTED: "Menu" or "Hi"
+    const isMenuTrigger = cleanText === 'hi' || cleanText === 'menu';
+
+    // If any major choice is made, clear previous clutter
+    if (platformMatch || isOrderTypeChoice || isMenuTrigger) {
+      await clearRecentMessages();
+    }
+
     // Command handling
     if (text.startsWith("SUBMIT_BULK_LINKS:")) {
       const linksArr = text.replace("SUBMIT_BULK_LINKS:", "").split('|').filter(l => l.trim());
@@ -179,7 +204,7 @@ export default function ChatPage() {
       setCurrentOrder(p => ({ ...p, tempLinks: linksArr }));
       setChatState('choosing_service');
       const filtered = activeServices.filter(s => s.platform === currentOrder.platform);
-      botReply(`✅ Links Saved! Now pick a service for ${PLATFORMS[currentOrder.platform]}:`, filtered.map((s, i) => `${i + 1}. ${s.name}`));
+      botReply(`✅ Links Saved! Now pick a service:`, filtered.map((s, i) => `${i + 1}. ${s.name}`));
       return;
     }
 
@@ -239,9 +264,9 @@ export default function ChatPage() {
       return;
     }
 
-    // Platform Selection Logic
-    const platformMatch = availablePlatforms.find((p, i) => cleanText.includes(PLATFORMS[p].toLowerCase()) || (chatState === 'choosing_platform' && cleanText === (i + 1).toString()));
+    // Logic for selections
     if (platformMatch) {
+      await addMessage('user', PLATFORMS[platformMatch]);
       setCurrentOrder(p => ({ ...p, platform: platformMatch, items: [] }));
       setChatState('choosing_order_type');
       botReply(`Pick for ${PLATFORMS[platformMatch]}:`, [
@@ -252,8 +277,8 @@ export default function ChatPage() {
       return;
     }
 
-    // Main Menu / Hi
-    if (cleanText === 'hi' || cleanText === 'menu') {
+    if (isMenuTrigger) {
+      await addMessage('user', text);
       if (availablePlatforms.length > 1) {
         setChatState('choosing_platform');
         botReply("Select your platform to continue:", availablePlatforms.map((p, i) => `${i + 1}. ${PLATFORMS[p]}`), { isPermanent: true });
@@ -270,21 +295,23 @@ export default function ChatPage() {
       return;
     }
 
-    // Order Type Selection (Single/Combo/Bulk)
     if (chatState === 'choosing_order_type') {
       if (cleanText.includes('single') || cleanText === '1') {
+        await addMessage('user', "Single Order");
         setCurrentOrder(p => ({ ...p, type: 'single' }));
         setChatState('choosing_service');
         const filtered = activeServices.filter(s => s.platform === currentOrder.platform);
-        botReply(`✅ SINGLE MODE\nChoose a service for ${PLATFORMS[currentOrder.platform]}:`, filtered.map((s, i) => `${i + 1}. ${s.name}`));
+        botReply(`✅ SINGLE MODE\nChoose a service:`, filtered.map((s, i) => `${i + 1}. ${s.name}`));
         return;
       }
       if (cleanText.includes('combo') || cleanText === '2') {
+        await addMessage('user', "Combo Order");
         setCurrentOrder(p => ({ ...p, type: 'combo' }));
         botReply(`✅ COMBO MODE\nI'll help you build a package. Use the config card below:`, [], { isComboConfigCard: true, discountPct: globalDiscounts.combo });
         return;
       }
       if (cleanText.includes('bulk') || cleanText === '3') {
+        await addMessage('user', "Bulk Order");
         setCurrentOrder(p => ({ ...p, type: 'bulk' }));
         setChatState('bulk_adding_links');
         botReply(`✅ BULK MODE\nPlease add multiple target links first:`, [], { isBulkLinkCard: true });
@@ -292,11 +319,11 @@ export default function ChatPage() {
       }
     }
 
-    // Service Selection
     const filtered = activeServices.filter(s => s.platform === currentOrder.platform);
     const serviceMatch = filtered.find((s, i) => cleanText.includes(s.name.toLowerCase()) || (chatState === 'choosing_service' && cleanText === (i + 1).toString()));
     
     if (serviceMatch) {
+      await addMessage('user', serviceMatch.name);
       setCurrentOrder(p => ({ ...p, items: [{ service: serviceMatch, quantity: 0, link: '' }] }));
       setChatState('entering_quantity');
       botReply(`📊 How many ${serviceMatch.name} do you want? (Min: ${serviceMatch.minQuantity})`);
@@ -305,7 +332,6 @@ export default function ChatPage() {
 
     await addMessage('user', text);
     
-    // Quantity Input
     if (chatState === 'entering_quantity') {
       const q = parseInt(text);
       if (isNaN(q) || q < currentOrder.items[0].service.minQuantity) { botReply(`⚠️ Invalid quantity. Minimum ${currentOrder.items[0].service.minQuantity} is required.`); return; }
@@ -329,25 +355,25 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-[100dvh] max-w-lg mx-auto whatsapp-bg font-body overflow-hidden">
-      <header className="glass-header px-3 py-2.5 flex items-center justify-between shadow-lg">
+      <header className="glass-header px-3 py-2 flex items-center justify-between shadow-lg h-12 shrink-0">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-[#312ECB] flex items-center justify-center text-white"><Zap size={16} /></div>
-          <h1 className="text-[16px] font-black italic tracking-tighter text-white uppercase">SOCIALBOOST</h1>
+          <div className="w-7 h-7 rounded-xl bg-[#312ECB] flex items-center justify-center text-white"><Zap size={14} /></div>
+          <h1 className="text-[14px] font-black italic tracking-tighter text-white uppercase">SOCIALBOOST</h1>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setIsNotifOpen(true)} className="relative p-1.5 text-slate-400"><Bell size={18} />{notifications.length > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />}</button>
-          <button onClick={() => router.push('/profile')} className="w-8 h-8 rounded-xl bg-slate-800 text-white font-black text-xs">{currentUser?.displayName?.[0] || 'U'}</button>
+          <button onClick={() => setIsNotifOpen(true)} className="relative p-1 text-slate-400"><Bell size={16} />{notifications.length > 0 && <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full" />}</button>
+          <button onClick={() => router.push('/profile')} className="w-7 h-7 rounded-xl bg-slate-800 text-white font-black text-[10px]">{currentUser?.displayName?.[0] || 'U'}</button>
         </div>
       </header>
 
-      <div className="bg-slate-900/50 px-3 py-1.5 flex items-center justify-between border-b border-white/5">
-        <button onClick={() => router.push('/add-funds')} className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 px-2.5 py-1 rounded-full border border-emerald-500/20">
-          <Wallet size={12} /><span className="text-[10px] font-black">₹{walletBalance.toFixed(0)}</span><PlusCircle size={12} />
+      <div className="bg-slate-900/50 px-3 py-1 flex items-center justify-between border-b border-white/5 h-8 shrink-0">
+        <button onClick={() => router.push('/add-funds')} className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/20">
+          <Wallet size={10} /><span className="text-[9px] font-black">₹{walletBalance.toFixed(0)}</span><PlusCircle size={10} />
         </button>
-        <button onClick={() => setIsOrdersOpen(true)} className="text-[9px] font-black uppercase text-[#312ECB] flex items-center gap-1"><Package size={12} /> ORDERS</button>
+        <button onClick={() => setIsOrdersOpen(true)} className="text-[8px] font-black uppercase text-[#312ECB] flex items-center gap-1"><Package size={10} /> ORDERS</button>
       </div>
 
-      <main className="flex-1 overflow-y-auto p-3 flex flex-col relative custom-scrollbar">
+      <main className="flex-1 overflow-y-auto p-3 flex flex-col relative custom-scrollbar bg-slate-950/20">
         {messages?.map(m => (
           <MessageBubble 
             key={m.id} 
@@ -377,10 +403,10 @@ export default function ChatPage() {
         <div ref={scrollRef} />
       </main>
 
-      <footer className="p-3 bg-slate-900/80 backdrop-blur-xl border-t border-white/5">
-        <div className="flex items-center gap-2 bg-slate-950 rounded-2xl p-1">
-          <Input value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSend()} placeholder="Type your request..." className="flex-1 bg-transparent border-none font-bold text-sm h-10 text-white placeholder:text-slate-600 focus-visible:ring-0" />
-          <Button onClick={() => handleSend()} size="icon" className="rounded-xl h-9 w-9 bg-[#312ECB]"><Send size={16} /></Button>
+      <footer className="p-2 bg-slate-900/80 backdrop-blur-xl border-t border-white/5 shrink-0">
+        <div className="flex items-center gap-2 bg-slate-950 rounded-2xl p-1 h-10">
+          <Input value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSend()} placeholder="Type your request..." className="flex-1 bg-transparent border-none font-bold text-xs h-full text-white placeholder:text-slate-600 focus-visible:ring-0" />
+          <Button onClick={() => handleSend()} size="icon" className="rounded-xl h-8 w-8 bg-[#312ECB]"><Send size={14} /></Button>
         </div>
       </footer>
 
