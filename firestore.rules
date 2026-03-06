@@ -35,10 +35,11 @@ service cloud.firestore {
       }
     }
 
-    // Fund Requests: Crucial fix for listing history
+    // Fund Requests: Optimized for list/get permissions
     match /fundRequests/{requestId} {
       allow create: if isSignedIn();
-      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow get: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow list: if isSignedIn() && (isAdmin() || request.query.limit <= 100);
       allow update, delete: if isAdmin();
     }
 

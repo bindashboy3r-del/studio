@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { ChevronLeft, RefreshCw, Check, X as CloseIcon, Wallet, Zap, Save } from "lucide-react";
 import { useFirestore, useUser } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 export default function FundRequestsPage() {
   const { user: admin, isUserLoading } = useUser();
@@ -207,8 +208,8 @@ export default function FundRequestsPage() {
               {requests.map((req) => (
                 <TableRow key={req.id} className="border-slate-50 hover:bg-slate-50/50">
                   <TableCell>
-                    <div className="flex flex-col">
-                      <span className="font-black text-slate-950 text-sm">{req.displayName || 'Anonymous'}</span>
+                    <div className="flex flex-col text-slate-950">
+                      <span className="font-black text-sm">{req.displayName || 'Anonymous'}</span>
                       <span className="text-[10px] font-bold text-slate-500">{req.userEmail}</span>
                     </div>
                   </TableCell>
