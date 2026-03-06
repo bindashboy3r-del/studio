@@ -7,10 +7,6 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
     function isAdmin() {
       return isSignedIn() && (
         request.auth.uid == "s55uL0f8PmcypR75usVYOLwVs7O2" ||
@@ -18,50 +14,62 @@ service cloud.firestore {
       );
     }
 
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // User profiles and subcollections
     match /users/{userId} {
       allow read, write: if isOwner(userId) || isAdmin();
+      
+      match /orders/{orderId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+      
+      match /chatMessages/{msgId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+      
+      match /notifications/{notifId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
     }
 
-    match /users/{userId}/notifications/{notificationId} {
-      allow read, write: if isOwner(userId) || isAdmin();
-    }
-
-    match /users/{userId}/orders/{orderId} {
-      allow read, write: if isOwner(userId) || isAdmin();
-    }
-
-    match /users/{userId}/chatMessages/{chatMessageId} {
-      allow read, write: if isOwner(userId) || isAdmin();
-    }
-
+    // Global collection for fund addition requests
     match /fundRequests/{requestId} {
       allow create: if isSignedIn();
       allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
       allow update, delete: if isAdmin();
     }
 
+    // Wallet redeem codes
     match /redeemCodes/{codeId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
 
+    // Global announcements (publicly readable)
     match /globalAnnouncements/{announcementId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if isAdmin();
     }
 
+    // General app settings
     match /globalSettings/{settingsId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
 
+    // SMM Services catalog
     match /services/{serviceId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
+    // Collection Group rule for Admin Order Tracker
     match /{path=**}/orders/{orderId} {
       allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow update: if isAdmin();
     }
   }
 }

@@ -158,7 +158,7 @@ export function MessageBubble({
   const handleWhatsAppConfirmation = () => {
     const adminNumber = "919116399517";
     const finalLinks = links || prefilledLinks;
-    const message = `🚀 *NEW ORDER PLACED!*\n\n🆔 *Order ID:* #${orderId || "N/A"}\n📊 *Service:* ${serviceName || "Service"}\n🔢 *Quantity:* ${quantity || "N/A"}\n💰 *Amount:* ₹${price.toFixed(2)}\n🔗 *Links:* ${finalLinks || "N/A"}\n💳 *UTR ID:* ${propUtr || utr || "N/A"}\n\nPlease process my order ASAP!`;
+    const message = `🚀 *NEW ORDER PLACED!*\n\n🆔 *Order ID:* #${orderId || "N/A"}\n📊 *Service:* ${serviceName || "Service"}\n🔢 *Quantity:* ${quantity || "N/A"}\n💰 *Amount:* ₹${price.toFixed(2)}\n🔗 *Target Link:* ${finalLinks || "N/A"}\n💳 *UTR ID:* ${propUtr || utr || "N/A"}\n\nPlease process my order ASAP!`;
     window.open(`https://wa.me/${adminNumber}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
@@ -270,7 +270,7 @@ export function MessageBubble({
               </div>
               <div>
                 <h3 className="text-[13px] font-black uppercase tracking-tight">Bulk Mode</h3>
-                <p className="text-[8px] font-black uppercase text-slate-500 tracking-widest">Add Multiple Links</p>
+                <p className="text-[8px] font-black uppercase text-slate-500 tracking-widest">Add Multiple Target Links</p>
               </div>
             </div>
 
@@ -425,10 +425,10 @@ export function MessageBubble({
               <div className="space-y-2">
                 {!isCombo && (
                   <div className="space-y-1">
-                    <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-[0.2em]">{isBulk ? "Bulk Links Saved" : "Target Link"}</label>
+                    <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-[0.2em]">Target Link</label>
                     {isBulk ? (
                       <div className="bg-slate-900/50 p-3 rounded-xl border border-white/5 shadow-inner">
-                         <p className="text-[9px] font-bold text-slate-400 leading-tight italic">{linkCount} links submitted in this batch.</p>
+                         <p className="text-[9px] font-bold text-slate-400 leading-tight italic">{linkCount} target links submitted in this batch.</p>
                       </div>
                     ) : (
                       <div className="relative">
@@ -465,10 +465,10 @@ export function MessageBubble({
              <div className="space-y-3 px-1">
                 {!isCombo && (
                   <div className="space-y-1">
-                    <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-[0.2em]">{isBulk ? "Bulk Links Confirmed" : "Target Link"}</label>
+                    <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-[0.2em]">Target Link</label>
                     {isBulk ? (
                       <div className="bg-slate-900/50 p-3 rounded-xl border border-white/5 shadow-inner">
-                         <p className="text-[9px] font-bold text-slate-400 leading-tight italic">{linkCount} links submitted in this batch.</p>
+                         <p className="text-[9px] font-bold text-slate-400 leading-tight italic">{linkCount} target links confirmed in this batch.</p>
                       </div>
                     ) : (
                       <div className="relative">

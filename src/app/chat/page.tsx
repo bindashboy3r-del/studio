@@ -191,7 +191,8 @@ export default function ChatPage() {
     if (!text || !db || !currentUser) return;
     if (!manualText) setInputValue("");
 
-    // Technical Priority Commands
+    // --- STEP 1: TECHNICAL COMMAND PRIORITY ---
+    // This prevents technical data (like combo items) from being misidentified as "YouTube" or "Instagram" platform jumps.
     if (text.startsWith("SUBMIT_BULK_LINKS:")) {
       const linksArr = text.replace("SUBMIT_BULK_LINKS:", "").split('|').filter(l => l.trim());
       await addMessage('user', `Submitted ${linksArr.length} links for bulk order.`);
@@ -215,7 +216,15 @@ export default function ChatPage() {
       const opts: string[] = [];
       if (paymentConfig?.walletEnabled !== false) opts.push("💳 PAY FROM WALLET");
       if (paymentConfig?.upiEnabled !== false) opts.push("📲 PAY VIA UPI QR");
-      botReply(`✅ COMBO READY\nPrice: ₹${parseFloat(total).toFixed(2)}`, opts, { paymentPrice: parseFloat(total), rawPrice: items.reduce((acc, it) => acc + (it.quantity/1000)*(it.service.pricePer1000||0), 0), discountPct: globalDiscounts.combo, serviceName: "Combo Bundle", quantity: items[0].quantity, isCombo: true });
+      botReply(`✅ COMBO READY\nPrice: ₹${parseFloat(total).toFixed(2)}`, opts, { 
+        paymentPrice: parseFloat(total), 
+        rawPrice: items.reduce((acc, it) => acc + (it.quantity/1000)*(it.service.pricePer1000||0), 0), 
+        discountPct: globalDiscounts.combo, 
+        serviceName: "Combo Bundle", 
+        quantity: items[0].quantity, 
+        isCombo: true,
+        prefilledLinks: linksInput
+      });
       return;
     }
 
@@ -258,8 +267,35 @@ export default function ChatPage() {
       return;
     }
 
-    // Normal Conversation Logic
+    // --- STEP 2: DYNAMIC INTENT MATCHING (Path Jumping) ---
     const cleanText = text.toLowerCase();
+    
+    // Check if user mentioned a platform name to switch paths
+    const platformMatch = availablePlatforms.find((p, i) => 
+      cleanText.includes(PLATFORMS[p].toLowerCase()) || 
+      (chatState === 'choosing_platform' && cleanText === (i + 1).toString())
+    );
+
+    if (platformMatch) {
+      // CLEANUP logic: If user was in the middle of something, restart
+      if (chatState !== 'choosing_platform' && chatState !== 'idle') {
+        const q = query(collection(db, "users", currentUser.uid, "chatMessages"), where("isPermanent", "!=", true));
+        const snap = await getDocs(q);
+        const batch = writeBatch(db);
+        snap.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      }
+
+      setCurrentOrder(p => ({ ...p, platform: platformMatch, items: [] }));
+      setChatState('choosing_order_type');
+      botReply(`Choose boost style for ${PLATFORMS[platformMatch]}:`, [
+        `1. SINGLE ORDER (${globalDiscounts.single}% OFF)`, 
+        `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)`, 
+        `3. BULK ORDER (${globalDiscounts.bulk}% OFF)`
+      ], { isPermanent: true });
+      return;
+    }
+
     if (cleanText === 'hi' || cleanText === 'menu') {
       await addMessage('user', text, [], { isPermanent: true });
       if (availablePlatforms.length > 1) {
@@ -269,17 +305,12 @@ export default function ChatPage() {
         const p = availablePlatforms[0] || 'instagram';
         setCurrentOrder(prev => ({ ...prev, platform: p }));
         setChatState('choosing_order_type');
-        botReply(`Choose boost style for ${PLATFORMS[p]}:`, [`1. SINGLE ORDER (${globalDiscounts.single}% OFF)`, `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)`, `3. BULK ORDER (${globalDiscounts.bulk}% OFF)`], { isPermanent: true });
+        botReply(`Choose boost style for ${PLATFORMS[p]}:`, [
+          `1. SINGLE ORDER (${globalDiscounts.single}% OFF)`, 
+          `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)`, 
+          `3. BULK ORDER (${globalDiscounts.bulk}% OFF)`
+        ], { isPermanent: true });
       }
-      return;
-    }
-
-    // Dynamic Intent Matchers
-    const platformMatch = availablePlatforms.find((p, i) => cleanText.includes(PLATFORMS[p].toLowerCase()) || (chatState === 'choosing_platform' && cleanText === (i + 1).toString()));
-    if (platformMatch) {
-      setCurrentOrder(p => ({ ...p, platform: platformMatch }));
-      setChatState('choosing_order_type');
-      botReply(`Choose boost style for ${PLATFORMS[platformMatch]}:`, [`1. SINGLE ORDER (${globalDiscounts.single}% OFF)`, `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)`, `3. BULK ORDER (${globalDiscounts.bulk}% OFF)`], { isPermanent: true });
       return;
     }
 
@@ -293,6 +324,7 @@ export default function ChatPage() {
 
     const filtered = activeServices.filter(s => s.platform === currentOrder.platform);
     const serviceMatch = filtered.find((s, i) => cleanText.includes(s.name.toLowerCase()) || (chatState === 'choosing_service' && cleanText === (i + 1).toString()));
+    
     if (serviceMatch) {
       setCurrentOrder(p => ({ ...p, items: [{ service: serviceMatch, quantity: 0, link: '' }] }));
       setChatState('entering_quantity');
@@ -300,7 +332,9 @@ export default function ChatPage() {
       return;
     }
 
+    // --- STEP 3: FALLBACK CONVERSATION ---
     await addMessage('user', text);
+    
     if (chatState === 'entering_quantity') {
       const q = parseInt(text);
       if (isNaN(q) || q < currentOrder.items[0].service.minQuantity) { botReply(`⚠️ Min ${currentOrder.items[0].service.minQuantity} required.`); return; }
@@ -325,7 +359,17 @@ export default function ChatPage() {
         const num = type === 'bulk' ? (currentOrder.tempLinks?.length || 1) : 1;
         const raw = (qty/1000) * currentOrder.items[0].service.pricePer1000 * num;
         const final = raw * (1 - disc/100);
-        botReply(isWallet ? "Confirm Order?" : "Scan QR:", [], { isWalletCard: isWallet, isPaymentCard: isUpi, paymentPrice: final, rawPrice: raw, discountPct: disc, serviceName: currentOrder.items[0].service.name, quantity: qty, prefilledLinks: currentOrder.tempLinks?.join('\n') || '', walletBalance });
+        botReply(isWallet ? "Confirm Order?" : "Scan QR:", [], { 
+          isWalletCard: isWallet, 
+          isPaymentCard: isUpi, 
+          paymentPrice: final, 
+          rawPrice: raw, 
+          discountPct: disc, 
+          serviceName: currentOrder.items[0].service.name, 
+          quantity: qty, 
+          prefilledLinks: currentOrder.tempLinks?.join('\n') || '', 
+          walletBalance 
+        });
       }
     }
   };

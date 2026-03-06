@@ -161,28 +161,35 @@ export default function AddFundsPage() {
       const snap = await getDoc(codeRef);
       
       if (!snap.exists()) {
-        toast({ variant: "destructive", title: "Invalid Code" });
+        toast({ variant: "destructive", title: "Invalid Code", description: "Yeh code sahi nahi hai." });
         setIsRedeeming(false);
         return;
       }
 
       const data = snap.data();
       if (data.usedCount >= data.limit) {
-        toast({ variant: "destructive", title: "Limit Reached" });
+        toast({ variant: "destructive", title: "Limit Reached", description: "Yeh code ab khatam ho chuka hai." });
         setIsRedeeming(false);
         return;
       }
 
       if (data.usedBy && data.usedBy.includes(user.uid)) {
-        toast({ variant: "destructive", title: "Already Used" });
+        toast({ variant: "destructive", title: "Already Used", description: "Aapne yeh code pehle hi redeem kar liya hai." });
         setIsRedeeming(false);
         return;
       }
 
       const batch = writeBatch(db);
-      batch.update(codeRef, { usedCount: increment(1), usedBy: arrayUnion(user.uid) });
-      batch.update(doc(db, "users", user.uid), { balance: increment(data.amount) });
-      batch.set(doc(collection(db, "users", user.uid, "notifications")), {
+      batch.update(codeRef, { 
+        usedCount: increment(1), 
+        usedBy: arrayUnion(user.uid) 
+      });
+      batch.update(doc(db, "users", user.uid), { 
+        balance: increment(data.amount) 
+      });
+      
+      const notifRef = doc(collection(db, "users", user.uid, "notifications"));
+      batch.set(notifRef, {
         title: "🎁 Voucher Redeemed!",
         message: `₹${data.amount} added to your wallet via code: ${codeId}`,
         read: false,
@@ -190,10 +197,10 @@ export default function AddFundsPage() {
       });
 
       await batch.commit();
-      toast({ title: "Redeemed Successfully!", description: `₹${data.amount} added.` });
+      toast({ title: "Redeemed Successfully!", description: `₹${data.amount} aapke wallet mein add ho gaye hain.` });
       setRedeemCode("");
     } catch (e) {
-      toast({ variant: "destructive", title: "Error" });
+      toast({ variant: "destructive", title: "Error", description: "Kuch technical issue hai." });
     } finally {
       setIsRedeeming(false);
     }
@@ -291,7 +298,7 @@ export default function AddFundsPage() {
                     <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", req.status === 'Approved' ? "bg-emerald-100 text-emerald-600" : req.status === 'Rejected' ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600")}>
                       {req.status === 'Approved' ? <CheckCircle size={16} /> : req.status === 'Rejected' ? <XCircle size={16} /> : <Clock size={16} />}
                     </div>
-                    <div><p className="text-[11px] font-black text-slate-800">₹{req.amount}</p><p className="text-[8px] font-bold text-slate-400 uppercase">{req.utrId}</p></div>
+                    <div><p className="text-[11px] font-black text-slate-800">₹{req.finalCreditAmount || req.amount}</p><p className="text-[8px] font-bold text-slate-400 uppercase">{req.utrId}</p></div>
                   </div>
                   <Badge variant="outline" className={cn("text-[7px] font-black uppercase border-none px-2 h-4", req.status === 'Approved' ? "bg-emerald-50 text-emerald-600" : req.status === 'Rejected' ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600")}>{req.status}</Badge>
                 </div>
