@@ -30,6 +30,22 @@
       },
       "required": ["id", "userId", "amount", "utrId", "status", "createdAt"]
     },
+    "RedeemCode": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "RedeemCode",
+      "type": "object",
+      "description": "A code that can be redeemed for wallet balance.",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "amount": { "type": "number" },
+        "limit": { "type": "number" },
+        "usedCount": { "type": "number" },
+        "usedBy": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["code", "amount", "limit", "usedCount", "usedBy"]
+    },
     "SMMService": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "SMMService",
@@ -66,6 +82,14 @@
           "entityName": "FundRequest",
           "schema": { "$ref": "#/backend/entities/FundRequest" },
           "description": "Global fund addition requests."
+        }
+      },
+      {
+        "path": "/redeemCodes/{codeId}",
+        "definition": {
+          "entityName": "RedeemCode",
+          "schema": { "$ref": "#/backend/entities/RedeemCode" },
+          "description": "Wallet redeem codes."
         }
       },
       {

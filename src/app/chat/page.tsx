@@ -37,7 +37,8 @@ import {
   MessageSquareText,
   Package,
   Megaphone,
-  Gift
+  Gift,
+  ExternalLink
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { SMMService, Platform, PLATFORMS } from "@/app/lib/constants";
@@ -710,7 +711,14 @@ export default function ChatPage() {
           </header>
           <div className="p-8 space-y-6 text-center">
              <p className="text-[13px] font-bold text-slate-200 leading-relaxed italic">"{activeBroadcast?.text}"</p>
-             <Button onClick={() => setIsBroadcastOpen(false)} className="w-full h-12 bg-[#312ECB] text-white font-black uppercase tracking-widest rounded-2xl">Got it!</Button>
+             {activeBroadcast?.buttonUrl && (
+               <Button asChild className="w-full h-12 bg-white text-slate-900 font-black uppercase tracking-widest rounded-2xl gap-2 hover:bg-white/90">
+                 <a href={activeBroadcast.buttonUrl} target="_blank" rel="noopener noreferrer">
+                   {activeBroadcast.buttonText || "Open Link"} <ExternalLink size={14} />
+                 </a>
+               </Button>
+             )}
+             <Button onClick={() => setIsBroadcastOpen(false)} variant="ghost" className="w-full h-10 text-slate-500 font-black uppercase text-[10px] tracking-widest">Close</Button>
           </div>
         </DialogContent>
       </Dialog>

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -19,12 +20,13 @@ import {
   Send,
   Clock,
   CheckCircle,
-  XCircle
+  XCircle,
+  Ticket
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { doc, onSnapshot, collection, addDoc, serverTimestamp, query, where, orderBy } from "firebase/firestore";
+import { doc, onSnapshot, collection, addDoc, serverTimestamp, query, where, orderBy, getDoc, updateDoc, increment, arrayUnion, writeBatch } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -35,6 +37,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 export default function AddFundsPage() {
   const { user } = useUser();
@@ -44,7 +47,9 @@ export default function AddFundsPage() {
 
   const [amount, setAmount] = useState("");
   const [utrId, setUtrId] = useState("");
+  const [redeemCode, setRedeemCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isRedeeming, setIsRedeeming] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [globalBonus, setGlobalBonus] = useState(0);
   const [paymentConfig, setPaymentConfig] = useState<any>(null);
@@ -152,6 +157,65 @@ export default function AddFundsPage() {
       toast({ variant: "destructive", title: "Failed", description: "Try again later." });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRedeem = async () => {
+    if (!user || !db || !redeemCode) return;
+    setIsRedeeming(true);
+    const codeId = redeemCode.trim().toUpperCase();
+    
+    try {
+      const codeRef = doc(db, "redeemCodes", codeId);
+      const snap = await getDoc(codeRef);
+      
+      if (!snap.exists()) {
+        toast({ variant: "destructive", title: "Invalid Code", description: "This code does not exist." });
+        setIsRedeeming(false);
+        return;
+      }
+
+      const data = snap.data();
+      if (data.usedCount >= data.limit) {
+        toast({ variant: "destructive", title: "Code Expired", description: "This code's usage limit is reached." });
+        setIsRedeeming(false);
+        return;
+      }
+
+      if (data.usedBy && data.usedBy.includes(user.uid)) {
+        toast({ variant: "destructive", title: "Already Used", description: "You have already redeemed this code." });
+        setIsRedeeming(false);
+        return;
+      }
+
+      const batch = writeBatch(db);
+      
+      // 1. Update Code usage
+      batch.update(codeRef, {
+        usedCount: increment(1),
+        usedBy: arrayUnion(user.uid)
+      });
+
+      // 2. Add Balance
+      const userRef = doc(db, "users", user.uid);
+      batch.update(userRef, { balance: increment(data.amount) });
+
+      // 3. Notification
+      const notifRef = doc(collection(db, "users", user.uid, "notifications"));
+      batch.set(notifRef, {
+        title: "🎁 Voucher Redeemed!",
+        message: `₹${data.amount} added to your wallet via code: ${codeId}`,
+        read: false,
+        createdAt: serverTimestamp()
+      });
+
+      await batch.commit();
+      toast({ title: "Redeemed Successfully!", description: `₹${data.amount} has been added to your wallet.` });
+      setRedeemCode("");
+    } catch (e) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to redeem code." });
+    } finally {
+      setIsRedeeming(false);
     }
   };
 
@@ -272,6 +336,29 @@ export default function AddFundsPage() {
             >
               {loading ? <Loader2 className="animate-spin" size={12} /> : "Submit Request"}
               <CheckCircle2 size={12} />
+            </Button>
+          </div>
+        </div>
+
+        {/* Redeem Code Section */}
+        <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-50 space-y-4">
+          <div className="flex items-center gap-2">
+            <Ticket className="text-orange-500" size={16} />
+            <h3 className="text-[10px] font-black uppercase tracking-widest">Redeem Voucher</h3>
+          </div>
+          <div className="flex gap-2">
+            <Input 
+              placeholder="ENTER CODE" 
+              value={redeemCode}
+              onChange={e => setRedeemCode(e.target.value.toUpperCase())}
+              className="h-12 bg-slate-50 border-none rounded-2xl px-4 text-sm font-black shadow-inner flex-1"
+            />
+            <Button 
+              onClick={handleRedeem}
+              disabled={isRedeeming || !redeemCode}
+              className="h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl font-black text-[9px] uppercase tracking-widest px-6 shadow-md"
+            >
+              {isRedeeming ? <Loader2 className="animate-spin" size={14} /> : "Redeem"}
             </Button>
           </div>
         </div>

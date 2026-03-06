@@ -9,14 +9,16 @@ import {
   Send, 
   Zap,
   Layers,
-  X
+  X,
+  Link as LinkIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useUser, useFirestore } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
-import { doc, setDoc, serverTimestamp, onSnapshot, writeBatch } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { cn } from "@/lib/utils";
@@ -27,10 +29,10 @@ export default function BroadcastPage() {
   const { user, isUserLoading } = useUser();
   const db = useFirestore();
   const [activeSlot, setActiveSlot] = useState("slot1");
-  const [slotData, setSlotData] = useState<Record<string, { text: string; active: boolean }>>({
-    slot1: { text: "", active: false },
-    slot2: { text: "", active: false },
-    slot3: { text: "", active: false },
+  const [slotData, setSlotData] = useState<Record<string, { text: string; active: boolean; buttonText?: string; buttonUrl?: string }>>({
+    slot1: { text: "", active: false, buttonText: "", buttonUrl: "" },
+    slot2: { text: "", active: false, buttonText: "", buttonUrl: "" },
+    slot3: { text: "", active: false, buttonText: "", buttonUrl: "" },
   });
   const [isSending, setIsSending] = useState(false);
   const router = useRouter();
@@ -55,7 +57,12 @@ export default function BroadcastPage() {
           const data = snapshot.data();
           setSlotData(prev => ({
             ...prev,
-            [slotId]: { text: data.text || "", active: data.active || false }
+            [slotId]: { 
+              text: data.text || "", 
+              active: data.active || false,
+              buttonText: data.buttonText || "",
+              buttonUrl: data.buttonUrl || ""
+            }
           }));
         }
       });
@@ -74,6 +81,8 @@ export default function BroadcastPage() {
     setDoc(ref, {
       text: currentData.text,
       active: currentData.active,
+      buttonText: currentData.buttonText || "",
+      buttonUrl: currentData.buttonUrl || "",
       timestamp: serverTimestamp(),
       adminEmail: user?.email
     }, { merge: true })
@@ -95,7 +104,7 @@ export default function BroadcastPage() {
       .finally(() => setIsSending(false));
   };
 
-  const updateCurrentSlot = (updates: Partial<{ text: string; active: boolean }>) => {
+  const updateCurrentSlot = (updates: Partial<{ text: string; active: boolean; buttonText: string; buttonUrl: string }>) => {
     setSlotData(prev => ({
       ...prev,
       [activeSlot]: { ...prev[activeSlot], ...updates }
@@ -183,13 +192,40 @@ export default function BroadcastPage() {
         <div className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden">
           <div className="p-8 space-y-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Message Content (Slot {activeSlot.slice(-1)})</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Message Content</label>
               <Textarea 
                 value={slotData[activeSlot].text}
                 onChange={(e) => updateCurrentSlot({ text: e.target.value })}
                 placeholder="Type your announcement here..."
-                className="min-h-[180px] bg-slate-50 border-none rounded-2xl p-6 text-[14px] font-bold text-slate-700 placeholder:text-slate-300 shadow-inner focus-visible:ring-1 focus-visible:ring-[#312ECB]/20 resize-none"
+                className="min-h-[140px] bg-slate-50 border-none rounded-2xl p-6 text-[14px] font-bold text-slate-700 placeholder:text-slate-300 shadow-inner resize-none"
               />
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-1">
+                <LinkIcon size={14} className="text-[#312ECB]" />
+                <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Action Button (Optional)</span>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Button Text</label>
+                  <Input 
+                    value={slotData[activeSlot].buttonText || ""}
+                    onChange={(e) => updateCurrentSlot({ buttonText: e.target.value })}
+                    placeholder="e.g. Join Channel"
+                    className="h-11 bg-slate-50 border-none rounded-xl text-xs font-bold"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Button Link (URL)</label>
+                  <Input 
+                    value={slotData[activeSlot].buttonUrl || ""}
+                    onChange={(e) => updateCurrentSlot({ buttonUrl: e.target.value })}
+                    placeholder="https://..."
+                    className="h-11 bg-slate-50 border-none rounded-xl text-xs font-bold"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="space-y-4 pt-4">
@@ -198,9 +234,16 @@ export default function BroadcastPage() {
                   <span className="absolute left-1/2 -top-3 -translate-x-1/2 bg-white px-4 text-[10px] font-black text-slate-300 uppercase tracking-widest">Preview</span>
                 </div>
                 
-                <div className="w-full border-2 border-dashed border-slate-100 rounded-3xl p-6 min-h-[100px] flex items-center justify-center bg-slate-50/50">
+                <div className="w-full border-2 border-dashed border-slate-100 rounded-3xl p-6 min-h-[100px] flex flex-col items-center justify-center bg-slate-50/50 gap-4">
                   {slotData[activeSlot].text ? (
-                    <p className="text-sm font-bold text-slate-600 text-center whitespace-pre-wrap leading-relaxed">{slotData[activeSlot].text}</p>
+                    <>
+                      <p className="text-sm font-bold text-slate-600 text-center whitespace-pre-wrap leading-relaxed">{slotData[activeSlot].text}</p>
+                      {slotData[activeSlot].buttonUrl && (
+                        <Button className="h-10 bg-[#312ECB] text-white rounded-xl font-black text-[9px] px-6 uppercase tracking-widest">
+                          {slotData[activeSlot].buttonText || "Open Link"}
+                        </Button>
+                      )}
+                    </>
                   ) : (
                     <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Slot Empty</p>
                   )}
@@ -213,7 +256,7 @@ export default function BroadcastPage() {
             <div className="flex w-full gap-3">
               <Button 
                 variant="outline"
-                onClick={() => updateCurrentSlot({ text: "", active: false })}
+                onClick={() => updateCurrentSlot({ text: "", active: false, buttonText: "", buttonUrl: "" })}
                 className="flex-1 h-14 border-slate-200 text-slate-400 font-black text-[11px] uppercase tracking-widest rounded-2xl"
               >
                 Clear

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect } from "react";
@@ -15,7 +16,8 @@ import {
   Share2,
   Percent,
   ShieldCheck,
-  ChevronRight
+  ChevronRight,
+  Ticket
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -35,6 +37,7 @@ export default function AdminHub() {
     { title: "Live Tracker", icon: <LayoutGrid size={20} />, color: "bg-emerald-500", path: "/admin/tracker", desc: "Monitor orders" },
     { title: "SMM Services", icon: <Layers size={20} />, color: "bg-blue-500", path: "/admin/services", desc: "Manage catalog" },
     { title: "Fund Approvals", icon: <Wallet size={20} />, color: "bg-amber-500", path: "/admin/funds", desc: "Verify payments" },
+    { title: "Redeem Codes", icon: <Ticket size={20} />, color: "bg-orange-500", path: "/admin/redeem", desc: "Create vouchers" },
     { title: "Broadcasts", icon: <Megaphone size={20} />, color: "bg-[#312ECB]", path: "/admin/broadcast", desc: "Announcements" },
     { title: "Users List", icon: <Users size={20} />, color: "bg-slate-700", path: "/admin/users", desc: "Database access" },
     { title: "Payments", icon: <QrCode size={20} />, color: "bg-pink-500", path: "/admin/payment-settings", desc: "QR & UPI Setup" },
