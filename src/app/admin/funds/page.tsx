@@ -10,7 +10,8 @@ import {
   writeBatch,
   increment,
   serverTimestamp,
-  getDoc
+  getDoc,
+  where
 } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { 

@@ -36,7 +36,7 @@ service cloud.firestore {
       }
     }
 
-    // Fund Requests - Allow listing for the owner's query
+    // Fund Requests
     match /fundRequests/{requestId} {
       allow create: if isSignedIn();
       allow read, list: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
@@ -56,7 +56,7 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // Settings & Services
+    // Settings & Configs (Public Read)
     match /globalSettings/{settingsId} {
       allow read: if true;
       allow write: if isAdmin();
@@ -70,6 +70,10 @@ service cloud.firestore {
     match /globalAnnouncements/{announcementId} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    match /globalSettings/categories {
+      allow read: if true;
     }
 
     // Orders Collection Group
