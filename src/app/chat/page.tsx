@@ -228,6 +228,34 @@ export default function ChatPage() {
       return;
     }
 
+    if (text.includes("📲 PAY VIA UPI QR")) {
+      await addMessage('user', text);
+      botReply("Scan this QR to pay and submit UTR:", [], { 
+        isPaymentCard: true, 
+        paymentPrice: currentOrder.items[0].tempPrice,
+        rawPrice: currentOrder.items[0].tempRawPrice,
+        discountPct: currentOrder.items[0].tempDiscount,
+        serviceName: currentOrder.items[0].tempServiceName,
+        quantity: currentOrder.items[0].tempQty,
+        prefilledLinks: currentOrder.tempLinks?.join('\n') || ""
+      });
+      return;
+    }
+
+    if (text.includes("💳 PAY FROM WALLET")) {
+      await addMessage('user', text);
+      botReply("Confirm payment from your wallet balance:", [], { 
+        isWalletCard: true, 
+        paymentPrice: currentOrder.items[0].tempPrice,
+        rawPrice: currentOrder.items[0].tempRawPrice,
+        discountPct: currentOrder.items[0].tempDiscount,
+        serviceName: currentOrder.items[0].tempServiceName,
+        quantity: currentOrder.items[0].tempQty,
+        prefilledLinks: currentOrder.tempLinks?.join('\n') || ""
+      });
+      return;
+    }
+
     if (text.startsWith("SUBMIT_BULK_LINKS:")) {
       const linksArr = text.replace("SUBMIT_BULK_LINKS:", "").split('|').filter(l => l.trim());
       await addMessage('user', `Submitted ${linksArr.length} links.`);
@@ -246,12 +274,22 @@ export default function ChatPage() {
         const service = activeServices.find(ds => ds.id === id)!;
         return { service, quantity: parseInt(q), link: linksInput };
       });
+      const totalPrice = parseFloat(total);
       setCurrentOrder(p => ({ ...p, type: 'combo', items }));
-      setChatState('choosing_payment_method');
+      
       const opts: string[] = [];
       if (paymentConfig?.walletEnabled !== false) opts.push("💳 PAY FROM WALLET");
       if (paymentConfig?.upiEnabled !== false) opts.push("📲 PAY VIA UPI QR");
-      botReply(`✅ COMBO READY\nTotal Amount: ₹${parseFloat(total).toFixed(2)}`, opts, { paymentPrice: parseFloat(total), serviceName: "Combo Bundle", isCombo: true, prefilledLinks: linksInput });
+      
+      botReply(`✅ COMBO READY`, opts, { 
+        isSummaryCard: true,
+        paymentPrice: totalPrice, 
+        rawPrice: totalPrice / (1 - globalDiscounts.combo/100),
+        discountPct: globalDiscounts.combo,
+        serviceName: "Combo Bundle", 
+        isCombo: true, 
+        prefilledLinks: linksInput 
+      });
       return;
     }
 
@@ -335,19 +373,30 @@ export default function ChatPage() {
       const q = parseInt(text);
       if (isNaN(q) || q < currentOrder.items[0].service.minQuantity) { botReply(`⚠️ Invalid quantity. Minimum ${currentOrder.items[0].service.minQuantity} is required.`); return; }
       
-      setCurrentOrder(p => ({ ...p, items: [{ ...p.items[0], quantity: q }] }));
+      const multiplier = currentOrder.type === 'bulk' ? (currentOrder.tempLinks?.length || 1) : 1;
+      const raw = (q/1000) * currentOrder.items[0].service.pricePer1000 * multiplier;
+      const disc = globalDiscounts[currentOrder.type || 'single'];
+      const finalPrice = raw * (1 - disc/100);
+
+      // Save temp data for later
+      const updatedItems = [{ ...currentOrder.items[0], quantity: q, tempPrice: finalPrice, tempRawPrice: raw, tempDiscount: disc, tempServiceName: currentOrder.items[0].service.name, tempQty: q }];
+      setCurrentOrder(p => ({ ...p, items: updatedItems }));
       setChatState('choosing_payment_method');
       
       const opts: string[] = [];
       if (paymentConfig?.walletEnabled !== false) opts.push("💳 PAY FROM WALLET");
       if (paymentConfig?.upiEnabled !== false) opts.push("📲 PAY VIA UPI QR");
       
-      const multiplier = currentOrder.type === 'bulk' ? (currentOrder.tempLinks?.length || 1) : 1;
-      const raw = (q/1000) * currentOrder.items[0].service.pricePer1000 * multiplier;
-      const disc = globalDiscounts[currentOrder.type || 'single'];
-      const finalPrice = raw * (1 - disc/100);
-      
-      botReply(`✅ ORDER SUMMARY\nTotal Amount: ₹${finalPrice.toFixed(2)}\n\nPlease select payment method:`, opts, { paymentPrice: finalPrice, rawPrice: raw, discountPct: disc, serviceName: currentOrder.items[0].service.name, quantity: q, walletBalance, prefilledLinks: currentOrder.tempLinks?.join('\n') || "" });
+      botReply(`✅ ORDER SUMMARY`, opts, { 
+        isSummaryCard: true,
+        paymentPrice: finalPrice, 
+        rawPrice: raw, 
+        discountPct: disc, 
+        serviceName: currentOrder.items[0].service.name, 
+        quantity: q, 
+        walletBalance, 
+        prefilledLinks: currentOrder.tempLinks?.join('\n') || "" 
+      });
       return;
     }
   };
@@ -389,10 +438,11 @@ export default function ChatPage() {
             text={m.text} 
             options={m.options} 
             onOptionClick={handleSend} 
-            isPaymentCard={m.paymentPrice && !m.isSuccessCard && !m.isWalletCard}
+            isPaymentCard={m.isPaymentCard}
+            isSummaryCard={m.isSummaryCard}
             paymentPrice={m.paymentPrice}
             rawPrice={m.rawPrice}
-            isWalletCard={m.options?.includes("💳 PAY FROM WALLET")}
+            isWalletCard={m.isWalletCard}
             isComboConfigCard={m.isComboConfigCard} 
             isBulkLinkCard={m.isBulkLinkCard} 
             isSuccessCard={m.isSuccessCard} 

@@ -46,6 +46,7 @@ interface MessageBubbleProps {
   options?: string[];
   onOptionClick?: (option: string) => void;
   isPaymentCard?: boolean;
+  isSummaryCard?: boolean;
   paymentPrice?: number;
   rawPrice?: number;
   isWalletCard?: boolean;
@@ -72,6 +73,7 @@ export function MessageBubble({
   options, 
   onOptionClick,
   isPaymentCard,
+  isSummaryCard,
   paymentPrice,
   rawPrice,
   isWalletCard,
@@ -253,8 +255,6 @@ export function MessageBubble({
 
   if (!mounted) return null;
 
-  const hasPriceData = paymentPrice !== undefined && rawPrice !== undefined;
-
   return (
     <div className={cn("flex w-full mb-4", isUser ? "justify-end" : "justify-start")}>
       <div className={cn(
@@ -405,6 +405,26 @@ export function MessageBubble({
               </Button>
             </div>
           </div>
+        ) : isSummaryCard ? (
+          <div className="space-y-4 min-w-[260px] py-1">
+            <div className="flex items-center gap-2 px-1">
+              <CheckCircle2 size={16} className="text-emerald-500" />
+              <h3 className="text-[13px] font-black uppercase text-white tracking-tight">Order Summary</h3>
+            </div>
+            <OrderSummaryBreakdown />
+            {options && (
+              <div className="mt-4 space-y-2 px-1">
+                {options.map((opt, i) => (
+                  <button key={i} onClick={() => onOptionClick?.(opt)} className="w-full bg-slate-900 border border-white/5 p-3 rounded-2xl flex items-center justify-between group shadow-3d active:shadow-3d-pressed transition-all">
+                    <span className="text-[10px] font-black uppercase text-[#312ECB] tracking-widest">{opt}</span>
+                    <div className="w-7 h-7 rounded-xl bg-[#312ECB]/10 flex items-center justify-center text-[#312ECB] shadow-3d-sm group-hover:scale-110 transition-transform">
+                      <SendHorizonal size={12} />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         ) : isPaymentCard ? (
           <div className="space-y-5 min-w-[260px] py-1">
             <div className="bg-slate-950 p-4 rounded-[1.8rem] flex flex-col items-center gap-4 shadow-3d-pressed border border-white/5">
@@ -550,24 +570,13 @@ export function MessageBubble({
               )}
             </div>
           </div>
-        ) : hasPriceData ? (
-          <div className="space-y-4 min-w-[260px] py-1">
-            <div className="flex items-center gap-2 px-1">
-              <CheckCircle2 size={16} className="text-emerald-500" />
-              <h3 className="text-[13px] font-black uppercase text-white tracking-tight">Order Summary</h3>
-            </div>
-            <OrderSummaryBreakdown />
-            {text && !text.includes('SUMMARY') && (
-              <p className="text-[11px] font-bold text-slate-300 px-1 mt-2">{text}</p>
-            )}
-          </div>
         ) : (
           <div className="space-y-1">
             <p className="text-[12px] font-bold whitespace-pre-wrap leading-relaxed tracking-wide">{text}</p>
           </div>
         )}
 
-        {options && !isPaymentCard && !isWalletCard && !isComboConfigCard && !isBulkLinkCard && !isSuccessCard && (
+        {options && !isPaymentCard && !isWalletCard && !isComboConfigCard && !isBulkLinkCard && !isSuccessCard && !isSummaryCard && (
           <div className="mt-4 space-y-2">
             {options.map((opt, i) => (
               <button key={i} onClick={() => onOptionClick?.(opt)} className="w-full bg-slate-900 border border-white/5 p-3 rounded-2xl flex items-center justify-between group shadow-3d active:shadow-3d-pressed transition-all">
