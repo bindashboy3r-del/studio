@@ -197,17 +197,17 @@ export function MessageBubble({
   };
 
   const OrderSummaryBreakdown = () => (
-    <div className="bg-slate-950/90 backdrop-blur-xl rounded-[1.8rem] p-5 border border-white/10 shadow-3d-pressed space-y-4">
-      <div className="flex items-center gap-3 border-b border-white/5 pb-3">
-        <div className="w-10 h-10 rounded-xl bg-[#312ECB]/20 flex items-center justify-center text-[#312ECB]">
-          <Package size={20} />
+    <div className="bg-slate-950/90 backdrop-blur-xl rounded-[2rem] p-6 border border-white/10 shadow-3d-pressed space-y-5">
+      <div className="flex items-center gap-4 border-b border-white/5 pb-4">
+        <div className="w-12 h-12 rounded-2xl bg-[#312ECB]/20 flex items-center justify-center text-[#312ECB]">
+          <Package size={24} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[13px] font-black uppercase text-white truncate tracking-tight">{serviceName || 'Package'}</p>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Qty: {quantity || 'N/A'}</span>
+          <p className="text-sm font-black uppercase text-white truncate tracking-tight">{serviceName || 'Package'}</p>
+          <div className="flex items-center gap-2.5 mt-1">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Qty: {quantity || 'N/A'}</span>
             {isBulk && (
-              <Badge className="bg-purple-500/10 text-purple-400 border-none font-black text-[8px] px-2 h-4">
+              <Badge className="bg-purple-500/10 text-purple-400 border-none font-black text-[9px] px-2.5 h-5">
                 {linkCount} LINKS
               </Badge>
             )}
@@ -215,39 +215,39 @@ export function MessageBubble({
         </div>
       </div>
 
-      <div className="space-y-2.5">
+      <div className="space-y-3.5">
         <div className="flex justify-between items-center px-1">
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Real Price</span>
-          <span className="text-[11px] font-bold text-slate-400 line-through">₹{finalRawPrice.toFixed(2)}</span>
+          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Market Price</span>
+          <span className="text-xs font-bold text-slate-400 line-through">₹{finalRawPrice.toFixed(2)}</span>
         </div>
         <div className="flex justify-between items-center px-1">
-          <div className="flex items-center gap-1.5">
-            <TrendingDown size={14} className="text-emerald-400" />
-            <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Saved ({discountPct}%)</span>
+          <div className="flex items-center gap-2">
+            <TrendingDown size={16} className="text-emerald-400" />
+            <span className="text-[11px] font-bold text-emerald-500 uppercase tracking-wider">Offer ({discountPct}%)</span>
           </div>
-          <span className="text-[11px] font-black text-emerald-400">- ₹{savings.toFixed(2)}</span>
+          <span className="text-xs font-black text-emerald-400">- ₹{savings.toFixed(2)}</span>
         </div>
-        <div className="flex justify-between items-center pt-2.5 border-t border-white/10 px-1">
-          <span className="text-[11px] font-black text-white uppercase tracking-widest">Final Amount</span>
-          <span className="text-[18px] font-black text-[#312ECB] italic">₹{price.toFixed(2)}</span>
+        <div className="flex justify-between items-center pt-4 border-t border-white/10 px-1">
+          <span className="text-xs font-black text-white uppercase tracking-widest">Net Payable</span>
+          <span className="text-2xl font-black text-[#312ECB] italic">₹{price.toFixed(2)}</span>
         </div>
       </div>
 
-      <div className="bg-emerald-500/5 rounded-2xl p-3.5 flex items-center justify-between border border-emerald-500/10 shadow-inner mt-2">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-            <Wallet size={14} />
+      <div className="bg-emerald-500/5 rounded-2xl p-4 flex items-center justify-between border border-emerald-500/10 shadow-inner">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+            <Wallet size={16} />
           </div>
-          <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.1em]">Wallet Balance</span>
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Wallet</span>
         </div>
         <div className="text-right">
           <p className={cn(
-            "text-[12px] font-black tracking-tight",
+            "text-sm font-black tracking-tight",
             walletBalance >= price ? "text-emerald-400" : "text-red-400"
           )}>
             ₹{walletBalance.toFixed(2)}
           </p>
-          {walletBalance < price && <p className="text-[7px] font-black uppercase text-red-500 mt-0.5 animate-pulse">Low Balance</p>}
+          {walletBalance < price && <p className="text-[8px] font-black uppercase text-red-500 mt-1 animate-pulse">Insufficient</p>}
         </div>
       </div>
     </div>
@@ -256,45 +256,45 @@ export function MessageBubble({
   if (!mounted) return null;
 
   return (
-    <div className={cn("flex w-full mb-4", isUser ? "justify-end" : "justify-start")}>
+    <div className={cn("flex w-full mb-5", isUser ? "justify-end" : "justify-start")}>
       <div className={cn(
-        "max-w-[92%] px-4 py-3 relative border border-white/5", 
+        "max-w-[94%] px-5 py-4 relative border border-white/5", 
         isUser ? "bubble-user" : "bubble-bot"
       )}>
         
         {isBulkLinkCard ? (
-          <div className="space-y-5 min-w-[280px] py-2">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-8 h-8 rounded-lg bg-[#312ECB]/20 flex items-center justify-center text-[#312ECB]">
-                <Layers size={16} />
+          <div className="space-y-6 min-w-[290px] py-2">
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-10 h-10 rounded-2xl bg-[#312ECB]/20 flex items-center justify-center text-[#312ECB]">
+                <Layers size={20} />
               </div>
               <div>
-                <h3 className="text-[13px] font-black uppercase tracking-tight">Bulk Mode</h3>
-                <p className="text-[8px] font-black uppercase text-slate-500 tracking-widest">Add Multiple Target Links</p>
+                <h3 className="text-sm font-black uppercase tracking-tight">Bulk Order Setup</h3>
+                <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Add Multiple Target Links</p>
               </div>
             </div>
 
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2.5">
                 <Input 
                   placeholder="Enter target link here"
                   value={currentBulkLink}
                   onChange={(e) => setCurrentBulkLink(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && addBulkLink()}
-                  className="h-11 bg-slate-950 border-none rounded-xl text-xs font-bold text-white shadow-3d-pressed flex-1"
+                  className="h-12 bg-slate-950 border-none rounded-xl text-sm font-bold text-white shadow-3d-pressed flex-1"
                 />
-                <Button onClick={addBulkLink} size="icon" className="h-11 w-11 rounded-xl bg-[#312ECB] shadow-3d active:shadow-3d-pressed shrink-0">
-                  <Plus size={20} />
+                <Button onClick={addBulkLink} size="icon" className="h-12 w-12 rounded-xl bg-[#312ECB] shadow-3d active:shadow-3d-pressed shrink-0">
+                  <Plus size={24} />
                 </Button>
               </div>
 
               {bulkLinks.length > 0 && (
-                <div className="bg-slate-950/50 p-3 rounded-2xl border border-white/5 space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar">
+                <div className="bg-slate-950/50 p-4 rounded-2xl border border-white/5 space-y-2.5 max-h-[180px] overflow-y-auto custom-scrollbar">
                   {bulkLinks.map((link, idx) => (
-                    <div key={idx} className="flex items-center justify-between bg-slate-900 p-2.5 rounded-xl border border-white/5 group">
-                      <span className="text-[9px] font-bold text-slate-400 truncate max-w-[180px]">{link}</span>
+                    <div key={idx} className="flex items-center justify-between bg-slate-900 p-3 rounded-xl border border-white/5 group">
+                      <span className="text-[10px] font-bold text-slate-400 truncate max-w-[200px]">{link}</span>
                       <button onClick={() => removeBulkLink(idx)} className="text-red-500/50 hover:text-red-500 transition-colors shrink-0">
-                        <Trash2 size={12} />
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   ))}
@@ -311,52 +311,52 @@ export function MessageBubble({
                 onOptionClick?.(`SUBMIT_BULK_LINKS:${bulkLinks.join('|')}`);
               }}
               disabled={bulkLinks.length === 0}
-              className="w-full h-12 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-3d active:shadow-3d-pressed flex items-center justify-center gap-2"
+              className="w-full h-14 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-3d active:shadow-3d-pressed flex items-center justify-center gap-3"
             >
-              <CheckCircle2 size={16} /> SUBMIT {bulkLinks.length} LINKS
+              <CheckCircle2 size={18} /> CONFIRM {bulkLinks.length} LINKS
             </Button>
           </div>
         ) : isComboConfigCard ? (
-          <div className="space-y-5 min-w-[280px] py-2">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-8 h-8 rounded-lg bg-[#312ECB]/20 flex items-center justify-center text-[#312ECB]">
-                <Rocket size={16} />
+          <div className="space-y-6 min-w-[290px] py-2">
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-10 h-10 rounded-2xl bg-[#312ECB]/20 flex items-center justify-center text-[#312ECB]">
+                <Rocket size={20} />
               </div>
               <div>
-                <h3 className="text-[13px] font-black uppercase tracking-tight">Configure Combo</h3>
-                <Badge className="bg-emerald-500/10 text-emerald-400 border-none font-black text-[7px] px-2 mt-0.5">
-                  % {discountPct}% DISCOUNT ACTIVE
+                <h3 className="text-sm font-black uppercase tracking-tight">Combo Builder</h3>
+                <Badge className="bg-emerald-500/10 text-emerald-400 border-none font-black text-[8px] px-2.5 mt-1 tracking-widest">
+                  {discountPct}% AUTO-DISCOUNT
                 </Badge>
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               {comboItems.map((item) => (
-                <div key={item.service.id} className="bg-slate-950 p-4 rounded-[1.2rem] border border-white/5 shadow-3d-pressed relative">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-black uppercase text-[#312ECB] tracking-widest">{item.service.name}</span>
+                <div key={item.service.id} className="bg-slate-950 p-5 rounded-[1.8rem] border border-white/5 shadow-3d-pressed relative">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[11px] font-black uppercase text-[#312ECB] tracking-widest">{item.service.name}</span>
                     <button onClick={() => removeServiceFromCombo(item.service.id)} className="text-red-500/50 hover:text-red-500 transition-colors">
-                      <Trash2 size={12} />
+                      <Trash2 size={14} />
                     </button>
                   </div>
                   <Input 
                     placeholder={`Qty (Min ${item.service.minQuantity})`}
                     value={item.qty}
                     onChange={(e) => updateComboQty(item.service.id, e.target.value)}
-                    className="h-9 bg-slate-900 border-none rounded-xl text-xs font-bold text-white shadow-inner"
+                    className="h-11 bg-slate-900 border-none rounded-xl text-sm font-bold text-white shadow-inner"
                   />
                 </div>
               ))}
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="w-full h-10 border-dashed border-white/10 bg-transparent text-slate-500 font-black text-[9px] uppercase tracking-widest rounded-xl hover:bg-white/5">
-                    <Plus size={14} className="mr-2" /> Add Service
+                  <Button variant="outline" className="w-full h-12 border-dashed border-white/10 bg-transparent text-slate-500 font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-white/5">
+                    <Plus size={16} className="mr-2" /> Add Service to Pack
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-slate-900 border-white/10 rounded-xl max-h-[200px] overflow-y-auto custom-scrollbar">
+                <DropdownMenuContent className="bg-slate-900 border-white/10 rounded-xl max-h-[220px] overflow-y-auto custom-scrollbar">
                   {dynamicServices?.filter(s => !comboItems.find(i => i.service.id === s.id)).map(s => (
-                    <DropdownMenuItem key={s.id} onClick={() => addServiceToCombo(s)} className="text-[9px] font-black uppercase text-slate-300 focus:bg-[#312ECB] focus:text-white">
+                    <DropdownMenuItem key={s.id} onClick={() => addServiceToCombo(s)} className="text-[10px] font-black uppercase text-slate-300 focus:bg-[#312ECB] focus:text-white p-3">
                       {s.name}
                     </DropdownMenuItem>
                   ))}
@@ -364,27 +364,27 @@ export function MessageBubble({
               </DropdownMenu>
             </div>
 
-            <div className="space-y-3 pt-2">
-              <div className="space-y-1">
-                <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-widest">Target Link</label>
+            <div className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <label className="text-[9px] font-black uppercase text-slate-500 ml-1 tracking-widest">Target Link</label>
                 <div className="relative">
-                  <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={12} />
+                  <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" size={14} />
                   <Input 
                     placeholder="Enter target link here" 
                     value={links}
                     onChange={(e) => setLinks(e.target.value)}
-                    className="h-10 bg-slate-950 border-none rounded-xl pl-9 text-xs font-bold text-white shadow-3d-pressed"
+                    className="h-12 bg-slate-950 border-none rounded-xl pl-11 text-sm font-bold text-white shadow-3d-pressed"
                   />
                 </div>
               </div>
 
-              <div className="bg-slate-950/50 p-4 rounded-2xl space-y-1.5 border border-white/5 shadow-inner">
-                <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase">
+              <div className="bg-slate-950/50 p-5 rounded-[1.5rem] space-y-2.5 border border-white/5 shadow-inner">
+                <div className="flex justify-between items-center text-[11px] font-bold text-slate-500 uppercase">
                   <span>Subtotal:</span>
                   <span>₹{comboSubtotal.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between items-center text-[12px] font-black text-emerald-400 uppercase">
-                  <span>Combo Total ({discountPct}% OFF):</span>
+                <div className="flex justify-between items-center text-sm font-black text-emerald-400 uppercase tracking-tight">
+                  <span>Pay Only:</span>
                   <span>₹{comboTotal.toFixed(2)}</span>
                 </div>
               </div>
@@ -399,26 +399,26 @@ export function MessageBubble({
                   const itemsStr = comboItems.map(i => `${i.service.id},${i.qty}`).join('|');
                   onOptionClick?.(`SUBMIT_COMBO_CONFIG###${itemsStr}###${links}###${comboTotal}`);
                 }}
-                className="w-full h-12 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-3d active:shadow-3d-pressed"
+                className="w-full h-14 bg-[#312ECB] hover:bg-[#2825A6] text-white font-black text-[11px] uppercase tracking-widest rounded-2xl shadow-3d active:shadow-3d-pressed"
               >
-                Proceed to Payment
+                GENERATE COMBO SUMMARY
               </Button>
             </div>
           </div>
         ) : isSummaryCard ? (
-          <div className="space-y-4 min-w-[260px] py-1">
-            <div className="flex items-center gap-2 px-1">
-              <CheckCircle2 size={16} className="text-emerald-500" />
-              <h3 className="text-[13px] font-black uppercase text-white tracking-tight">Order Summary</h3>
+          <div className="space-y-5 min-w-[270px] py-1">
+            <div className="flex items-center gap-3 px-1">
+              <CheckCircle2 size={20} className="text-emerald-500" />
+              <h3 className="text-sm font-black uppercase text-white tracking-tight">Final Summary</h3>
             </div>
             <OrderSummaryBreakdown />
             {options && (
-              <div className="mt-4 space-y-2 px-1">
+              <div className="mt-5 space-y-3 px-1">
                 {options.map((opt, i) => (
-                  <button key={i} onClick={() => onOptionClick?.(opt)} className="w-full bg-slate-900 border border-white/5 p-3 rounded-2xl flex items-center justify-between group shadow-3d active:shadow-3d-pressed transition-all">
-                    <span className="text-[10px] font-black uppercase text-[#312ECB] tracking-widest">{opt}</span>
-                    <div className="w-7 h-7 rounded-xl bg-[#312ECB]/10 flex items-center justify-center text-[#312ECB] shadow-3d-sm group-hover:scale-110 transition-transform">
-                      <SendHorizonal size={12} />
+                  <button key={i} onClick={() => onOptionClick?.(opt)} className="w-full bg-slate-900 border border-white/5 p-4 rounded-2xl flex items-center justify-between group shadow-3d active:shadow-3d-pressed transition-all">
+                    <span className="text-[11px] font-black uppercase text-[#312ECB] tracking-widest">{opt}</span>
+                    <div className="w-8 h-8 rounded-xl bg-[#312ECB]/10 flex items-center justify-center text-[#312ECB] shadow-3d-sm group-hover:scale-110 transition-transform">
+                      <SendHorizonal size={14} />
                     </div>
                   </button>
                 ))}
@@ -426,78 +426,76 @@ export function MessageBubble({
             )}
           </div>
         ) : isPaymentCard ? (
-          <div className="space-y-5 min-w-[260px] py-1">
-            <div className="bg-slate-950 p-4 rounded-[1.8rem] flex flex-col items-center gap-4 shadow-3d-pressed border border-white/5">
-              <div className="bg-white p-2.5 rounded-2xl shadow-3d border border-white/20">
-                <img src={qrUrl} alt="UPI QR" className="w-32 h-32" />
+          <div className="space-y-6 min-w-[270px] py-1">
+            <div className="bg-slate-950 p-5 rounded-[2rem] flex flex-col items-center gap-5 shadow-3d-pressed border border-white/5">
+              <div className="bg-white p-3 rounded-[1.5rem] shadow-3d border border-white/20">
+                <img src={qrUrl} alt="UPI QR" className="w-40 h-40" />
               </div>
-              <div className="flex w-full gap-2.5 px-1">
-                <Button onClick={() => { navigator.clipboard.writeText(upiId); toast({ title: "Copied!" }); }} variant="outline" className="flex-1 h-10 text-[9px] font-black uppercase rounded-xl border-white/10 shadow-3d active:shadow-3d-pressed text-slate-300">
-                  <Copy size={12} className="mr-1.5" /> COPY UPI
+              <div className="flex w-full gap-3 px-1">
+                <Button onClick={() => { navigator.clipboard.writeText(upiId); toast({ title: "Copied!" }); }} variant="outline" className="flex-1 h-11 text-[10px] font-black uppercase rounded-xl border-white/10 shadow-3d active:shadow-3d-pressed text-slate-300">
+                  <Copy size={14} className="mr-2" /> COPY ID
                 </Button>
-                <Button onClick={handleDownloadQR} disabled={isDownloading} variant="outline" className="flex-1 h-10 text-[9px] font-black uppercase rounded-xl border-white/10 shadow-3d active:shadow-3d-pressed text-[#312ECB]">
-                  {isDownloading ? <Loader2 size={12} className="animate-spin mr-1.5" /> : <Download size={12} className="mr-1.5" />} SAVE QR
+                <Button onClick={handleDownloadQR} disabled={isDownloading} variant="outline" className="flex-1 h-11 text-[10px] font-black uppercase rounded-xl border-white/10 shadow-3d active:shadow-3d-pressed text-[#312ECB]">
+                  {isDownloading ? <Loader2 size={14} className="animate-spin mr-2" /> : <Download size={14} className="mr-2" />} SAVE QR
                 </Button>
               </div>
             </div>
 
-            <div className="space-y-4 px-1">
-              <div className="space-y-2">
+            <div className="space-y-5 px-1">
+              <div className="space-y-3">
                 {!isCombo && (
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-[0.2em]">Target Link</label>
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black uppercase text-slate-500 ml-1 tracking-widest">Target Link</label>
                     {isBulk ? (
-                      <div className="bg-slate-900/50 p-3 rounded-xl border border-white/5 shadow-inner">
-                         <p className="text-[9px] font-bold text-slate-400 leading-tight italic">{linkCount} target links submitted in this batch.</p>
+                      <div className="bg-slate-900/50 p-4 rounded-xl border border-white/5 shadow-inner">
+                         <p className="text-[10px] font-bold text-slate-400 leading-tight italic">{linkCount} target links submitted.</p>
                       </div>
                     ) : (
                       <div className="relative">
-                        <LinkIcon size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
-                        <Input placeholder="Enter target link here" value={links} onChange={(e) => setLinks(e.target.value)} className="h-11 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-xs pl-9 text-white" />
+                        <LinkIcon size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" />
+                        <Input placeholder="Enter target link here" value={links} onChange={(e) => setLinks(e.target.value)} className="h-12 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-sm pl-11 text-white" />
                       </div>
                     )}
                   </div>
                 )}
-                <div className="space-y-1 pt-1">
-                  <label className="text-[9px] font-black uppercase text-red-500 ml-1 leading-none animate-pulse tracking-tighter">Shi utr dalo varna payment verify nhi hoga</label>
-                  <Input placeholder="Enter 12-Digit UTR ID" value={utr} maxLength={12} onChange={(e) => setUtr(e.target.value.replace(/[^0-9]/g, ''))} className="h-11 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-black tracking-[0.3em] text-xs text-center text-white" />
+                <div className="space-y-2 pt-1">
+                  <label className="text-[10px] font-black uppercase text-red-500 ml-1 leading-none animate-pulse tracking-tighter">Shi utr dalo varna payment verify nhi hoga</label>
+                  <Input placeholder="12-Digit UTR ID" value={utr} maxLength={12} onChange={(e) => setUtr(e.target.value.replace(/[^0-9]/g, ''))} className="h-12 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-black tracking-[0.4em] text-sm text-center text-white" />
                 </div>
               </div>
               
-              <div className="flex flex-col gap-3">
-                <Button onClick={() => onOptionClick?.(`SUBMIT_PAYMENT###${links || prefilledLinks}###${utr}`)} disabled={(!isCombo && !links) || utr.length !== 12} className="w-full h-14 bg-[#312ECB] font-black text-[11px] uppercase tracking-[0.2em] rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10">
-                  VERIFY & SUBMIT
-                </Button>
-              </div>
+              <Button onClick={() => onOptionClick?.(`SUBMIT_PAYMENT###${links || prefilledLinks}###${utr}`)} disabled={(!isCombo && !links) || utr.length !== 12} className="w-full h-16 bg-[#312ECB] font-black text-xs uppercase tracking-[0.2em] rounded-[1.5rem] shadow-3d active:shadow-3d-pressed border border-white/10">
+                VERIFY & SUBMIT ORDER
+              </Button>
             </div>
           </div>
         ) : isWalletCard ? (
-          <div className="space-y-5 min-w-[260px] py-1">
+          <div className="space-y-6 min-w-[270px] py-1">
              <div className="flex items-center justify-between px-1">
-                <h3 className="text-[12px] font-black uppercase text-white tracking-tight flex items-center gap-2">
-                  <Wallet size={14} className="text-[#312ECB]" /> CONFIRM ORDER
+                <h3 className="text-sm font-black uppercase text-white tracking-tight flex items-center gap-3">
+                  <Wallet size={18} className="text-[#312ECB]" /> SECURE CHECKOUT
                 </h3>
-                <Badge className="bg-emerald-500/10 text-emerald-400 border-none font-black text-[8px] uppercase h-5">WALLET</Badge>
+                <Badge className="bg-emerald-500/10 text-emerald-400 border-none font-black text-[9px] uppercase h-6 px-3">WALLET</Badge>
              </div>
 
              <OrderSummaryBreakdown />
              
-             <div className="space-y-3 px-1">
+             <div className="space-y-4 px-1">
                 {!isCombo && (
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black uppercase text-slate-500 ml-1 tracking-[0.2em]">Target Link</label>
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black uppercase text-slate-500 ml-1 tracking-widest">Target Link</label>
                     {isBulk ? (
-                      <div className="bg-slate-900/50 p-3 rounded-xl border border-white/5 shadow-inner">
-                         <p className="text-[9px] font-bold text-slate-400 leading-tight italic">{linkCount} target links confirmed in this batch.</p>
+                      <div className="bg-slate-900/50 p-4 rounded-xl border border-white/5 shadow-inner">
+                         <p className="text-[10px] font-bold text-slate-400 leading-tight italic">{linkCount} target links confirmed.</p>
                       </div>
                     ) : (
                       <div className="relative">
-                        <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
+                        <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" size={14} />
                         <Input 
                           placeholder="Enter target link here" 
                           value={links} 
                           onChange={(e) => setLinks(e.target.value)} 
-                          className="h-11 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-xs pl-9 text-white" 
+                          className="h-12 rounded-xl bg-slate-950 border-none shadow-3d-pressed font-bold text-sm pl-11 text-white" 
                         />
                       </div>
                     )}
@@ -509,87 +507,85 @@ export function MessageBubble({
                     onClick={() => onOptionClick?.(`CONFIRM_WALLET###${links || prefilledLinks}`)} 
                     disabled={(!isCombo && !links) || walletBalance < price}
                     className={cn(
-                      "w-full h-14 font-black text-[11px] uppercase tracking-[0.2em] rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10 transition-all",
+                      "w-full h-16 font-black text-xs uppercase tracking-[0.2em] rounded-[1.5rem] shadow-3d active:shadow-3d-pressed border border-white/10 transition-all",
                       walletBalance >= price ? "bg-[#312ECB] text-white" : "bg-red-500/20 text-red-400 cursor-not-allowed border-red-500/20"
                     )}
                   >
-                    {walletBalance >= price ? "PLACE ORDER NOW" : "INSUFFICIENT BALANCE"}
+                    {walletBalance >= price ? "PLACE ORDER NOW" : "REFILL WALLET FIRST"}
                   </Button>
                   {walletBalance < price && (
-                    <p className="text-center text-[8px] font-black uppercase text-red-500 mt-2 animate-pulse">Refill wallet to proceed</p>
+                    <p className="text-center text-[9px] font-black uppercase text-red-500 mt-3 animate-pulse tracking-widest">Low balance detected!</p>
                   )}
                 </div>
              </div>
           </div>
         ) : isSuccessCard ? (
-          <div className="space-y-5 min-w-[280px] py-2">
-            <div className="text-center space-y-2">
-              <div className="w-14 h-14 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-2">
-                <CheckCircle2 className="text-emerald-500" size={32} />
+          <div className="space-y-6 min-w-[290px] py-2">
+            <div className="text-center space-y-3">
+              <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-2">
+                <CheckCircle2 className="text-emerald-500" size={40} />
               </div>
-              <h3 className="text-[15px] font-black uppercase text-white tracking-tight">Congratulations!</h3>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Your order is placed</p>
+              <h3 className="text-lg font-black uppercase text-white tracking-tight">Success!</h3>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Order has been queued</p>
             </div>
 
-            <div className="bg-slate-950/80 rounded-[1.5rem] p-4 border border-white/5 space-y-3 shadow-inner">
+            <div className="bg-slate-950/80 rounded-[2rem] p-5 border border-white/5 space-y-4 shadow-inner">
               <div className="flex justify-between">
-                <span className="text-[9px] font-bold text-slate-500 uppercase">Service:</span>
-                <span className="text-[10px] font-black text-[#312ECB] uppercase">{serviceName}</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Service</span>
+                <span className="text-xs font-black text-[#312ECB] uppercase">{serviceName}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-[9px] font-bold text-slate-500 uppercase">Quantity:</span>
-                <span className="text-[10px] font-black text-white">{quantity}</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Quantity</span>
+                <span className="text-xs font-black text-white">{quantity}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-[9px] font-bold text-slate-500 uppercase">Paid Amount:</span>
-                <span className="text-[10px] font-black text-emerald-400">₹{price.toFixed(2)}</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Total Paid</span>
+                <span className="text-xs font-black text-emerald-400">₹{price.toFixed(2)}</span>
               </div>
-              <div className="pt-2 border-t border-white/5">
-                <span className="text-[8px] font-bold text-slate-500 uppercase block mb-1">Target Link:</span>
-                <p className="text-[9px] font-medium text-slate-300 break-all">{links || prefilledLinks}</p>
+              <div className="pt-3 border-t border-white/5">
+                <span className="text-[9px] font-bold text-slate-500 uppercase block mb-1.5">Target</span>
+                <p className="text-[10px] font-medium text-slate-300 break-all leading-relaxed">{links || prefilledLinks}</p>
               </div>
             </div>
 
-            <div className="space-y-3">
-              <div className="flex gap-2.5">
-                <Button onClick={() => onOptionClick?.("menu")} variant="outline" className="w-full h-11 border-white/10 bg-slate-950 text-white font-black text-[9px] uppercase tracking-widest rounded-xl shadow-3d active:shadow-3d-pressed">
-                  MENU
-                </Button>
-              </div>
+            <div className="space-y-4">
+              <Button onClick={() => onOptionClick?.("menu")} variant="outline" className="w-full h-12 border-white/10 bg-slate-950 text-white font-black text-[10px] uppercase tracking-widest rounded-xl shadow-3d active:shadow-3d-pressed">
+                BACK TO MENU
+              </Button>
 
               {showWhatsAppSuccess && (
                 <div className="pt-2">
-                  <p className="text-center text-[8px] font-black text-slate-500 uppercase mb-2">Send order details to admin</p>
+                  <p className="text-center text-[9px] font-black text-slate-500 uppercase mb-3">Send snapshot to admin</p>
                   <Button 
                     onClick={handleWhatsAppConfirmation}
-                    className="w-full h-12 bg-[#25D366] hover:bg-[#1EBE57] text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10 gap-2"
+                    className="w-full h-14 bg-[#25D366] hover:bg-[#1EBE57] text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-3d active:shadow-3d-pressed border border-white/10 gap-3"
                   >
-                    <MessageCircle size={18} /> SEND ON WHATSAPP
+                    <MessageCircle size={20} /> WHATSAPP ADMIN
                   </Button>
                 </div>
               )}
             </div>
           </div>
         ) : (
-          <div className="space-y-1">
-            <p className="text-[12px] font-bold whitespace-pre-wrap leading-relaxed tracking-wide">{text}</p>
+          <div className="space-y-1.5">
+            <p className="text-sm font-bold whitespace-pre-wrap leading-relaxed tracking-wide">{text}</p>
           </div>
         )}
 
         {options && !isPaymentCard && !isWalletCard && !isComboConfigCard && !isBulkLinkCard && !isSuccessCard && !isSummaryCard && (
-          <div className="mt-4 space-y-2">
+          <div className="mt-5 space-y-3">
             {options.map((opt, i) => (
-              <button key={i} onClick={() => onOptionClick?.(opt)} className="w-full bg-slate-900 border border-white/5 p-3 rounded-2xl flex items-center justify-between group shadow-3d active:shadow-3d-pressed transition-all">
-                <span className="text-[10px] font-black uppercase text-[#312ECB] tracking-widest">{opt}</span>
-                <div className="w-7 h-7 rounded-xl bg-[#312ECB]/10 flex items-center justify-center text-[#312ECB] shadow-3d-sm group-hover:scale-110 transition-transform">
-                  <SendHorizonal size={12} />
+              <button key={i} onClick={() => onOptionClick?.(opt)} className="w-full bg-slate-900 border border-white/5 p-4 rounded-2xl flex items-center justify-between group shadow-3d active:shadow-3d-pressed transition-all">
+                <span className="text-[11px] font-black uppercase text-[#312ECB] tracking-widest">{opt}</span>
+                <div className="w-8 h-8 rounded-xl bg-[#312ECB]/10 flex items-center justify-center text-[#312ECB] shadow-3d-sm group-hover:scale-110 transition-transform">
+                  <SendHorizonal size={14} />
                 </div>
               </button>
             ))}
           </div>
         )}
 
-        <div className={cn("text-[7px] mt-2 font-black uppercase opacity-40 tracking-widest", isUser ? "text-right" : "text-left")}>
+        <div className={cn("text-[8px] mt-2.5 font-black uppercase opacity-40 tracking-widest", isUser ? "text-right" : "text-left")}>
           {format(timestamp, 'HH:mm')}
         </div>
       </div>

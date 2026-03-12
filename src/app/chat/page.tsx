@@ -61,6 +61,11 @@ interface OrderItem {
   service: SMMService;
   quantity: number;
   link: string;
+  tempPrice?: number;
+  tempRawPrice?: number;
+  tempDiscount?: number;
+  tempServiceName?: string;
+  tempQty?: number;
 }
 
 interface OrderInProgress {
@@ -204,7 +209,7 @@ export default function ChatPage() {
     if (!manualText) setInputValue("");
 
     const cleanText = text.toLowerCase();
-    const isMajorOption = cleanText.includes('single') || cleanText.includes('combo') || cleanText.includes('bulk');
+    const isMajorOption = cleanText.includes('single order') || cleanText.includes('combo order') || cleanText.includes('bulk order');
 
     if (isMajorOption) {
       await clearTrailMessages();
@@ -275,7 +280,16 @@ export default function ChatPage() {
         return { service, quantity: parseInt(q), link: linksInput };
       });
       const totalPrice = parseFloat(total);
-      setCurrentOrder(p => ({ ...p, type: 'combo', items }));
+      
+      const multiplier = 1; // Combo usually single link batch
+      const disc = globalDiscounts.combo;
+      const raw = totalPrice / (1 - disc / 100);
+
+      setCurrentOrder(p => ({ 
+        ...p, 
+        type: 'combo', 
+        items: items.map((it, idx) => idx === 0 ? { ...it, tempPrice: totalPrice, tempRawPrice: raw, tempDiscount: disc, tempServiceName: "Combo Bundle", tempQty: it.quantity } : it)
+      }));
       
       const opts: string[] = [];
       if (paymentConfig?.walletEnabled !== false) opts.push("💳 PAY FROM WALLET");
@@ -284,8 +298,8 @@ export default function ChatPage() {
       botReply(`✅ COMBO READY`, opts, { 
         isSummaryCard: true,
         paymentPrice: totalPrice, 
-        rawPrice: totalPrice / (1 - globalDiscounts.combo/100),
-        discountPct: globalDiscounts.combo,
+        rawPrice: raw,
+        discountPct: disc,
         serviceName: "Combo Bundle", 
         isCombo: true, 
         prefilledLinks: linksInput 
@@ -344,7 +358,7 @@ export default function ChatPage() {
       if (cleanText.includes('combo')) {
         await addMessage('user', "Combo Order");
         setCurrentOrder(p => ({ ...p, type: 'combo' }));
-        botReply(`✅ COMBO MODE\nI'll help you build a package. Use the config card below:`, [], { isComboConfigCard: true, discountPct: globalDiscounts.combo });
+        botReply(`✅ COMBO MODE\nI'll help you build a package. Use the card below:`, [], { isComboConfigCard: true, discountPct: globalDiscounts.combo });
         return;
       }
       if (cleanText.includes('bulk')) {
@@ -378,7 +392,6 @@ export default function ChatPage() {
       const disc = globalDiscounts[currentOrder.type || 'single'];
       const finalPrice = raw * (1 - disc/100);
 
-      // Save temp data for later
       const updatedItems = [{ ...currentOrder.items[0], quantity: q, tempPrice: finalPrice, tempRawPrice: raw, tempDiscount: disc, tempServiceName: currentOrder.items[0].service.name, tempQty: q }];
       setCurrentOrder(p => ({ ...p, items: updatedItems }));
       setChatState('choosing_payment_method');
@@ -405,32 +418,32 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-[100dvh] max-w-lg mx-auto whatsapp-bg font-body overflow-hidden">
-      <header className="glass-header px-3 py-1 flex items-center justify-between shadow-lg h-10 shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg bg-[#312ECB] flex items-center justify-center text-white shadow-3d"><Zap size={12} /></div>
-          <h1 className="text-[11px] font-black italic tracking-tighter text-white uppercase">SOCIALBOOST</h1>
+      <header className="glass-header px-4 py-2 flex items-center justify-between shadow-lg h-14 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl bg-[#312ECB] flex items-center justify-center text-white shadow-3d"><Zap size={16} /></div>
+          <h1 className="text-sm font-black italic tracking-tighter text-white uppercase">SOCIALBOOST</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => { markAllRead(); setIsNotifOpen(true); }} className="relative p-1 text-slate-400">
-            <Bell size={14} />
+        <div className="flex items-center gap-3">
+          <button onClick={() => { markAllRead(); setIsNotifOpen(true); }} className="relative p-1.5 text-slate-400">
+            <Bell size={18} />
             {unreadCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-red-500 text-white rounded-full flex items-center justify-center text-[7px] font-black border border-slate-900">
+              <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-[8px] font-black border border-slate-900">
                 {unreadCount}
               </span>
             )}
           </button>
-          <button onClick={() => router.push('/profile')} className="w-6 h-6 rounded-lg bg-slate-800 text-white font-black text-[9px] shadow-3d-sm">{currentUser?.displayName?.[0] || 'U'}</button>
+          <button onClick={() => router.push('/profile')} className="w-8 h-8 rounded-xl bg-slate-800 text-white font-black text-xs shadow-3d-sm">{currentUser?.displayName?.[0] || 'U'}</button>
         </div>
       </header>
 
-      <div className="bg-slate-900/50 px-3 py-0.5 flex items-center justify-between border-b border-white/5 h-6 shrink-0">
-        <button onClick={() => router.push('/add-funds')} className="flex items-center gap-1 bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/20">
-          <Wallet size={8} /><span className="text-[8px] font-black">₹{walletBalance.toFixed(0)}</span><PlusCircle size={8} />
+      <div className="bg-slate-900/50 px-4 py-1.5 flex items-center justify-between border-b border-white/5 h-10 shrink-0">
+        <button onClick={() => router.push('/add-funds')} className="flex items-center gap-2 bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-full border border-emerald-500/20">
+          <Wallet size={12} /><span className="text-[10px] font-black">₹{walletBalance.toFixed(0)}</span><PlusCircle size={10} />
         </button>
-        <button onClick={() => router.push('/orders')} className="text-[8px] font-black uppercase text-[#312ECB] flex items-center gap-1"><Package size={8} /> ORDERS</button>
+        <button onClick={() => router.push('/orders')} className="text-[10px] font-black uppercase text-[#312ECB] flex items-center gap-1.5"><Package size={12} /> ORDERS</button>
       </div>
 
-      <main className="flex-1 overflow-y-auto p-2 flex flex-col relative custom-scrollbar bg-slate-950/20">
+      <main className="flex-1 overflow-y-auto p-3 flex flex-col relative custom-scrollbar bg-slate-950/20">
         {messages?.map(m => (
           <MessageBubble 
             key={m.id} 
@@ -461,55 +474,55 @@ export default function ChatPage() {
         <div ref={scrollRef} />
       </main>
 
-      <footer className="p-1 bg-slate-900/80 backdrop-blur-xl border-t border-white/5 shrink-0">
-        <div className="flex items-center gap-2 bg-slate-950 rounded-xl p-1 h-8">
-          <Input value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSend()} placeholder="Ask something..." className="flex-1 bg-transparent border-none font-bold text-[10px] h-full text-white placeholder:text-slate-600 focus-visible:ring-0" />
-          <Button onClick={() => handleSend()} size="icon" className="rounded-lg h-6 w-6 bg-[#312ECB] shadow-3d"><Send size={10} /></Button>
+      <footer className="p-3 bg-slate-900/80 backdrop-blur-xl border-t border-white/5 shrink-0">
+        <div className="flex items-center gap-3 bg-slate-950 rounded-2xl p-1.5 h-14">
+          <Input value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSend()} placeholder="Ask something..." className="flex-1 bg-transparent border-none font-bold text-sm h-full text-white placeholder:text-slate-600 focus-visible:ring-0" />
+          <Button onClick={() => handleSend()} size="icon" className="rounded-xl h-11 w-11 bg-[#312ECB] shadow-3d"><Send size={18} /></Button>
         </div>
       </footer>
 
       <Dialog open={isBroadcastOpen} onOpenChange={setIsBroadcastOpen}>
-        <DialogContent className="max-w-[300px] rounded-[2rem] border-none shadow-2xl bg-[#030712] p-0 overflow-hidden">
-          <header className="bg-[#312ECB] p-3 text-white text-center">
-             <Megaphone size={18} className="mx-auto" />
-             <DialogTitle className="font-black uppercase text-[8px] tracking-widest mt-1">Official Update</DialogTitle>
+        <DialogContent className="max-w-[320px] rounded-[2.5rem] border-none shadow-2xl bg-[#030712] p-0 overflow-hidden">
+          <header className="bg-[#312ECB] p-4 text-white text-center">
+             <Megaphone size={24} className="mx-auto" />
+             <DialogTitle className="font-black uppercase text-xs tracking-widest mt-2">Official Update</DialogTitle>
           </header>
-          <div className="p-5 space-y-3 text-center">
-             <p className="text-[11px] font-bold text-slate-200 leading-relaxed italic">{activeBroadcast?.text}</p>
+          <div className="p-6 space-y-4 text-center">
+             <p className="text-sm font-bold text-slate-200 leading-relaxed italic">{activeBroadcast?.text}</p>
              {activeBroadcast?.buttonUrl && (
-               <Button asChild className="w-full h-9 bg-white text-slate-900 font-black uppercase text-[9px] rounded-lg gap-2 shadow-3d">
-                 <a href={activeBroadcast.buttonUrl} target="_blank" rel="noopener noreferrer">{activeBroadcast.buttonText || "Open"} <ExternalLink size={10} /></a>
+               <Button asChild className="w-full h-11 bg-white text-slate-900 font-black uppercase text-xs rounded-xl gap-2 shadow-3d">
+                 <a href={activeBroadcast.buttonUrl} target="_blank" rel="noopener noreferrer">{activeBroadcast.buttonText || "Open"} <ExternalLink size={14} /></a>
                </Button>
              )}
-             <Button onClick={() => setIsBroadcastOpen(false)} variant="ghost" className="w-full text-slate-500 font-black uppercase text-[8px] h-8">Close</Button>
+             <button onClick={() => setIsBroadcastOpen(false)} className="w-full text-slate-500 font-black uppercase text-[10px] h-10 tracking-widest">Dismiss</button>
           </div>
         </DialogContent>
       </Dialog>
 
       <Dialog open={isNotifOpen} onOpenChange={setIsNotifOpen}>
-        <DialogContent className="max-w-[320px] rounded-[2.5rem] border-none shadow-2xl bg-slate-950 p-0 overflow-hidden">
-          <header className="bg-[#312ECB] p-4 text-white flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Bell size={18} />
-              <DialogTitle className="font-black uppercase text-[10px] tracking-widest">Inbox</DialogTitle>
+        <DialogContent className="max-w-[340px] rounded-[2.5rem] border-none shadow-2xl bg-slate-950 p-0 overflow-hidden">
+          <header className="bg-[#312ECB] p-5 text-white flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Bell size={20} />
+              <DialogTitle className="font-black uppercase text-sm tracking-widest">Notifications</DialogTitle>
             </div>
-            <button onClick={() => setIsNotifOpen(false)}><X size={18} /></button>
+            <button onClick={() => setIsNotifOpen(false)}><X size={20} /></button>
           </header>
-          <ScrollArea className="h-[350px] p-4">
+          <ScrollArea className="h-[400px] p-5">
             {notifications.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {notifications.map((n) => (
-                  <div key={n.id} className={cn("p-3 rounded-2xl border transition-all", n.read ? "bg-slate-900/50 border-white/5" : "bg-white/5 border-[#312ECB]/20 shadow-lg")}>
-                    <h4 className="text-[11px] font-black text-[#312ECB] uppercase mb-1">{n.title}</h4>
-                    <p className="text-[10px] font-bold text-slate-300 leading-relaxed">{n.message}</p>
-                    <p className="text-[7px] font-black text-slate-500 uppercase mt-2">{n.createdAt?.toDate ? n.createdAt.toDate().toLocaleDateString() : 'Just now'}</p>
+                  <div key={n.id} className={cn("p-4 rounded-[1.5rem] border transition-all", n.read ? "bg-slate-900/50 border-white/5" : "bg-white/5 border-[#312ECB]/20 shadow-lg")}>
+                    <h4 className="text-xs font-black text-[#312ECB] uppercase mb-1">{n.title}</h4>
+                    <p className="text-[11px] font-bold text-slate-300 leading-relaxed">{n.message}</p>
+                    <p className="text-[8px] font-black text-slate-500 uppercase mt-2">{n.createdAt?.toDate ? n.createdAt.toDate().toLocaleDateString() : 'Just now'}</p>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full py-10 opacity-30">
-                <Bell size={40} className="mb-2" />
-                <p className="text-[9px] font-black uppercase">No notifications</p>
+              <div className="flex flex-col items-center justify-center h-full py-16 opacity-30">
+                <Bell size={48} className="mb-3" />
+                <p className="text-[10px] font-black uppercase tracking-widest">No updates yet</p>
               </div>
             )}
           </ScrollArea>
