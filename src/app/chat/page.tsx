@@ -1,178 +1,107 @@
 
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { 
   collection, 
-  addDoc, 
   query, 
   orderBy, 
-  serverTimestamp,
-  where,
-  onSnapshot,
-  doc,
-  writeBatch,
-  increment,
+  onSnapshot, 
+  doc, 
+  writeBatch, 
+  increment, 
+  serverTimestamp, 
   Timestamp,
-  deleteDoc,
-  updateDoc
+  addDoc
 } from "firebase/firestore";
-import { MessageBubble } from "@/components/chat/MessageBubble";
-import { TypingIndicator } from "@/components/chat/TypingIndicator";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { 
-  Send, 
-  Zap,
-  Wallet,
-  PlusCircle,
-  Bell,
-  Package,
-  Megaphone,
-  ExternalLink,
-  CheckCircle2,
-  X
-} from "lucide-react";
 import { useRouter } from "next/navigation";
-import { SMMService, Platform, PLATFORMS } from "@/app/lib/constants";
-import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from "@/firebase";
+import { 
+  Zap, 
+  Wallet, 
+  PlusCircle, 
+  Bell, 
+  Package, 
+  Gift, 
+  LayoutGrid, 
+  ShoppingCart,
+  ChevronRight,
+  TrendingUp,
+  History,
+  Info,
+  Clock,
+  CheckCircle2,
+  X,
+  CreditCard,
+  QrCode,
+  Link as LinkIcon
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
+import { SMMService, PLATFORMS } from "@/app/lib/constants";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle 
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { BottomNav } from "@/components/layout/BottomNav";
 
-type ChatState = 
-  | 'idle' 
-  | 'initial'
-  | 'choosing_platform'
-  | 'choosing_order_type'
-  | 'bulk_adding_links'
-  | 'choosing_service' 
-  | 'entering_quantity' 
-  | 'choosing_payment_method';
-
-interface OrderItem {
-  service: SMMService;
-  quantity: number;
-  link: string;
-  tempPrice?: number;
-  tempRawPrice?: number;
-  tempDiscount?: number;
-  tempServiceName?: string;
-  tempQty?: number;
-}
-
-interface OrderInProgress {
-  type: 'single' | 'combo' | 'bulk';
-  platform: Platform;
-  items: OrderItem[];
-  tempLinks?: string[];
-}
-
-export default function ChatPage() {
+export default function DashboardPage() {
   const { user: currentUser, isUserLoading } = useUser();
   const db = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
-  
-  const [inputValue, setInputValue] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  const [chatState, setChatState] = useState<ChatState>('idle');
-  const [currentOrder, setCurrentOrder] = useState<OrderInProgress>({
-    type: 'single',
-    platform: 'instagram',
-    items: []
-  });
-  
-  const [isOrdersOpen, setIsOrdersOpen] = useState(false);
-  const [isNotifOpen, setIsNotifOpen] = useState(false);
-  const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
 
+  // States
   const [activeBroadcast, setActiveBroadcast] = useState<any>(null);
   const [globalDiscounts, setGlobalDiscounts] = useState({ single: 0, combo: 0, bulk: 0 });
   const [paymentConfig, setPaymentConfig] = useState<any>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
-  const [sessionStart, setSessionStart] = useState<Timestamp | null>(null);
-  
-  const hasInitialGreeted = useRef(false);
-  const hasBroadcastShown = useRef(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    setSessionStart(Timestamp.fromDate(new Date()));
-  }, []);
-
+  // Auth Protection
   useEffect(() => {
     if (!isUserLoading && !currentUser) router.push("/");
   }, [currentUser, isUserLoading, router]);
 
-  const servicesQuery = useMemoFirebase(() => {
-    if (!db || !currentUser) return null;
-    return query(collection(db, "services"), orderBy("order", "asc"));
-  }, [db, currentUser]);
-  const { data: rawDynamicServices } = useCollection<SMMService>(servicesQuery);
-
-  const activeServices = useMemo(() => {
-    if (!rawDynamicServices) return [];
-    return [...rawDynamicServices].filter(s => s.isActive !== false).sort((a, b) => (a.order || 0) - (b.order || 0));
-  }, [rawDynamicServices]);
-
-  const availablePlatforms = useMemo(() => {
-    const platforms = new Set<Platform>();
-    activeServices.forEach(s => { if (s.platform) platforms.add(s.platform); });
-    return Array.from(platforms);
-  }, [activeServices]);
-
+  // Data Fetching
   const { data: userData } = useDoc(useMemoFirebase(() => currentUser && db ? doc(db, "users", currentUser.uid) : null, [db, currentUser]));
   const walletBalance = userData?.balance || 0;
 
   useEffect(() => {
-    if (!db || !currentUser) return; 
-    
-    const unsubBroadcast = onSnapshot(query(collection(db, "globalAnnouncements"), where("active", "==", true)), (snap) => {
-      if (!snap.empty) {
-        const docs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
-        docs.sort((a, b) => (b.timestamp?.toMillis?.() || 0) - (a.timestamp?.toMillis?.() || 0));
-        setActiveBroadcast(docs[0]);
-        if (!hasBroadcastShown.current) { setIsBroadcastOpen(true); hasBroadcastShown.current = true; }
-      }
+    if (!db || !currentUser) return;
+
+    // Broadcasts
+    const unsubBroadcast = onSnapshot(query(collection(db, "globalAnnouncements"), orderBy("timestamp", "desc")), (snap) => {
+      if (!snap.empty) setActiveBroadcast(snap.docs[0].data());
     });
 
+    // Global Discounts
     onSnapshot(doc(db, "globalSettings", "discounts"), (snap) => {
-      if (snap.exists()) setGlobalDiscounts({ single: snap.data().single || 0, combo: snap.data().combo || 0, bulk: snap.data().bulk || 0 });
+      if (snap.exists()) setGlobalDiscounts({ 
+        single: snap.data().single || 0, 
+        combo: snap.data().combo || 0, 
+        bulk: snap.data().bulk || 0 
+      });
     });
 
-    onSnapshot(doc(db, "globalSettings", "payment"), (snap) => { if (snap.exists()) setPaymentConfig(snap.data()); });
-    
+    // Notifications
     const qNotif = query(collection(db, "users", currentUser.uid, "notifications"), orderBy("createdAt", "desc"));
-    const unsubNotif = onSnapshot(qNotif, (snap) => {
-      setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    onSnapshot(qNotif, (snap) => setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
-    return () => { unsubBroadcast(); unsubNotif(); };
+    // Recent Orders
+    const qOrders = query(collection(db, "users", currentUser.uid, "orders"), orderBy("createdAt", "desc"));
+    onSnapshot(qOrders, (snap) => setRecentOrders(snap.docs.slice(0, 3).map(d => ({ id: d.id, ...d.data() }))));
+
+    return () => unsubBroadcast();
   }, [db, currentUser]);
-
-  const { data: messages, isLoading: isMessagesLoading } = useCollection(useMemoFirebase(() => db && currentUser && sessionStart ? query(collection(db, "users", currentUser.uid, "chatMessages"), where("timestamp", ">=", sessionStart), orderBy("timestamp", "asc")) : null, [db, currentUser, sessionStart]));
-
-  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollIntoView({ behavior: "smooth" }); }, [messages, isTyping]);
-
-  const clearTrailMessages = async () => {
-    if (!currentUser || !db || !messages) return;
-    const batch = writeBatch(db);
-    messages.forEach(m => {
-      if (!m.isPermanent) {
-        batch.delete(doc(db, "users", currentUser.uid, "chatMessages", m.id));
-      }
-    });
-    await batch.commit();
-  };
 
   const markAllRead = async () => {
     if (!db || !currentUser) return;
@@ -183,328 +112,186 @@ export default function ChatPage() {
     await batch.commit();
   };
 
-  const addMessage = async (sender: 'user' | 'bot', text: string, options?: string[], extraData?: any) => {
-    if (!currentUser || !db) return;
-    return addDoc(collection(db, "users", currentUser.uid, "chatMessages"), { sender, text, options: options || [], timestamp: serverTimestamp(), userId: currentUser.uid, ...extraData });
-  };
-
-  const botReply = async (text: string, options?: string[], extraData?: any) => {
-    setIsTyping(true);
-    setTimeout(async () => { await addMessage('bot', text, options, extraData); setIsTyping(false); }, 600);
-  };
-
-  useEffect(() => {
-    if (currentUser && !isMessagesLoading && !hasInitialGreeted.current && sessionStart) {
-      hasInitialGreeted.current = true;
-      if (!messages?.length) { 
-        setChatState('initial'); 
-        botReply("Send 'Hi' to grow your social media! 🚀", [], { isInitialGreeting: true, isPermanent: true }); 
-      }
-    }
-  }, [currentUser, isMessagesLoading, messages, sessionStart]);
-
-  const handleSend = async (manualText?: string) => {
-    const text = manualText || inputValue.trim();
-    if (!text || !db || !currentUser) return;
-    if (!manualText) setInputValue("");
-
-    const cleanText = text.toLowerCase();
-    const isMajorOption = cleanText.includes('single order') || cleanText.includes('combo order') || cleanText.includes('bulk order');
-
-    if (isMajorOption) {
-      await clearTrailMessages();
-    }
-
-    if (cleanText === 'hi' || cleanText === 'menu') {
-      await addMessage('user', text);
-      if (availablePlatforms.length > 1) {
-        setChatState('choosing_platform');
-        botReply("Select your platform to continue:", availablePlatforms.map((p, i) => `${i + 1}. ${PLATFORMS[p]}`), { isPermanent: true });
-      } else {
-        const p = availablePlatforms[0] || 'instagram';
-        setCurrentOrder(prev => ({ ...prev, platform: p }));
-        setChatState('choosing_order_type');
-        botReply(`Pick for ${PLATFORMS[p]}:`, [
-          `1. SINGLE ORDER (${globalDiscounts.single}% OFF)`, 
-          `2. COMBO ORDER (${globalDiscounts.combo}% OFF 🎁)`, 
-          `3. BULK ORDER (${globalDiscounts.bulk}% OFF)`
-        ], { isPermanent: true });
-      }
-      return;
-    }
-
-    if (text.includes("📲 PAY VIA UPI QR")) {
-      await addMessage('user', text);
-      botReply("Scan this QR to pay and submit UTR:", [], { 
-        isPaymentCard: true, 
-        paymentPrice: currentOrder.items[0].tempPrice,
-        rawPrice: currentOrder.items[0].tempRawPrice,
-        discountPct: currentOrder.items[0].tempDiscount,
-        serviceName: currentOrder.items[0].tempServiceName,
-        quantity: currentOrder.items[0].tempQty,
-        prefilledLinks: currentOrder.tempLinks?.join('\n') || ""
-      });
-      return;
-    }
-
-    if (text.includes("💳 PAY FROM WALLET")) {
-      await addMessage('user', text);
-      botReply("Confirm payment from your wallet balance:", [], { 
-        isWalletCard: true, 
-        paymentPrice: currentOrder.items[0].tempPrice,
-        rawPrice: currentOrder.items[0].tempRawPrice,
-        discountPct: currentOrder.items[0].tempDiscount,
-        serviceName: currentOrder.items[0].tempServiceName,
-        quantity: currentOrder.items[0].tempQty,
-        prefilledLinks: currentOrder.tempLinks?.join('\n') || ""
-      });
-      return;
-    }
-
-    if (text.startsWith("SUBMIT_BULK_LINKS:")) {
-      const linksArr = text.replace("SUBMIT_BULK_LINKS:", "").split('|').filter(l => l.trim());
-      await addMessage('user', `Submitted ${linksArr.length} links.`);
-      setCurrentOrder(p => ({ ...p, tempLinks: linksArr }));
-      setChatState('choosing_service');
-      const filtered = activeServices.filter(s => s.platform === currentOrder.platform);
-      botReply(`✅ Links Saved! Now pick a service:`, filtered.map((s, i) => `${i + 1}. ${s.name}`));
-      return;
-    }
-
-    if (text.startsWith("SUBMIT_COMBO_CONFIG###")) {
-      const [, itemsStr, linksInput, total] = text.split("###");
-      await addMessage('user', "Proceeding with Combo package...");
-      const items = itemsStr.split('|').map(s => {
-        const [id, q] = s.split(',');
-        const service = activeServices.find(ds => ds.id === id)!;
-        return { service, quantity: parseInt(q), link: linksInput };
-      });
-      const totalPrice = parseFloat(total);
-      
-      const multiplier = 1; // Combo usually single link batch
-      const disc = globalDiscounts.combo;
-      const raw = totalPrice / (1 - disc / 100);
-
-      setCurrentOrder(p => ({ 
-        ...p, 
-        type: 'combo', 
-        items: items.map((it, idx) => idx === 0 ? { ...it, tempPrice: totalPrice, tempRawPrice: raw, tempDiscount: disc, tempServiceName: "Combo Bundle", tempQty: it.quantity } : it)
-      }));
-      
-      const opts: string[] = [];
-      if (paymentConfig?.walletEnabled !== false) opts.push("💳 PAY FROM WALLET");
-      if (paymentConfig?.upiEnabled !== false) opts.push("📲 PAY VIA UPI QR");
-      
-      botReply(`✅ COMBO READY`, opts, { 
-        isSummaryCard: true,
-        paymentPrice: totalPrice, 
-        rawPrice: raw,
-        discountPct: disc,
-        serviceName: "Combo Bundle", 
-        isCombo: true, 
-        prefilledLinks: linksInput 
-      });
-      return;
-    }
-
-    if (text.startsWith("SUBMIT_PAYMENT###") || text.startsWith("CONFIRM_WALLET###")) {
-      const isWallet = text.startsWith("CONFIRM_WALLET###");
-      const parts = text.split("###");
-      const linksInput = parts[1];
-      const utr = parts[2] || "";
-      await addMessage('user', isWallet ? "Confirming payment via wallet..." : "Submitted payment proof", [], { isPermanent: true });
-      
-      const type = currentOrder.type || 'single';
-      const disc = globalDiscounts[type] || 0;
-      const linksArr = linksInput.split('\n').filter(l => l.trim());
-      let totalPrice = 0; let serviceNames = ""; let qty = 0;
-
-      if (type === 'combo') {
-        const base = currentOrder.items.reduce((acc, item) => acc + (item.quantity / 1000) * (item.service.pricePer1000 || 0), 0);
-        totalPrice = base * (1 - disc / 100); serviceNames = "Combo Bundle"; qty = currentOrder.items[0].quantity;
-      } else {
-        const s = currentOrder.items[0].service; qty = currentOrder.items[0].quantity;
-        totalPrice = (qty / 1000) * (s.pricePer1000 || 0) * (1 - disc / 100) * linksArr.length; serviceNames = s.name;
-      }
-
-      if (isWallet && walletBalance < totalPrice) { botReply("❌ Insufficient Wallet Balance! Please refill."); return; }
-
-      const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}`;
-      const batch = writeBatch(db);
-      if (isWallet) batch.update(doc(db, "users", currentUser.uid), { balance: increment(-totalPrice) });
-      
-      batch.set(doc(collection(db, "users", currentUser.uid, "orders")), {
-        orderId, service: serviceNames, quantity: qty, price: totalPrice,
-        status: isWallet ? 'Processing' : 'Pending', type: isWallet ? 'API' : 'Manual',
-        links: linksArr, utrId: utr, platform: currentOrder.platform, createdAt: serverTimestamp(),
-        autoCompleteAt: Timestamp.fromDate(new Date(Date.now() + 45 * 60 * 1000))
-      });
-      await batch.commit();
-
-      botReply("Order Placed Successfully! 🚀", [], { orderId, isPermanent: true, isSuccessCard: true, showWhatsAppSuccess: !isWallet, paymentPrice: totalPrice, serviceName: serviceNames, quantity: qty, prefilledLinks: linksInput });
-      setChatState('idle');
-      return;
-    }
-
-    if (isMajorOption) {
-      if (cleanText.includes('single')) {
-        await addMessage('user', "Single Order");
-        setCurrentOrder(p => ({ ...p, type: 'single' }));
-        setChatState('choosing_service');
-        const filtered = activeServices.filter(s => s.platform === currentOrder.platform);
-        botReply(`✅ SINGLE MODE\nChoose a service:`, filtered.map((s, i) => `${i + 1}. ${s.name}`));
-        return;
-      }
-      if (cleanText.includes('combo')) {
-        await addMessage('user', "Combo Order");
-        setCurrentOrder(p => ({ ...p, type: 'combo' }));
-        botReply(`✅ COMBO MODE\nI'll help you build a package. Use the card below:`, [], { isComboConfigCard: true, discountPct: globalDiscounts.combo });
-        return;
-      }
-      if (cleanText.includes('bulk')) {
-        await addMessage('user', "Bulk Order");
-        setCurrentOrder(p => ({ ...p, type: 'bulk' }));
-        setChatState('bulk_adding_links');
-        botReply(`✅ BULK MODE\nPlease add multiple Target Links first:`, [], { isBulkLinkCard: true });
-        return;
-      }
-    }
-
-    const filtered = activeServices.filter(s => s.platform === currentOrder.platform);
-    const serviceMatch = filtered.find((s, i) => cleanText.includes(s.name.toLowerCase()) || (chatState === 'choosing_service' && cleanText === (i + 1).toString()));
-    
-    if (serviceMatch) {
-      await addMessage('user', serviceMatch.name);
-      setCurrentOrder(p => ({ ...p, items: [{ service: serviceMatch, quantity: 0, link: '' }] }));
-      setChatState('entering_quantity');
-      botReply(`📊 How many ${serviceMatch.name} do you want? (Min: ${serviceMatch.minQuantity})`);
-      return;
-    }
-
-    await addMessage('user', text);
-    
-    if (chatState === 'entering_quantity') {
-      const q = parseInt(text);
-      if (isNaN(q) || q < currentOrder.items[0].service.minQuantity) { botReply(`⚠️ Invalid quantity. Minimum ${currentOrder.items[0].service.minQuantity} is required.`); return; }
-      
-      const multiplier = currentOrder.type === 'bulk' ? (currentOrder.tempLinks?.length || 1) : 1;
-      const raw = (q/1000) * currentOrder.items[0].service.pricePer1000 * multiplier;
-      const disc = globalDiscounts[currentOrder.type || 'single'];
-      const finalPrice = raw * (1 - disc/100);
-
-      const updatedItems = [{ ...currentOrder.items[0], quantity: q, tempPrice: finalPrice, tempRawPrice: raw, tempDiscount: disc, tempServiceName: currentOrder.items[0].service.name, tempQty: q }];
-      setCurrentOrder(p => ({ ...p, items: updatedItems }));
-      setChatState('choosing_payment_method');
-      
-      const opts: string[] = [];
-      if (paymentConfig?.walletEnabled !== false) opts.push("💳 PAY FROM WALLET");
-      if (paymentConfig?.upiEnabled !== false) opts.push("📲 PAY VIA UPI QR");
-      
-      botReply(`✅ ORDER SUMMARY`, opts, { 
-        isSummaryCard: true,
-        paymentPrice: finalPrice, 
-        rawPrice: raw, 
-        discountPct: disc, 
-        serviceName: currentOrder.items[0].service.name, 
-        quantity: q, 
-        walletBalance, 
-        prefilledLinks: currentOrder.tempLinks?.join('\n') || "" 
-      });
-      return;
-    }
-  };
-
   const unreadCount = notifications.filter(n => !n.read).length;
 
+  if (isUserLoading) return <div className="min-h-screen flex items-center justify-center bg-[#030712]"><Zap className="animate-pulse text-[#312ECB]" size={40} /></div>;
+
   return (
-    <div className="flex flex-col h-[100dvh] max-w-lg mx-auto whatsapp-bg font-body overflow-hidden">
-      <header className="glass-header px-4 py-2 flex items-center justify-between shadow-lg h-14 shrink-0">
+    <div className="min-h-screen bg-[#030712] font-body text-slate-100 pb-24">
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-[#030712]/80 backdrop-blur-xl border-b border-white/5 px-5 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-[#312ECB] flex items-center justify-center text-white shadow-3d"><Zap size={16} /></div>
-          <h1 className="text-sm font-black italic tracking-tighter text-white uppercase">SOCIALBOOST</h1>
+          <div className="w-10 h-10 rounded-2xl bg-[#312ECB] flex items-center justify-center text-white shadow-lg">
+            <Zap size={20} className="fill-current" />
+          </div>
+          <div>
+            <h1 className="text-base font-black italic tracking-tighter text-white uppercase">SOCIALBOOST</h1>
+            <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Premium SMM Dashboard</p>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => { markAllRead(); setIsNotifOpen(true); }} className="relative p-1.5 text-slate-400">
-            <Bell size={18} />
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => { markAllRead(); setIsNotifOpen(true); }} 
+            className="relative p-2.5 bg-white/5 rounded-xl border border-white/5 text-slate-400"
+          >
+            <Bell size={20} />
             {unreadCount > 0 && (
-              <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-[8px] font-black border border-slate-900">
+              <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-[8px] font-black border-2 border-[#030712]">
                 {unreadCount}
               </span>
             )}
           </button>
-          <button onClick={() => router.push('/profile')} className="w-8 h-8 rounded-xl bg-slate-800 text-white font-black text-xs shadow-3d-sm">{currentUser?.displayName?.[0] || 'U'}</button>
+          <button onClick={() => router.push('/profile')} className="w-10 h-10 rounded-xl bg-slate-800 border border-white/10 flex items-center justify-center text-white font-black text-sm uppercase">
+            {currentUser?.displayName?.[0] || 'U'}
+          </button>
         </div>
       </header>
 
-      <div className="bg-slate-900/50 px-4 py-1.5 flex items-center justify-between border-b border-white/5 h-10 shrink-0">
-        <button onClick={() => router.push('/add-funds')} className="flex items-center gap-2 bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-full border border-emerald-500/20">
-          <Wallet size={12} /><span className="text-[10px] font-black">₹{walletBalance.toFixed(0)}</span><PlusCircle size={10} />
-        </button>
-        <button onClick={() => router.push('/orders')} className="text-[10px] font-black uppercase text-[#312ECB] flex items-center gap-1.5"><Package size={12} /> ORDERS</button>
-      </div>
+      <main className="max-w-md mx-auto p-5 space-y-6">
+        {/* Wallet Card */}
+        <div className="bg-gradient-to-br from-[#312ECB] to-[#1E1B8F] rounded-[2.5rem] p-7 text-white shadow-2xl relative overflow-hidden">
+          <div className="relative z-10 space-y-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-[10px] font-black text-white/60 uppercase tracking-widest mb-1">Available Balance</p>
+                <h2 className="text-4xl font-black italic tracking-tight">₹{walletBalance.toFixed(2)}</h2>
+              </div>
+              <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md">
+                <Wallet size={24} />
+              </div>
+            </div>
+            
+            <div className="flex gap-3">
+              <Button 
+                onClick={() => router.push('/add-funds')}
+                className="flex-1 h-14 bg-white text-[#312ECB] hover:bg-slate-50 rounded-2xl font-black text-xs uppercase tracking-widest gap-2 shadow-xl"
+              >
+                <PlusCircle size={18} /> Add Money
+              </Button>
+              <Button 
+                onClick={() => router.push('/refer')}
+                className="flex-1 h-14 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest gap-2 shadow-xl"
+              >
+                <Gift size={18} /> Refer & Earn
+              </Button>
+            </div>
+          </div>
+          {/* Decorative shapes */}
+          <div className="absolute top-[-20%] right-[-10%] w-48 h-48 bg-white/5 rounded-full blur-3xl" />
+          <div className="absolute bottom-[-10%] left-[-5%] w-32 h-32 bg-emerald-500/20 rounded-full blur-2xl" />
+        </div>
 
-      <main className="flex-1 overflow-y-auto p-3 flex flex-col relative custom-scrollbar bg-slate-950/20">
-        {messages?.map(m => (
-          <MessageBubble 
-            key={m.id} 
-            sender={m.sender} 
-            text={m.text} 
-            options={m.options} 
-            onOptionClick={handleSend} 
-            isPaymentCard={m.isPaymentCard}
-            isSummaryCard={m.isSummaryCard}
-            paymentPrice={m.paymentPrice}
-            rawPrice={m.rawPrice}
-            isWalletCard={m.isWalletCard}
-            isComboConfigCard={m.isComboConfigCard} 
-            isBulkLinkCard={m.isBulkLinkCard} 
-            isSuccessCard={m.isSuccessCard} 
-            showWhatsAppSuccess={m.showWhatsAppSuccess} 
-            orderId={m.orderId} 
-            timestamp={m.timestamp?.toDate ? m.timestamp.toDate() : new Date()} 
-            dynamicServices={m.dynamicServices || activeServices.filter(s => s.platform === currentOrder.platform)} 
-            discountPct={m.discountPct ?? 0} 
-            serviceName={m.serviceName} 
-            quantity={m.quantity} 
-            prefilledLinks={m.prefilledLinks} 
-            walletBalance={m.walletBalance || walletBalance} 
-          />
-        ))}
-        {isTyping && <TypingIndicator />}
-        <div ref={scrollRef} />
+        {/* Global Announcement */}
+        {activeBroadcast && activeBroadcast.active && (
+          <div className="bg-slate-900 border border-white/5 rounded-[1.8rem] p-5 flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center shrink-0">
+              <Info size={20} />
+            </div>
+            <div>
+              <p className="text-[13px] font-bold text-slate-200 leading-relaxed">{activeBroadcast.text}</p>
+              {activeBroadcast.buttonUrl && (
+                <button 
+                  onClick={() => window.open(activeBroadcast.buttonUrl, '_blank')}
+                  className="mt-2 text-[10px] font-black text-[#312ECB] uppercase tracking-widest flex items-center gap-1"
+                >
+                  {activeBroadcast.buttonText || 'Learn More'} <ChevronRight size={12} />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Action Grid */}
+        <div className="grid grid-cols-2 gap-4">
+          <button 
+            onClick={() => router.push('/new-order')}
+            className="bg-white/5 hover:bg-white/10 border border-white/5 p-6 rounded-[2rem] text-left transition-all active:scale-95 group"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-[#312ECB]/20 text-[#312ECB] flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+              <ShoppingCart size={24} />
+            </div>
+            <h3 className="text-sm font-black uppercase text-white">New Order</h3>
+            <p className="text-[9px] font-bold text-slate-500 uppercase mt-1">Start growing now</p>
+          </button>
+          
+          <button 
+            onClick={() => router.push('/orders')}
+            className="bg-white/5 hover:bg-white/10 border border-white/5 p-6 rounded-[2rem] text-left transition-all active:scale-95 group"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-500 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+              <History size={24} />
+            </div>
+            <h3 className="text-sm font-black uppercase text-white">History</h3>
+            <p className="text-[9px] font-bold text-slate-500 uppercase mt-1">Track your orders</p>
+          </button>
+        </div>
+
+        {/* Quick Stats & Offers */}
+        <div className="space-y-4">
+          <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] px-1">Exclusive Offers</h4>
+          <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-[2rem] p-6 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                <TrendingUp size={24} />
+              </div>
+              <div>
+                <h5 className="text-[13px] font-black uppercase text-white">60% Deposit Bonus</h5>
+                <p className="text-[9px] font-bold text-slate-500 uppercase mt-0.5">On every refill today</p>
+              </div>
+            </div>
+            <Badge className="bg-emerald-500 text-white font-black text-[9px] uppercase px-3 py-1">LIVE</Badge>
+          </div>
+        </div>
+
+        {/* Recent Activity List */}
+        <div className="space-y-4">
+          <div className="flex justify-between items-center px-1">
+            <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">Recent Activity</h4>
+            <button onClick={() => router.push('/orders')} className="text-[9px] font-black text-[#312ECB] uppercase">View All</button>
+          </div>
+          
+          {recentOrders.length > 0 ? (
+            <div className="space-y-3">
+              {recentOrders.map((order) => (
+                <div key={order.id} className="bg-white/5 border border-white/5 rounded-2xl p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <div className={cn(
+                      "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
+                      order.status === 'Completed' ? "bg-emerald-500/10 text-emerald-500" : "bg-blue-500/10 text-blue-500"
+                    )}>
+                      {order.status === 'Completed' ? <CheckCircle2 size={18} /> : <Clock size={18} />}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-black text-white truncate uppercase">{order.service}</p>
+                      <p className="text-[9px] font-bold text-slate-500 uppercase mt-0.5">#{order.orderId || order.id.slice(0, 8).toUpperCase()}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[11px] font-black text-white">₹{order.price?.toFixed(2)}</p>
+                    <p className={cn(
+                      "text-[8px] font-black uppercase mt-1",
+                      order.status === 'Completed' ? "text-emerald-500" : "text-blue-500"
+                    )}>{order.status}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white/5 border border-white/5 rounded-[2rem] py-12 flex flex-col items-center justify-center opacity-30">
+              <Package size={40} className="mb-3" />
+              <p className="text-[10px] font-black uppercase tracking-widest">No activity yet</p>
+            </div>
+          )}
+        </div>
       </main>
 
-      <footer className="p-3 bg-slate-900/80 backdrop-blur-xl border-t border-white/5 shrink-0">
-        <div className="flex items-center gap-3 bg-slate-950 rounded-2xl p-1.5 h-14">
-          <Input value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSend()} placeholder="Ask something..." className="flex-1 bg-transparent border-none font-bold text-sm h-full text-white placeholder:text-slate-600 focus-visible:ring-0" />
-          <Button onClick={() => handleSend()} size="icon" className="rounded-xl h-11 w-11 bg-[#312ECB] shadow-3d"><Send size={18} /></Button>
-        </div>
-      </footer>
-
-      <Dialog open={isBroadcastOpen} onOpenChange={setIsBroadcastOpen}>
-        <DialogContent className="max-w-[320px] rounded-[2.5rem] border-none shadow-2xl bg-[#030712] p-0 overflow-hidden">
-          <header className="bg-[#312ECB] p-4 text-white text-center">
-             <Megaphone size={24} className="mx-auto" />
-             <DialogTitle className="font-black uppercase text-xs tracking-widest mt-2">Official Update</DialogTitle>
-          </header>
-          <div className="p-6 space-y-4 text-center">
-             <p className="text-sm font-bold text-slate-200 leading-relaxed italic">{activeBroadcast?.text}</p>
-             {activeBroadcast?.buttonUrl && (
-               <Button asChild className="w-full h-11 bg-white text-slate-900 font-black uppercase text-xs rounded-xl gap-2 shadow-3d">
-                 <a href={activeBroadcast.buttonUrl} target="_blank" rel="noopener noreferrer">{activeBroadcast.buttonText || "Open"} <ExternalLink size={14} /></a>
-               </Button>
-             )}
-             <button onClick={() => setIsBroadcastOpen(false)} className="w-full text-slate-500 font-black uppercase text-[10px] h-10 tracking-widest">Dismiss</button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
+      {/* Notifications Drawer */}
       <Dialog open={isNotifOpen} onOpenChange={setIsNotifOpen}>
         <DialogContent className="max-w-[340px] rounded-[2.5rem] border-none shadow-2xl bg-slate-950 p-0 overflow-hidden">
           <header className="bg-[#312ECB] p-5 text-white flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Bell size={20} />
-              <DialogTitle className="font-black uppercase text-sm tracking-widest">Notifications</DialogTitle>
+              <DialogTitle className="font-black uppercase text-sm tracking-widest">Inbox</DialogTitle>
             </div>
             <button onClick={() => setIsNotifOpen(false)}><X size={20} /></button>
           </header>
@@ -513,21 +300,24 @@ export default function ChatPage() {
               <div className="space-y-4">
                 {notifications.map((n) => (
                   <div key={n.id} className={cn("p-4 rounded-[1.5rem] border transition-all", n.read ? "bg-slate-900/50 border-white/5" : "bg-white/5 border-[#312ECB]/20 shadow-lg")}>
-                    <h4 className="text-xs font-black text-[#312ECB] uppercase mb-1">{n.title}</h4>
-                    <p className="text-[11px] font-bold text-slate-300 leading-relaxed">{n.message}</p>
-                    <p className="text-[8px] font-black text-slate-500 uppercase mt-2">{n.createdAt?.toDate ? n.createdAt.toDate().toLocaleDateString() : 'Just now'}</p>
+                    <h4 className="text-[11px] font-black text-[#312ECB] uppercase mb-1">{n.title}</h4>
+                    <p className="text-[10px] font-bold text-slate-300 leading-relaxed">{n.message}</p>
+                    <p className="text-[7px] font-black text-slate-500 uppercase mt-2">{n.createdAt?.toDate ? n.createdAt.toDate().toLocaleDateString() : 'Just now'}</p>
                   </div>
                 ))}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-full py-16 opacity-30">
                 <Bell size={48} className="mb-3" />
-                <p className="text-[10px] font-black uppercase tracking-widest">No updates yet</p>
+                <p className="text-[10px] font-black uppercase tracking-widest">No new updates</p>
               </div>
             )}
           </ScrollArea>
         </DialogContent>
       </Dialog>
+
+      {/* Bottom Nav */}
+      <BottomNav />
     </div>
   );
 }
