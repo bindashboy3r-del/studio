@@ -68,7 +68,7 @@ export default function DashboardPage() {
 
   // Order Settings
   const [orderType, setOrderType] = useState<'single' | 'combo' | 'bulk'>('single');
-  const selectedPlatform: Platform = 'instagram'; // Hardcoded to Instagram
+  const selectedPlatform: Platform = 'instagram';
   const [selectedServiceId, setSelectedServiceId] = useState<string>("");
   const [quantity, setQuantity] = useState<string>("");
   const [targetLink, setTargetLink] = useState<string>("");
@@ -93,12 +93,12 @@ export default function DashboardPage() {
   }, [db]);
   const { data: rawServices } = useCollection<SMMService>(servicesQuery);
   
-  // Filter only Instagram services
   const activeServices = useMemo(() => 
     (rawServices || []).filter(s => s.isActive !== false && s.platform === 'instagram'), 
   [rawServices]);
   
-  const { data: userData } = useDoc(useMemoFirebase(() => currentUser && db ? doc(db, "users", currentUser.uid) : null, [db, currentUser]));
+  const userDocRef = useMemoFirebase(() => currentUser && db ? doc(db, "users", currentUser.uid) : null, [db, currentUser]);
+  const { data: userData } = useDoc(userDocRef);
   const walletBalance = userData?.balance || 0;
 
   const [globalDiscounts, setGlobalDiscounts] = useState({ single: 0, combo: 0, bulk: 0 });
@@ -106,29 +106,32 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!db) return;
-    onSnapshot(doc(db, "globalSettings", "discounts"), (snap) => {
+    const unsubDiscounts = onSnapshot(doc(db, "globalSettings", "discounts"), (snap) => {
       if (snap.exists()) setGlobalDiscounts({ 
         single: snap.data().single || 0, 
         combo: snap.data().combo || 0, 
         bulk: snap.data().bulk || 0 
       });
     });
-    onSnapshot(doc(db, "globalSettings", "payment"), (snap) => { if (snap.exists()) setPaymentConfig(snap.data()); });
+    const unsubPayment = onSnapshot(doc(db, "globalSettings", "payment"), (snap) => { if (snap.exists()) setPaymentConfig(snap.data()); });
     
+    let unsubNotif = () => {};
     if (currentUser) {
       const qNotif = query(collection(db, "users", currentUser.uid, "notifications"), orderBy("createdAt", "desc"));
-      onSnapshot(qNotif, (snap) => setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+      unsubNotif = onSnapshot(qNotif, (snap) => setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     }
+
+    return () => { unsubDiscounts(); unsubPayment(); unsubNotif(); };
   }, [db, currentUser]);
 
   const selectedService = useMemo(() => activeServices.find(s => s.id === selectedServiceId), [activeServices, selectedServiceId]);
-  const currentDiscount = globalDiscounts[orderType];
+  const currentDiscount = globalDiscounts[orderType] || 0;
 
   // Pricing Logic
   const calcPrices = () => {
     let raw = 0;
     if (orderType === 'combo') {
-      raw = comboItems.reduce((acc, item) => acc + (parseInt(item.quantity || "0") / 1000) * item.pricePer1000, 0);
+      raw = comboItems.reduce((acc, item) => acc + (parseInt(item.quantity || "0") / 1000) * (item.pricePer1000 || 0), 0);
     } else {
       const qty = parseInt(quantity) || 0;
       const rate = selectedService?.pricePer1000 || 0;
@@ -141,7 +144,6 @@ export default function DashboardPage() {
 
   const { raw: rawPrice, final: finalPrice, savings } = calcPrices();
 
-  // Handlers
   const handlePlaceOrder = async () => {
     if (isGuest) { router.push('/'); return; }
     if (!currentUser || !db) return;
@@ -222,7 +224,6 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-[100dvh] bg-[#030712] font-body text-slate-100 pb-24 overflow-x-hidden">
-      {/* Dynamic Header */}
       <header className="sticky top-0 z-50 bg-[#030712]/80 backdrop-blur-xl border-b border-white/5 px-5 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-[#312ECB] flex items-center justify-center text-white shadow-lg">
@@ -274,7 +275,6 @@ export default function DashboardPage() {
               </TabsList>
 
               <div className="mt-6 space-y-5">
-                {/* Info Alert for Guest */}
                 {isGuest && (
                   <div className="bg-[#312ECB]/10 border border-[#312ECB]/20 p-4 rounded-2xl flex items-start gap-3">
                     <Zap className="text-[#312ECB] shrink-0" size={18} />
@@ -284,7 +284,6 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {/* Service Selection */}
                 {orderType === 'combo' ? (
                   <div className="space-y-4">
                     <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Build Instagram Pack</label>
@@ -301,7 +300,6 @@ export default function DashboardPage() {
                       </SelectContent>
                     </Select>
 
-                    {/* Combo List */}
                     <div className="space-y-2">
                       {comboItems.map((item) => (
                         <div key={item.id} className="bg-white/5 border border-white/5 rounded-2xl p-4 flex items-center justify-between gap-3">
@@ -361,7 +359,6 @@ export default function DashboardPage() {
                   </>
                 )}
 
-                {/* Target Links */}
                 {orderType === 'bulk' ? (
                   <div className="space-y-3">
                     <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Target Links ({bulkLinks.length})</label>
@@ -548,7 +545,6 @@ export default function DashboardPage() {
         )}
       </main>
 
-      {/* Notifications Drawer */}
       <Dialog open={isNotifOpen} onOpenChange={setIsNotifOpen}>
         <DialogContent className="max-w-[340px] rounded-[2.5rem] border-none shadow-2xl bg-slate-950 p-0 overflow-hidden">
           <header className="bg-[#312ECB] p-5 text-white flex items-center justify-between">

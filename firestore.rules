@@ -18,6 +18,27 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    // Public Read Access for Services, Settings, and Announcements
+    match /services/{serviceId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /globalSettings/{settingsId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /globalAnnouncements/{announcementId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /redeemCodes/{codeId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     // User profiles
     match /users/{userId} {
       allow read: if isSignedIn();
@@ -57,26 +78,6 @@ service cloud.firestore {
       allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
       allow list: if isSignedIn();
       allow update, delete: if isAdmin();
-    }
-
-    // Settings & Configs (Public Read)
-    match /globalSettings/{settingsId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /services/{serviceId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /globalAnnouncements/{announcementId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /globalSettings/categories {
-      allow read: if true;
     }
 
     // Orders Collection Group

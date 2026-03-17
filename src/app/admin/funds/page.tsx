@@ -71,7 +71,8 @@ export default function FundRequestsPage() {
       const newCreditAmounts: Record<string, string> = { ...creditAmounts };
       reqs.forEach(r => {
         if (!newCreditAmounts[r.id]) {
-          const totalWithBonus = Math.floor(r.amount * (1 + globalBonus / 100));
+          const bonusVal = globalBonus || 0;
+          const totalWithBonus = Math.floor(r.amount * (1 + bonusVal / 100));
           newCreditAmounts[r.id] = totalWithBonus.toString();
         }
       });
@@ -86,8 +87,11 @@ export default function FundRequestsPage() {
     if (!db || !admin || !isActuallyAdmin) return;
     setProcessingId(request.id);
     
+    // Automatic Calculation Logic
+    const bonusToApply = globalBonus || 0;
+    const autoAmount = Math.floor(request.amount * (1 + bonusToApply / 100));
     const finalCreditStr = creditAmounts[request.id];
-    const validatedAmount = action === 'Approved' ? (parseFloat(finalCreditStr) || request.amount) : 0;
+    const validatedAmount = action === 'Approved' ? (parseFloat(finalCreditStr) || autoAmount) : 0;
 
     try {
       const batch = writeBatch(db);
@@ -126,7 +130,7 @@ export default function FundRequestsPage() {
       }
 
       await batch.commit();
-      toast({ title: `Request ${action}` });
+      toast({ title: `Request ${action}`, description: action === 'Approved' ? `₹${validatedAmount} credited.` : undefined });
     } catch (e) {
       toast({ variant: "destructive", title: "Error processing" });
     } finally {
