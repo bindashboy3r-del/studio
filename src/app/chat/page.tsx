@@ -209,11 +209,15 @@ export default function DashboardPage() {
               apiOrderId = apiResult.order?.toString() || "";
               apiProviderId = provider.id;
             } else {
-              toast({ variant: "destructive", title: "API Provider Error", description: apiResult.error });
+              toast({ variant: "destructive", title: "API Placement Failed", description: apiResult.error });
               setIsProcessing(false);
               return;
             }
+          } else {
+            console.warn("Provider settings incomplete for:", mapping.providerId);
           }
+        } else {
+          console.warn("No API mapping found for service:", serviceIdToMap);
         }
       }
 
@@ -246,11 +250,11 @@ export default function DashboardPage() {
       batch.set(doc(collection(db, "users", currentUser.uid, "orders")), orderPayload);
 
       await batch.commit();
-      toast({ title: "Order Placed!", description: apiOrderId ? `API Order ID: ${apiOrderId}` : `Order #${orderId} is now queued.` });
+      toast({ title: "Order Placed!", description: apiOrderId ? `API ID: ${apiOrderId}` : `Order #${orderId} is queued.` });
       router.push('/orders');
     } catch (e) {
       console.error("Order error:", e);
-      toast({ variant: "destructive", title: "Error", description: "Failed to place order." });
+      toast({ variant: "destructive", title: "Database Error", description: "Could not save order data." });
     } finally {
       setIsProcessing(false);
     }
@@ -344,7 +348,7 @@ export default function DashboardPage() {
                   <div className="bg-[#312ECB]/10 border border-[#312ECB]/20 p-4 rounded-2xl flex items-start gap-3">
                     <Zap className="text-[#312ECB] shrink-0" size={18} />
                     <p className="text-[10px] font-bold text-slate-300 leading-relaxed uppercase">
-                      You are in <span className="text-white font-black">Preview Mode</span>. Browse Instagram services and rates below. Login to place orders.
+                      You are in <span className="text-white font-black">Preview Mode</span>. Browse services below. Login to place orders.
                     </p>
                   </div>
                 )}
@@ -425,14 +429,14 @@ export default function DashboardPage() {
                     {orderType === 'drip' && (
                       <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2 duration-300">
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Ek baar me kitne views (Qty)</label>
+                          <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Batch Quantity</label>
                           <div className="relative">
                             <Layers className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" size={14} />
                             <Input 
                               type="number" 
                               value={batchQty} 
                               onChange={(e) => setBatchQty(e.target.value)}
-                              placeholder="Batch Qty"
+                              placeholder="e.g. 100"
                               className="h-12 bg-white/5 border-none rounded-xl pl-10 text-sm font-black text-white"
                             />
                           </div>

@@ -16,35 +16,48 @@ export interface ApiAddOrderParams {
 }
 
 /**
- * Places an order on an external SMM Panel.
+ * Places an order on an external SMM Panel using standard API parameters.
+ * Uses FormData for compatibility with most SMM panels.
  */
 export async function placeApiOrder(params: ApiAddOrderParams) {
   const { apiUrl, apiKey, serviceId, link, quantity, runs, interval } = params;
 
   try {
-    const url = new URL(apiUrl);
-    url.searchParams.append('key', apiKey);
-    url.searchParams.append('action', 'add');
-    url.searchParams.append('service', serviceId);
-    url.searchParams.append('link', link);
-    url.searchParams.append('quantity', quantity.toString());
+    const formData = new URLSearchParams();
+    formData.append('key', apiKey);
+    formData.append('action', 'add');
+    formData.append('service', serviceId);
+    formData.append('link', link);
+    formData.append('quantity', quantity.toString());
 
-    // Add Drip-Feed parameters if provided
+    // Add Drip-Feed parameters if provided and valid
     if (runs && runs > 1) {
-      url.searchParams.append('runs', runs.toString());
-      url.searchParams.append('interval', interval?.toString() || '30');
+      formData.append('runs', runs.toString());
+      formData.append('interval', interval?.toString() || '15');
     }
 
-    const response = await fetch(url.toString(), { method: 'POST' });
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    });
+
     const data = await response.json();
 
     if (data.error) {
       return { success: false, error: data.error };
     }
 
+    if (!data.order) {
+      return { success: false, error: data.message || 'No order ID returned from API' };
+    }
+
     return { success: true, order: data.order };
   } catch (error: any) {
-    return { success: false, error: error.message || 'Failed to connect to SMM API' };
+    console.error('API Placement Error:', error);
+    return { success: false, error: error.message || 'Failed to connect to SMM API provider' };
   }
 }
 
@@ -53,11 +66,18 @@ export async function placeApiOrder(params: ApiAddOrderParams) {
  */
 export async function getApiBalance(apiUrl: string, apiKey: string) {
   try {
-    const url = new URL(apiUrl);
-    url.searchParams.append('key', apiKey);
-    url.searchParams.append('action', 'balance');
+    const formData = new URLSearchParams();
+    formData.append('key', apiKey);
+    formData.append('action', 'balance');
 
-    const response = await fetch(url.toString(), { method: 'POST' });
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    });
+    
     const data = await response.json();
 
     if (data.error) {
@@ -75,12 +95,19 @@ export async function getApiBalance(apiUrl: string, apiKey: string) {
  */
 export async function getApiOrdersStatus(apiUrl: string, apiKey: string, apiOrderIds: string) {
   try {
-    const url = new URL(apiUrl);
-    url.searchParams.append('key', apiKey);
-    url.searchParams.append('action', 'status');
-    url.searchParams.append('orders', apiOrderIds); // Comma separated IDs
+    const formData = new URLSearchParams();
+    formData.append('key', apiKey);
+    formData.append('action', 'status');
+    formData.append('orders', apiOrderIds);
 
-    const response = await fetch(url.toString(), { method: 'POST' });
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    });
+    
     const data = await response.json();
 
     if (data.error) {
