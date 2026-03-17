@@ -106,7 +106,7 @@ export default function FundRequestsPage() {
         batch.update(doc(db, "users", request.userId), { balance: increment(validatedAmount) });
         batch.set(doc(collection(db, "users", request.userId, "notifications")), {
           title: '💰 Wallet Credited!', 
-          message: `₹${validatedAmount} added to your account. (Bonus Applied)`, 
+          message: `₹${validatedAmount} added to your account. (${bonusToApply}% Bonus Applied)`, 
           read: false, 
           createdAt: serverTimestamp()
         });
@@ -147,7 +147,7 @@ export default function FundRequestsPage() {
           <button onClick={() => router.push("/admin")} className="p-3 bg-white rounded-2xl text-slate-400 hover:text-[#312ECB] shadow-sm"><ChevronLeft size={24} /></button>
           <div>
             <h1 className="text-2xl font-black tracking-tight text-slate-950 uppercase">PAYMENT APPROVALS</h1>
-            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Active Bonus: {globalBonus}%</p>
+            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Active Global Bonus: {globalBonus}%</p>
           </div>
         </header>
 

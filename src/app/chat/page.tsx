@@ -28,7 +28,8 @@ import {
   Package,
   TrendingDown,
   QrCode,
-  LogIn
+  LogIn,
+  ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

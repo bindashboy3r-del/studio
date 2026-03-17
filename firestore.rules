@@ -20,17 +20,17 @@ service cloud.firestore {
 
     // Public Read Access for Services and Global Settings (For Rate Card & Discounts)
     match /services/{serviceId} {
-      allow read: if true;
+      allow get, list: if true;
       allow write: if isAdmin();
     }
 
     match /globalSettings/{settingsId} {
-      allow read: if true;
+      allow get, list: if true;
       allow write: if isAdmin();
     }
 
     match /globalAnnouncements/{announcementId} {
-      allow read: if true;
+      allow get, list: if true;
       allow write: if isAdmin();
     }
 
@@ -60,29 +60,26 @@ service cloud.firestore {
     // Fund Requests
     match /fundRequests/{requestId} {
       allow create: if isSignedIn();
-      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
-      allow list: if isSignedIn();
+      allow get, list: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
       allow update, delete: if isAdmin();
     }
 
     // Referral Transactions
     match /referralTransactions/{txId} {
-      allow read: if isSignedIn() && (isAdmin() || resource.data.referrerId == request.auth.uid);
-      allow list: if isSignedIn();
+      allow get, list: if isSignedIn() && (isAdmin() || resource.data.referrerId == request.auth.uid);
       allow write: if isAdmin();
     }
 
     // Withdrawals
     match /withdrawals/{withdrawalId} {
       allow create: if isSignedIn();
-      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
-      allow list: if isSignedIn();
+      allow get, list: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
       allow update, delete: if isAdmin();
     }
 
     // Orders Collection Group
     match /{path=**}/orders/{orderId} {
-      allow read: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow update: if isAdmin();
     }
   }
