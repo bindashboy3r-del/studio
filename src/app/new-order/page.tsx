@@ -13,7 +13,6 @@ import {
   increment, 
   serverTimestamp, 
   Timestamp,
-  addDoc
 } from "firebase/firestore";
 import { 
   ChevronLeft, 
@@ -39,7 +38,7 @@ import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@
 import { SMMService, PLATFORMS, Platform } from "@/app/lib/constants";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/tabs"; // Adjusted for convenience
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -120,7 +119,11 @@ export default function NewOrderPage() {
     try {
       const batch = writeBatch(db);
       if (paymentMethod === 'wallet') {
-        if (walletBalance < finalPrice) { toast({ variant: "destructive", title: "Low Balance" }); setIsProcessing(false); return; }
+        if (walletBalance < finalPrice) { 
+          toast({ variant: "destructive", title: "Low Balance" }); 
+          setIsProcessing(false); 
+          return; 
+        }
         batch.update(doc(db, "users", currentUser.uid), { balance: increment(-finalPrice) });
       }
 
@@ -149,13 +152,16 @@ export default function NewOrderPage() {
   };
 
   const addBulkLink = () => {
-    if (currentBulkLink.trim()) { setBulkLinks([...bulkLinks, currentBulkLink.trim()]); setCurrentBulkLink(""); }
+    if (currentBulkLink.trim()) { 
+      setBulkLinks([...bulkLinks, currentBulkLink.trim()]); 
+      setCurrentBulkLink(""); 
+    }
   };
 
   if (isUserLoading) return null;
 
   return (
-    <div className="min-h-screen bg-[#030712] font-body text-slate-100 pb-24">
+    <div className="min-h-[100dvh] bg-[#030712] font-body text-slate-100 pb-24">
       <header className="sticky top-0 z-50 bg-[#030712]/80 backdrop-blur-xl border-b border-white/5 px-5 py-4 flex items-center justify-between">
         <button onClick={() => router.push('/chat')} className="flex items-center gap-1 text-[#312ECB] font-black uppercase text-[10px] tracking-widest">
           <ChevronLeft size={16} /> BACK
@@ -167,7 +173,10 @@ export default function NewOrderPage() {
       <main className="max-w-md mx-auto p-5 space-y-6">
         {checkoutStep === 'form' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <Tabs defaultValue="single" onValueChange={(v) => setOrderType(v as any)} className="w-full">
+            <Tabs defaultValue="single" onValueChange={(v) => {
+              setOrderType(v as any);
+              setSelectedServiceId(""); // Reset service on tab change
+            }} className="w-full">
               <TabsList className="bg-white/5 border border-white/5 w-full h-14 rounded-2xl p-1 gap-1">
                 <TabsTrigger value="single" className="flex-1 rounded-xl font-black text-[10px] uppercase data-[state=active]:bg-[#312ECB] data-[state=active]:text-white">Single</TabsTrigger>
                 <TabsTrigger value="combo" className="flex-1 rounded-xl font-black text-[10px] uppercase data-[state=active]:bg-[#312ECB] data-[state=active]:text-white">Combo</TabsTrigger>
@@ -175,14 +184,16 @@ export default function NewOrderPage() {
               </TabsList>
 
               <div className="mt-6 space-y-5">
-                {/* Platform Selector */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Platform</label>
                   <div className="grid grid-cols-3 gap-2">
                     {Object.entries(PLATFORMS).map(([key, label]) => (
                       <button 
                         key={key} 
-                        onClick={() => setSelectedPlatform(key as Platform)}
+                        onClick={() => {
+                          setSelectedPlatform(key as Platform);
+                          setSelectedServiceId("");
+                        }}
                         className={cn(
                           "h-12 rounded-xl border font-black text-[9px] uppercase transition-all",
                           selectedPlatform === key ? "bg-[#312ECB]/10 border-[#312ECB] text-white shadow-lg" : "bg-white/5 border-white/5 text-slate-500"
@@ -194,7 +205,6 @@ export default function NewOrderPage() {
                   </div>
                 </div>
 
-                {/* Service Selector */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Select Service</label>
                   <Select onValueChange={setSelectedServiceId} value={selectedServiceId}>
@@ -211,7 +221,6 @@ export default function NewOrderPage() {
                   </Select>
                 </div>
 
-                {/* Quantity Input */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">
                     Quantity {selectedService ? `(Min: ${selectedService.minQuantity})` : ''}
@@ -225,7 +234,6 @@ export default function NewOrderPage() {
                   />
                 </div>
 
-                {/* Link Input(s) */}
                 {orderType === 'bulk' ? (
                   <div className="space-y-3">
                     <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Target Links ({bulkLinks.length})</label>
@@ -242,11 +250,13 @@ export default function NewOrderPage() {
                       </Button>
                     </div>
                     {bulkLinks.length > 0 && (
-                      <div className="bg-white/5 rounded-2xl p-3 space-y-2 max-h-32 overflow-y-auto">
+                      <div className="bg-white/5 rounded-2xl p-3 space-y-2 max-h-32 overflow-y-auto custom-scrollbar">
                         {bulkLinks.map((l, i) => (
                           <div key={i} className="flex items-center justify-between bg-white/5 p-2 rounded-lg group">
                             <span className="text-[10px] font-bold text-slate-400 truncate flex-1">{l}</span>
-                            <button onClick={() => setBulkLinks(bulkLinks.filter((_, idx) => idx !== i))} className="text-red-500/50 hover:text-red-500"><Trash2 size={14} /></button>
+                            <button onClick={() => setBulkLinks(bulkLinks.filter((_, idx) => idx !== i))} className="text-red-500/50 hover:text-red-500 transition-colors">
+                              <Trash2 size={14} />
+                            </button>
                           </div>
                         ))}
                       </div>
