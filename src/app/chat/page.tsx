@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { 
   collection, 
   query, 
@@ -12,45 +13,54 @@ import {
   increment, 
   serverTimestamp, 
   Timestamp,
-  addDoc
 } from "firebase/firestore";
-import { useRouter } from "next/navigation";
 import { 
-  Zap, 
-  Wallet, 
-  PlusCircle, 
-  Bell, 
+  ChevronLeft, 
+  ShoppingCart, 
+  Rocket, 
+  Layers, 
   Package, 
-  Gift, 
-  LayoutGrid, 
-  ShoppingCart,
-  ChevronRight,
-  TrendingUp,
-  History,
-  Info,
-  Clock,
-  CheckCircle2,
-  X,
-  CreditCard,
-  QrCode,
-  Link as LinkIcon
+  TrendingDown, 
+  Wallet, 
+  CheckCircle2, 
+  QrCode, 
+  Copy, 
+  Download, 
+  Loader2, 
+  MessageCircle,
+  Link as LinkIcon,
+  Trash2,
+  Plus,
+  Zap,
+  Bell,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
-import { SMMService, PLATFORMS } from "@/app/lib/constants";
+import { SMMService, PLATFORMS, Platform } from "@/app/lib/constants";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle 
-} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+interface ComboItem {
+  id: string;
+  serviceId: string;
+  serviceName: string;
+  quantity: string;
+  pricePer1000: number;
+}
 
 export default function DashboardPage() {
   const { user: currentUser, isUserLoading } = useUser();
@@ -58,32 +68,43 @@ export default function DashboardPage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  // States
-  const [activeBroadcast, setActiveBroadcast] = useState<any>(null);
-  const [globalDiscounts, setGlobalDiscounts] = useState({ single: 0, combo: 0, bulk: 0 });
-  const [paymentConfig, setPaymentConfig] = useState<any>(null);
-  const [notifications, setNotifications] = useState<any[]>([]);
+  // Order Settings
+  const [orderType, setOrderType] = useState<'single' | 'combo' | 'bulk'>('single');
+  const [selectedPlatform, setSelectedPlatform] = useState<Platform>('instagram');
+  const [selectedServiceId, setSelectedServiceId] = useState<string>("");
+  const [quantity, setQuantity] = useState<string>("");
+  const [targetLink, setTargetLink] = useState<string>("");
+  const [bulkLinks, setBulkLinks] = useState<string[]>([]);
+  const [currentBulkLink, setCurrentBulkLink] = useState("");
+  const [utrId, setUtrId] = useState("");
+  
+  // Combo State
+  const [comboItems, setComboItems] = useState<ComboItem[]>([]);
+  
+  // Checkout State
+  const [checkoutStep, setCheckoutStep] = useState<'form' | 'summary' | 'payment'>('form');
+  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'upi' | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
-  const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
 
-  // Auth Protection
-  useEffect(() => {
-    if (!isUserLoading && !currentUser) router.push("/");
-  }, [currentUser, isUserLoading, router]);
-
-  // Data Fetching
+  // Data
+  const servicesQuery = useMemoFirebase(() => {
+    if (!db || !currentUser) return null;
+    return query(collection(db, "services"), orderBy("order", "asc"));
+  }, [db, currentUser]);
+  const { data: rawServices } = useCollection<SMMService>(servicesQuery);
+  const activeServices = useMemo(() => (rawServices || []).filter(s => s.isActive !== false), [rawServices]);
+  
   const { data: userData } = useDoc(useMemoFirebase(() => currentUser && db ? doc(db, "users", currentUser.uid) : null, [db, currentUser]));
   const walletBalance = userData?.balance || 0;
 
+  const [globalDiscounts, setGlobalDiscounts] = useState({ single: 0, combo: 0, bulk: 0 });
+  const [paymentConfig, setPaymentConfig] = useState<any>(null);
+
   useEffect(() => {
     if (!db || !currentUser) return;
-
-    // Broadcasts
-    const unsubBroadcast = onSnapshot(query(collection(db, "globalAnnouncements"), orderBy("timestamp", "desc")), (snap) => {
-      if (!snap.empty) setActiveBroadcast(snap.docs[0].data());
-    });
-
-    // Global Discounts
     onSnapshot(doc(db, "globalSettings", "discounts"), (snap) => {
       if (snap.exists()) setGlobalDiscounts({ 
         single: snap.data().single || 0, 
@@ -91,25 +112,106 @@ export default function DashboardPage() {
         bulk: snap.data().bulk || 0 
       });
     });
-
-    // Notifications
+    onSnapshot(doc(db, "globalSettings", "payment"), (snap) => { if (snap.exists()) setPaymentConfig(snap.data()); });
+    
     const qNotif = query(collection(db, "users", currentUser.uid, "notifications"), orderBy("createdAt", "desc"));
     onSnapshot(qNotif, (snap) => setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-
-    // Recent Orders
-    const qOrders = query(collection(db, "users", currentUser.uid, "orders"), orderBy("createdAt", "desc"));
-    onSnapshot(qOrders, (snap) => setRecentOrders(snap.docs.slice(0, 3).map(d => ({ id: d.id, ...d.data() }))));
-
-    return () => unsubBroadcast();
   }, [db, currentUser]);
 
-  const markAllRead = async () => {
-    if (!db || !currentUser) return;
-    const batch = writeBatch(db);
-    notifications.forEach(n => {
-      if (!n.read) batch.update(doc(db, "users", currentUser.uid, "notifications", n.id), { read: true });
-    });
-    await batch.commit();
+  const selectedService = useMemo(() => activeServices.find(s => s.id === selectedServiceId), [activeServices, selectedServiceId]);
+  const currentDiscount = globalDiscounts[orderType];
+
+  // Pricing Logic
+  const calcPrices = () => {
+    let raw = 0;
+    if (orderType === 'combo') {
+      raw = comboItems.reduce((acc, item) => acc + (parseInt(item.quantity) / 1000) * item.pricePer1000, 0);
+    } else {
+      const qty = parseInt(quantity) || 0;
+      const rate = selectedService?.pricePer1000 || 0;
+      const multiplier = orderType === 'bulk' ? Math.max(1, bulkLinks.length) : 1;
+      raw = (qty / 1000) * rate * multiplier;
+    }
+    const final = raw * (1 - currentDiscount / 100);
+    return { raw, final, savings: raw - final };
+  };
+
+  const { raw: rawPrice, final: finalPrice, savings } = calcPrices();
+
+  // Handlers
+  const handlePlaceOrder = async () => {
+    if (!currentUser || !db) return;
+    if (orderType !== 'combo' && !selectedService) return;
+    if (orderType === 'combo' && comboItems.length === 0) return;
+
+    setIsProcessing(true);
+    const orderId = `SB-${Math.floor(100000 + Math.random() * 900000)}`;
+    const linksArr = orderType === 'bulk' ? bulkLinks : [targetLink];
+    
+    try {
+      const batch = writeBatch(db);
+      if (paymentMethod === 'wallet') {
+        if (walletBalance < finalPrice) { 
+          toast({ variant: "destructive", title: "Low Balance" }); 
+          setIsProcessing(false); 
+          return; 
+        }
+        batch.update(doc(db, "users", currentUser.uid), { balance: increment(-finalPrice) });
+      }
+
+      const orderPayload = {
+        orderId, 
+        service: orderType === 'combo' ? `Combo (${comboItems.length} items)` : selectedService?.name, 
+        quantity: orderType === 'combo' ? comboItems.reduce((a, b) => a + parseInt(b.quantity), 0) : parseInt(quantity), 
+        price: finalPrice,
+        status: paymentMethod === 'wallet' ? 'Processing' : 'Pending', 
+        type: paymentMethod === 'wallet' ? 'API' : 'Manual',
+        links: linksArr, 
+        utrId: paymentMethod === 'upi' ? utrId : "", 
+        platform: selectedPlatform, 
+        createdAt: serverTimestamp(),
+        autoCompleteAt: Timestamp.fromDate(new Date(Date.now() + 45 * 60 * 1000)),
+        comboItems: orderType === 'combo' ? comboItems : null
+      };
+
+      batch.set(doc(collection(db, "users", currentUser.uid, "orders")), orderPayload);
+
+      await batch.commit();
+      toast({ title: "Order Placed!", description: `Order #${orderId} is now queued.` });
+      router.push('/orders');
+    } catch (e) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to place order." });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const addComboItem = (serviceId: string) => {
+    const s = activeServices.find(x => x.id === serviceId);
+    if (!s) return;
+    setComboItems([...comboItems, {
+      id: Math.random().toString(36).substr(2, 9),
+      serviceId: s.id,
+      serviceName: s.name,
+      quantity: s.minQuantity.toString(),
+      pricePer1000: s.pricePer1000
+    }]);
+    setSelectedServiceId(""); // Reset selection dropdown
+  };
+
+  const removeComboItem = (id: string) => {
+    setComboItems(comboItems.filter(item => item.id !== id));
+  };
+
+  const updateComboItemQty = (id: string, qty: string) => {
+    setComboItems(comboItems.map(item => item.id === id ? { ...item, quantity: qty } : item));
+  };
+
+  const addBulkLink = () => {
+    if (currentBulkLink.trim()) { 
+      setBulkLinks([...bulkLinks, currentBulkLink.trim()]); 
+      setCurrentBulkLink(""); 
+    }
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -117,21 +219,24 @@ export default function DashboardPage() {
   if (isUserLoading) return <div className="min-h-screen flex items-center justify-center bg-[#030712]"><Zap className="animate-pulse text-[#312ECB]" size={40} /></div>;
 
   return (
-    <div className="min-h-screen bg-[#030712] font-body text-slate-100 pb-24">
-      {/* Header */}
+    <div className="min-h-[100dvh] bg-[#030712] font-body text-slate-100 pb-24 overflow-x-hidden">
+      {/* Dynamic Header */}
       <header className="sticky top-0 z-50 bg-[#030712]/80 backdrop-blur-xl border-b border-white/5 px-5 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-[#312ECB] flex items-center justify-center text-white shadow-lg">
-            <Zap size={20} className="fill-current" />
+            <ShoppingCart size={20} className="fill-current" />
           </div>
           <div>
-            <h1 className="text-base font-black italic tracking-tighter text-white uppercase">SOCIALBOOST</h1>
-            <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Premium SMM Dashboard</p>
+            <h1 className="text-base font-black italic tracking-tighter text-white uppercase">CREATE NEW ORDER</h1>
+            <div className="flex items-center gap-2 mt-0.5">
+              <Wallet size={10} className="text-emerald-400" />
+              <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Balance: ₹{walletBalance.toFixed(2)}</p>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <button 
-            onClick={() => { markAllRead(); setIsNotifOpen(true); }} 
+            onClick={() => setIsNotifOpen(true)} 
             className="relative p-2.5 bg-white/5 rounded-xl border border-white/5 text-slate-400"
           >
             <Bell size={20} />
@@ -141,148 +246,299 @@ export default function DashboardPage() {
               </span>
             )}
           </button>
-          <button onClick={() => router.push('/profile')} className="w-10 h-10 rounded-xl bg-slate-800 border border-white/10 flex items-center justify-center text-white font-black text-sm uppercase">
-            {currentUser?.displayName?.[0] || 'U'}
-          </button>
         </div>
       </header>
 
       <main className="max-w-md mx-auto p-5 space-y-6">
-        {/* Wallet Card */}
-        <div className="bg-gradient-to-br from-[#312ECB] to-[#1E1B8F] rounded-[2.5rem] p-7 text-white shadow-2xl relative overflow-hidden">
-          <div className="relative z-10 space-y-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-[10px] font-black text-white/60 uppercase tracking-widest mb-1">Available Balance</p>
-                <h2 className="text-4xl font-black italic tracking-tight">₹{walletBalance.toFixed(2)}</h2>
-              </div>
-              <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md">
-                <Wallet size={24} />
-              </div>
-            </div>
-            
-            <div className="flex gap-3">
-              <Button 
-                onClick={() => router.push('/add-funds')}
-                className="flex-1 h-14 bg-white text-[#312ECB] hover:bg-slate-50 rounded-2xl font-black text-xs uppercase tracking-widest gap-2 shadow-xl"
-              >
-                <PlusCircle size={18} /> Add Money
-              </Button>
-              <Button 
-                onClick={() => router.push('/refer')}
-                className="flex-1 h-14 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest gap-2 shadow-xl"
-              >
-                <Gift size={18} /> Refer & Earn
-              </Button>
-            </div>
-          </div>
-          {/* Decorative shapes */}
-          <div className="absolute top-[-20%] right-[-10%] w-48 h-48 bg-white/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-[-10%] left-[-5%] w-32 h-32 bg-emerald-500/20 rounded-full blur-2xl" />
-        </div>
+        {checkoutStep === 'form' && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <Tabs defaultValue="single" onValueChange={(v) => {
+              setOrderType(v as any);
+              setSelectedServiceId("");
+              setComboItems([]);
+            }} className="w-full">
+              <TabsList className="bg-white/5 border border-white/5 w-full h-14 rounded-2xl p-1 gap-1">
+                <TabsTrigger value="single" className="flex-1 rounded-xl font-black text-[10px] uppercase data-[state=active]:bg-[#312ECB] data-[state=active]:text-white">Single</TabsTrigger>
+                <TabsTrigger value="combo" className="flex-1 rounded-xl font-black text-[10px] uppercase data-[state=active]:bg-[#312ECB] data-[state=active]:text-white">Combo</TabsTrigger>
+                <TabsTrigger value="bulk" className="flex-1 rounded-xl font-black text-[10px] uppercase data-[state=active]:bg-[#312ECB] data-[state=active]:text-white">Bulk</TabsTrigger>
+              </TabsList>
 
-        {/* Global Announcement */}
-        {activeBroadcast && activeBroadcast.active && (
-          <div className="bg-slate-900 border border-white/5 rounded-[1.8rem] p-5 flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center shrink-0">
-              <Info size={20} />
-            </div>
-            <div>
-              <p className="text-[13px] font-bold text-slate-200 leading-relaxed">{activeBroadcast.text}</p>
-              {activeBroadcast.buttonUrl && (
-                <button 
-                  onClick={() => window.open(activeBroadcast.buttonUrl, '_blank')}
-                  className="mt-2 text-[10px] font-black text-[#312ECB] uppercase tracking-widest flex items-center gap-1"
+              <div className="mt-6 space-y-5">
+                {/* Platform Selector */}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Platform</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {Object.entries(PLATFORMS).map(([key, label]) => (
+                      <button 
+                        key={key} 
+                        onClick={() => {
+                          setSelectedPlatform(key as Platform);
+                          setSelectedServiceId("");
+                          setComboItems([]);
+                        }}
+                        className={cn(
+                          "h-12 rounded-xl border font-black text-[9px] uppercase transition-all",
+                          selectedPlatform === key ? "bg-[#312ECB]/10 border-[#312ECB] text-white shadow-lg" : "bg-white/5 border-white/5 text-slate-500"
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Service Selection */}
+                {orderType === 'combo' ? (
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Build Your Combo Pack</label>
+                    <Select onValueChange={addComboItem} value={selectedServiceId}>
+                      <SelectTrigger className="h-14 bg-white/5 border-white/5 rounded-2xl font-bold text-sm text-white px-5 focus:ring-[#312ECB]">
+                        <SelectValue placeholder="Add service to combo..." />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#030712] border-white/10 rounded-2xl">
+                        {activeServices.filter(s => s.platform === selectedPlatform).map(s => (
+                          <SelectItem key={s.id} value={s.id} className="text-sm font-bold p-4 focus:bg-[#312ECB] text-white">
+                            {s.name} (₹{s.pricePer1000}/1k)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {/* Combo List */}
+                    <div className="space-y-2">
+                      {comboItems.map((item) => (
+                        <div key={item.id} className="bg-white/5 border border-white/5 rounded-2xl p-4 flex items-center justify-between gap-3 animate-in zoom-in-95">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[11px] font-black text-white truncate uppercase">{item.serviceName}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Input 
+                                type="number" 
+                                value={item.quantity} 
+                                onChange={(e) => updateComboItemQty(item.id, e.target.value)}
+                                className="h-8 w-20 bg-white/5 border-none rounded-lg text-[10px] font-black text-white px-2"
+                              />
+                              <span className="text-[9px] font-bold text-slate-500 uppercase">Qty</span>
+                            </div>
+                          </div>
+                          <button onClick={() => removeComboItem(item.id)} className="text-red-500/50 hover:text-red-500 p-2">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Select Service</label>
+                      <Select onValueChange={setSelectedServiceId} value={selectedServiceId}>
+                        <SelectTrigger className="h-14 bg-white/5 border-white/5 rounded-2xl font-bold text-sm text-white px-5 focus:ring-[#312ECB]">
+                          <SelectValue placeholder="Pick a service..." />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#030712] border-white/10 rounded-2xl">
+                          {activeServices.filter(s => s.platform === selectedPlatform).map(s => (
+                            <SelectItem key={s.id} value={s.id} className="text-sm font-bold p-4 focus:bg-[#312ECB] text-white">
+                              {s.name} (₹{s.pricePer1000}/1k)
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">
+                        Quantity {selectedService ? `(Min: ${selectedService.minQuantity})` : ''}
+                      </label>
+                      <Input 
+                        type="number" 
+                        placeholder="Enter amount..." 
+                        value={quantity} 
+                        onChange={(e) => setQuantity(e.target.value)}
+                        className="h-14 bg-white/5 border-white/5 rounded-2xl px-5 text-base font-black text-white focus-visible:ring-[#312ECB]"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Target Links */}
+                {orderType === 'bulk' ? (
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Target Links ({bulkLinks.length})</label>
+                    <div className="flex gap-2">
+                      <Input 
+                        placeholder="Add multiple links..." 
+                        value={currentBulkLink} 
+                        onChange={(e) => setCurrentBulkLink(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && addBulkLink()}
+                        className="h-14 bg-white/5 border-white/5 rounded-2xl px-5 text-sm font-bold text-white flex-1"
+                      />
+                      <Button onClick={addBulkLink} size="icon" className="h-14 w-14 rounded-2xl bg-[#312ECB] shadow-lg shrink-0">
+                        <Plus size={24} />
+                      </Button>
+                    </div>
+                    {bulkLinks.length > 0 && (
+                      <div className="bg-white/5 rounded-2xl p-3 space-y-2 max-h-32 overflow-y-auto custom-scrollbar">
+                        {bulkLinks.map((l, i) => (
+                          <div key={i} className="flex items-center justify-between bg-white/5 p-2 rounded-lg group">
+                            <span className="text-[10px] font-bold text-slate-400 truncate flex-1">{l}</span>
+                            <button onClick={() => setBulkLinks(bulkLinks.filter((_, idx) => idx !== i))} className="text-red-500/50 hover:text-red-500 transition-colors">
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Target Link</label>
+                    <div className="relative">
+                      <LinkIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600" size={18} />
+                      <Input 
+                        placeholder="Paste link here..." 
+                        value={targetLink} 
+                        onChange={(e) => setTargetLink(e.target.value)}
+                        className="h-14 bg-white/5 border-white/5 rounded-2xl pl-12 text-sm font-bold text-white focus-visible:ring-[#312ECB]"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <Button 
+                  disabled={
+                    (orderType === 'combo' && comboItems.length === 0) || 
+                    (orderType === 'single' && (!selectedService || !quantity || !targetLink)) ||
+                    (orderType === 'bulk' && (!selectedService || !quantity || bulkLinks.length === 0))
+                  }
+                  onClick={() => setCheckoutStep('summary')}
+                  className="w-full h-16 bg-[#312ECB] hover:bg-[#2825A6] text-white rounded-[1.8rem] font-black text-xs uppercase tracking-[0.2em] shadow-2xl mt-4"
                 >
-                  {activeBroadcast.buttonText || 'Learn More'} <ChevronRight size={12} />
-                </button>
-              )}
+                  Confirm Selection
+                </Button>
+              </div>
+            </Tabs>
+          </div>
+        )}
+
+        {checkoutStep === 'summary' && (
+          <div className="space-y-6 animate-in zoom-in-95 duration-300">
+            <div className="bg-slate-900 border border-white/5 rounded-[2.5rem] p-8 shadow-2xl space-y-6">
+              <div className="flex items-center gap-4 border-b border-white/5 pb-6">
+                <div className="w-14 h-14 rounded-2xl bg-[#312ECB]/20 flex items-center justify-center text-[#312ECB]">
+                  <Package size={28} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black uppercase text-white tracking-tight">
+                    {orderType === 'combo' ? 'Combo Pack' : selectedService?.name}
+                  </h3>
+                  <Badge className="bg-[#312ECB]/10 text-[#312ECB] border-none font-black text-[9px] uppercase px-3 mt-1">
+                    {orderType === 'combo' ? `${comboItems.length} Services` : `Qty: ${quantity}`}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex justify-between items-center px-1">
+                  <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Original Price</span>
+                  <span className="text-sm font-bold text-slate-400 line-through">₹{rawPrice.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center px-1">
+                  <div className="flex items-center gap-2">
+                    <TrendingDown size={18} className="text-emerald-400" />
+                    <span className="text-[11px] font-black text-emerald-500 uppercase tracking-widest">Offer ({currentDiscount}%)</span>
+                  </div>
+                  <span className="text-sm font-black text-emerald-400">- ₹{savings.toFixed(2)}</span>
+                </div>
+                <div className="pt-6 border-t border-white/10 flex justify-between items-center px-1">
+                  <span className="text-[13px] font-black text-white uppercase tracking-[0.2em]">Net Payable</span>
+                  <span className="text-3xl font-black text-[#312ECB] italic">₹{finalPrice.toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div className="bg-emerald-500/5 rounded-2xl p-5 border border-emerald-500/10 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+                    <Wallet size={20} />
+                  </div>
+                  <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Wallet Balance</span>
+                </div>
+                <p className={cn("text-base font-black italic", walletBalance >= finalPrice ? "text-emerald-400" : "text-red-400")}>
+                  ₹{walletBalance.toFixed(2)}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
+              <Button 
+                onClick={() => { setPaymentMethod('wallet'); handlePlaceOrder(); }}
+                disabled={isProcessing || walletBalance < finalPrice}
+                className={cn(
+                  "h-16 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl gap-3",
+                  walletBalance >= finalPrice ? "bg-emerald-500 text-white" : "bg-red-500/10 text-red-500 border border-red-500/20"
+                )}
+              >
+                {isProcessing && paymentMethod === 'wallet' ? <Loader2 className="animate-spin" /> : <Wallet size={20} />}
+                {walletBalance >= finalPrice ? "Pay from Wallet" : "Insufficient Balance"}
+              </Button>
+
+              <Button 
+                onClick={() => { setPaymentMethod('upi'); setCheckoutStep('payment'); }}
+                disabled={isProcessing}
+                variant="outline"
+                className="h-16 border-white/10 bg-white/5 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl gap-3"
+              >
+                <QrCode size={20} className="text-[#312ECB]" /> Pay via UPI QR
+              </Button>
+
+              <button onClick={() => setCheckoutStep('form')} className="text-center py-4 text-[10px] font-black uppercase text-slate-500 tracking-widest">
+                Cancel & Go Back
+              </button>
             </div>
           </div>
         )}
 
-        {/* Action Grid */}
-        <div className="grid grid-cols-2 gap-4">
-          <button 
-            onClick={() => router.push('/new-order')}
-            className="bg-white/5 hover:bg-white/10 border border-white/5 p-6 rounded-[2rem] text-left transition-all active:scale-95 group"
-          >
-            <div className="w-12 h-12 rounded-2xl bg-[#312ECB]/20 text-[#312ECB] flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <ShoppingCart size={24} />
-            </div>
-            <h3 className="text-sm font-black uppercase text-white">New Order</h3>
-            <p className="text-[9px] font-bold text-slate-500 uppercase mt-1">Start growing now</p>
-          </button>
-          
-          <button 
-            onClick={() => router.push('/orders')}
-            className="bg-white/5 hover:bg-white/10 border border-white/5 p-6 rounded-[2rem] text-left transition-all active:scale-95 group"
-          >
-            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-500 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <History size={24} />
-            </div>
-            <h3 className="text-sm font-black uppercase text-white">History</h3>
-            <p className="text-[9px] font-bold text-slate-500 uppercase mt-1">Track your orders</p>
-          </button>
-        </div>
-
-        {/* Quick Stats & Offers */}
-        <div className="space-y-4">
-          <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] px-1">Exclusive Offers</h4>
-          <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-[2rem] p-6 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
-                <TrendingUp size={24} />
+        {checkoutStep === 'payment' && (
+          <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+            <div className="bg-slate-900 border border-white/5 rounded-[2.5rem] p-8 text-center space-y-6 shadow-2xl">
+              <div className="bg-white p-4 rounded-[2rem] inline-block shadow-3d">
+                <img 
+                  src={`https://quickchart.io/qr?text=${encodeURIComponent(`upi://pay?pa=smmxpressbot@slc&pn=SocialBoost&am=${finalPrice.toFixed(2)}&cu=INR`)}&size=400&margin=1&format=png`} 
+                  alt="Payment QR" 
+                  className="w-48 h-48" 
+                />
               </div>
-              <div>
-                <h5 className="text-[13px] font-black uppercase text-white">60% Deposit Bonus</h5>
-                <p className="text-[9px] font-bold text-slate-500 uppercase mt-0.5">On every refill today</p>
+              
+              <div className="space-y-2">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Amount to Pay</p>
+                <h2 className="text-3xl font-black text-white italic">₹{finalPrice.toFixed(2)}</h2>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-red-500 animate-pulse">Sahi UTR ID dalo varna verify nahi hoga</label>
+                <Input 
+                  placeholder="Enter 12-Digit UTR ID" 
+                  maxLength={12}
+                  value={utrId}
+                  onChange={(e) => setUtrId(e.target.value.replace(/[^0-9]/g, ''))}
+                  className="h-14 bg-white/5 border-none rounded-2xl text-center text-lg font-black tracking-[0.3em] text-white focus-visible:ring-emerald-500"
+                />
               </div>
             </div>
-            <Badge className="bg-emerald-500 text-white font-black text-[9px] uppercase px-3 py-1">LIVE</Badge>
-          </div>
-        </div>
 
-        {/* Recent Activity List */}
-        <div className="space-y-4">
-          <div className="flex justify-between items-center px-1">
-            <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">Recent Activity</h4>
-            <button onClick={() => router.push('/orders')} className="text-[9px] font-black text-[#312ECB] uppercase">View All</button>
+            <Button 
+              onClick={handlePlaceOrder}
+              disabled={isProcessing || utrId.length !== 12}
+              className="w-full h-16 bg-emerald-500 hover:bg-emerald-600 text-white rounded-[1.8rem] font-black text-xs uppercase tracking-[0.2em] shadow-2xl gap-3"
+            >
+              {isProcessing ? <Loader2 className="animate-spin" /> : <CheckCircle2 size={20} />}
+              Verify & Place Order
+            </Button>
+
+            <button onClick={() => setCheckoutStep('summary')} className="w-full text-center py-2 text-[10px] font-black uppercase text-slate-500 tracking-widest">
+              Back to Summary
+            </button>
           </div>
-          
-          {recentOrders.length > 0 ? (
-            <div className="space-y-3">
-              {recentOrders.map((order) => (
-                <div key={order.id} className="bg-white/5 border border-white/5 rounded-2xl p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3 overflow-hidden">
-                    <div className={cn(
-                      "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
-                      order.status === 'Completed' ? "bg-emerald-500/10 text-emerald-500" : "bg-blue-500/10 text-blue-500"
-                    )}>
-                      {order.status === 'Completed' ? <CheckCircle2 size={18} /> : <Clock size={18} />}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-black text-white truncate uppercase">{order.service}</p>
-                      <p className="text-[9px] font-bold text-slate-500 uppercase mt-0.5">#{order.orderId || order.id.slice(0, 8).toUpperCase()}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[11px] font-black text-white">₹{order.price?.toFixed(2)}</p>
-                    <p className={cn(
-                      "text-[8px] font-black uppercase mt-1",
-                      order.status === 'Completed' ? "text-emerald-500" : "text-blue-500"
-                    )}>{order.status}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="bg-white/5 border border-white/5 rounded-[2rem] py-12 flex flex-col items-center justify-center opacity-30">
-              <Package size={40} className="mb-3" />
-              <p className="text-[10px] font-black uppercase tracking-widest">No activity yet</p>
-            </div>
-          )}
-        </div>
+        )}
       </main>
 
       {/* Notifications Drawer */}
@@ -316,7 +572,6 @@ export default function DashboardPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Bottom Nav */}
       <BottomNav />
     </div>
   );
