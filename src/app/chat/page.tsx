@@ -72,7 +72,7 @@ export default function DashboardPage() {
   const isGuest = !currentUser && !isUserLoading;
 
   // Order Settings
-  const [orderType, setOrderType] = useState<'single' | 'combo' | 'bulk' | 'drip'>('single');
+  const [orderType, setOrderType] = useState<'single' | 'bulk' | 'combo' | 'drip'>('single');
   const selectedPlatform: Platform = 'instagram';
   const [selectedServiceId, setSelectedServiceId] = useState<string>("");
   const [quantity, setQuantity] = useState<string>("");
@@ -82,7 +82,7 @@ export default function DashboardPage() {
   const [utrId, setUtrId] = useState("");
   
   // Drip-Feed State
-  const [runs, setRuns] = useState<string>("2");
+  const [batchQty, setBatchQty] = useState<string>("");
   const [interval, setInterval] = useState<string>("15");
   
   // Combo State
@@ -110,7 +110,7 @@ export default function DashboardPage() {
   const { data: userData } = useDoc(userDocRef);
   const walletBalance = userData?.balance || 0;
 
-  const [globalDiscounts, setGlobalDiscounts] = useState({ single: 0, combo: 0, bulk: 0, drip: 0 });
+  const [globalDiscounts, setGlobalDiscounts] = useState({ single: 0, bulk: 0, combo: 0, drip: 0 });
   const [paymentConfig, setPaymentConfig] = useState<any>(null);
 
   useEffect(() => {
@@ -118,8 +118,8 @@ export default function DashboardPage() {
     const unsubDiscounts = onSnapshot(doc(db, "globalSettings", "discounts"), (snap) => {
       if (snap.exists()) setGlobalDiscounts({ 
         single: snap.data().single || 0, 
+        bulk: snap.data().bulk || 0, 
         combo: snap.data().combo || 0, 
-        bulk: snap.data().bulk || 0,
         drip: snap.data().drip || snap.data().single || 0 
       });
     });
@@ -136,6 +136,15 @@ export default function DashboardPage() {
 
   const selectedService = useMemo(() => activeServices.find(s => s.id === selectedServiceId), [activeServices, selectedServiceId]);
   const currentDiscount = globalDiscounts[orderType] || 0;
+
+  // Runs Calculation for Drip
+  const dripRuns = useMemo(() => {
+    if (orderType !== 'drip' || !quantity || !batchQty) return 1;
+    const total = parseInt(quantity);
+    const batch = parseInt(batchQty);
+    if (!total || !batch || batch <= 0) return 1;
+    return Math.ceil(total / batch);
+  }, [orderType, quantity, batchQty]);
 
   // Pricing Logic
   const calcPrices = () => {
@@ -190,9 +199,9 @@ export default function DashboardPage() {
               apiUrl: provider.url,
               apiKey: provider.key,
               serviceId: mapping.remoteServiceId,
-              link: linksArr[0], // Currently API only supports one link at a time in standard add action
-              quantity: parseInt(quantity) || parseInt(comboItems[0]?.quantity || "0"),
-              runs: orderType === 'drip' ? parseInt(runs) : 1,
+              link: linksArr[0], 
+              quantity: orderType === 'drip' ? parseInt(batchQty) : (parseInt(quantity) || parseInt(comboItems[0]?.quantity || "0")),
+              runs: orderType === 'drip' ? dripRuns : 1,
               interval: orderType === 'drip' ? parseInt(interval) : 0
             });
 
@@ -210,7 +219,6 @@ export default function DashboardPage() {
 
       const batch = writeBatch(db);
       
-      // Update balance if wallet payment
       if (paymentMethod === 'wallet') {
         batch.update(doc(db, "users", currentUser.uid), { balance: increment(-finalPrice) });
       }
@@ -229,7 +237,7 @@ export default function DashboardPage() {
         autoCompleteAt: Timestamp.fromDate(new Date(Date.now() + 45 * 60 * 1000)),
         comboItems: orderType === 'combo' ? comboItems : null,
         isDripFeed: orderType === 'drip',
-        runs: orderType === 'drip' ? parseInt(runs) : 1,
+        runs: orderType === 'drip' ? dripRuns : 1,
         interval: orderType === 'drip' ? parseInt(interval) : 0,
         apiOrderId,
         providerId: apiProviderId
@@ -326,9 +334,9 @@ export default function DashboardPage() {
             }} className="w-full">
               <TabsList className="bg-white/5 border border-white/5 w-full h-14 rounded-2xl p-1 gap-1">
                 <TabsTrigger value="single" className="flex-1 rounded-xl font-black text-[10px] uppercase data-[state=active]:bg-[#312ECB] data-[state=active]:text-white">Single</TabsTrigger>
-                <TabsTrigger value="drip" className="flex-1 rounded-xl font-black text-[10px] uppercase data-[state=active]:bg-[#312ECB] data-[state=active]:text-white">Drip</TabsTrigger>
-                <TabsTrigger value="combo" className="flex-1 rounded-xl font-black text-[10px] uppercase data-[state=active]:bg-[#312ECB] data-[state=active]:text-white">Combo</TabsTrigger>
                 <TabsTrigger value="bulk" className="flex-1 rounded-xl font-black text-[10px] uppercase data-[state=active]:bg-[#312ECB] data-[state=active]:text-white">Bulk</TabsTrigger>
+                <TabsTrigger value="combo" className="flex-1 rounded-xl font-black text-[10px] uppercase data-[state=active]:bg-[#312ECB] data-[state=active]:text-white">Combo</TabsTrigger>
+                <TabsTrigger value="drip" className="flex-1 rounded-xl font-black text-[10px] uppercase data-[state=active]:bg-[#312ECB] data-[state=active]:text-white">Drip-Feed</TabsTrigger>
               </TabsList>
 
               <div className="mt-6 space-y-5">
@@ -407,7 +415,7 @@ export default function DashboardPage() {
                       <Input 
                         type="number" 
                         disabled={isGuest}
-                        placeholder={isGuest ? "Login to enter quantity" : "Enter amount..."}
+                        placeholder={isGuest ? "Login to enter quantity" : "Enter total amount..."}
                         value={quantity} 
                         onChange={(e) => setQuantity(e.target.value)}
                         className="h-14 bg-white/5 border-none rounded-2xl px-5 text-base font-black text-white focus-visible:ring-[#312ECB]"
@@ -417,19 +425,20 @@ export default function DashboardPage() {
                     {orderType === 'drip' && (
                       <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2 duration-300">
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Runs (Batches)</label>
+                          <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Ek baar me kitne views (Qty)</label>
                           <div className="relative">
                             <Layers className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" size={14} />
                             <Input 
                               type="number" 
-                              value={runs} 
-                              onChange={(e) => setRuns(e.target.value)}
+                              value={batchQty} 
+                              onChange={(e) => setBatchQty(e.target.value)}
+                              placeholder="Batch Qty"
                               className="h-12 bg-white/5 border-none rounded-xl pl-10 text-sm font-black text-white"
                             />
                           </div>
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Interval (Min)</label>
+                          <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Interval (Minutes)</label>
                           <div className="relative">
                             <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" size={14} />
                             <Input 
@@ -440,10 +449,10 @@ export default function DashboardPage() {
                             />
                           </div>
                         </div>
-                        {quantity && runs && parseInt(runs) > 0 && (
+                        {quantity && batchQty && parseInt(batchQty) > 0 && (
                           <div className="col-span-2 bg-[#312ECB]/5 p-3 rounded-xl border border-[#312ECB]/10">
                             <p className="text-[9px] font-black uppercase text-center text-[#312ECB] tracking-widest">
-                              Schedule: {Math.floor(parseInt(quantity) / parseInt(runs))} per batch every {interval} mins
+                              Schedule: {dripRuns} batches of {batchQty} every {interval} mins
                             </p>
                           </div>
                         )}
@@ -504,7 +513,8 @@ export default function DashboardPage() {
                     !isGuest && (
                       (orderType === 'combo' && comboItems.length === 0) || 
                       ((orderType === 'single' || orderType === 'drip') && (!selectedService || !quantity || !targetLink)) ||
-                      (orderType === 'bulk' && (!selectedService || !quantity || bulkLinks.length === 0))
+                      (orderType === 'bulk' && (!selectedService || !quantity || bulkLinks.length === 0)) ||
+                      (orderType === 'drip' && !batchQty)
                     )
                   }
                   onClick={() => isGuest ? router.push('/') : setCheckoutStep('summary')}
@@ -530,7 +540,7 @@ export default function DashboardPage() {
                   </h3>
                   <Badge className="bg-[#312ECB]/10 text-[#312ECB] border-none font-black text-[9px] uppercase px-3 mt-1">
                     {orderType === 'combo' ? `${comboItems.length} Services` : 
-                     orderType === 'drip' ? `Drip: ${runs} batches` : `Qty: ${quantity}`}
+                     orderType === 'drip' ? `Drip: ${dripRuns} batches` : `Qty: ${quantity}`}
                   </Badge>
                 </div>
               </div>
@@ -572,21 +582,31 @@ export default function DashboardPage() {
                 disabled={isProcessing || walletBalance < finalPrice}
                 className={cn(
                   "h-16 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl gap-3",
-                  walletBalance >= finalPrice ? "bg-emerald-500 text-white" : "bg-red-500/10 text-red-500 border border-red-500/20"
+                  walletBalance >= finalPrice ? "bg-emerald-50 text-emerald-600" : "bg-red-500/10 text-red-500 border border-red-500/20"
                 )}
               >
                 {isProcessing && paymentMethod === 'wallet' ? <Loader2 className="animate-spin" /> : <Wallet size={20} />}
                 {walletBalance >= finalPrice ? "Pay from Wallet" : "Insufficient Balance"}
               </Button>
 
-              <Button 
-                onClick={() => { setPaymentMethod('upi'); setCheckoutStep('payment'); }}
-                disabled={isProcessing}
-                variant="outline"
-                className="h-16 border-white/10 bg-white/5 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl gap-3"
-              >
-                <QrCode size={20} className="text-[#312ECB]" /> Pay via UPI QR
-              </Button>
+              {orderType !== 'drip' && (
+                <Button 
+                  onClick={() => { setPaymentMethod('upi'); setCheckoutStep('payment'); }}
+                  disabled={isProcessing}
+                  variant="outline"
+                  className="h-16 border-white/10 bg-white/5 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl gap-3"
+                >
+                  <QrCode size={20} className="text-[#312ECB]" /> Pay via UPI QR
+                </Button>
+              )}
+
+              {orderType === 'drip' && (
+                <div className="bg-amber-500/10 p-4 rounded-2xl border border-amber-500/20 text-center">
+                  <p className="text-[9px] font-bold text-amber-400 uppercase leading-relaxed">
+                    Drip-Feed orders are only available via Wallet payment for safety.
+                  </p>
+                </div>
+              )}
 
               <button onClick={() => setCheckoutStep('form')} className="text-center py-4 text-[10px] font-black uppercase text-slate-500 tracking-widest">
                 Cancel & Go Back

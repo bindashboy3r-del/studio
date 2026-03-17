@@ -87,11 +87,9 @@ export default function FundRequestsPage() {
     if (!db || !admin || !isActuallyAdmin) return;
     setProcessingId(request.id);
     
-    // Automatic Calculation Logic
-    const bonusToApply = globalBonus || 0;
-    const autoAmount = Math.floor(request.amount * (1 + bonusToApply / 100));
+    // Use the amount from the input box
     const finalCreditStr = creditAmounts[request.id];
-    const validatedAmount = action === 'Approved' ? (parseFloat(finalCreditStr) || autoAmount) : 0;
+    const validatedAmount = action === 'Approved' ? (parseFloat(finalCreditStr) || request.amount) : 0;
 
     try {
       const batch = writeBatch(db);
@@ -106,7 +104,7 @@ export default function FundRequestsPage() {
         batch.update(doc(db, "users", request.userId), { balance: increment(validatedAmount) });
         batch.set(doc(collection(db, "users", request.userId, "notifications")), {
           title: '💰 Wallet Credited!', 
-          message: `₹${validatedAmount} added to your account. (${bonusToApply}% Bonus Applied)`, 
+          message: `₹${validatedAmount} added to your account.`, 
           read: false, 
           createdAt: serverTimestamp()
         });
@@ -157,7 +155,7 @@ export default function FundRequestsPage() {
               <TableRow className="border-slate-100">
                 <TableHead className="text-[10px] font-black uppercase text-slate-950">User</TableHead>
                 <TableHead className="text-[10px] font-black uppercase text-slate-950">Requested</TableHead>
-                <TableHead className="text-[10px] font-black uppercase text-slate-950">Final Credit (With Bonus)</TableHead>
+                <TableHead className="text-[10px] font-black uppercase text-slate-950">Final Credit (Edit Bonus)</TableHead>
                 <TableHead className="text-[10px] font-black uppercase text-slate-950">UTR ID</TableHead>
                 <TableHead className="text-right text-[10px] font-black uppercase text-slate-950">Actions</TableHead>
               </TableRow>
