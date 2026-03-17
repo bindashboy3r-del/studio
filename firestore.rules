@@ -18,19 +18,19 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Public Read Access for Services and Global Settings (For Rate Card & Discounts)
+    // Public Read Access for Services and Global Settings (Crucial for Rate Card & Pre-login access)
     match /services/{serviceId} {
-      allow get, list: if true;
+      allow read, get, list: if true;
       allow write: if isAdmin();
     }
 
     match /globalSettings/{settingsId} {
-      allow get, list: if true;
+      allow read, get, list: if true;
       allow write: if isAdmin();
     }
 
     match /globalAnnouncements/{announcementId} {
-      allow get, list: if true;
+      allow read, get, list: if true;
       allow write: if isAdmin();
     }
 
