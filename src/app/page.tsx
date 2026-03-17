@@ -95,7 +95,6 @@ function AuthContent() {
   };
 
   if (isUserLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-[#312ECB]" /></div>;
-  if (user) return null;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC] p-6 font-body overflow-x-hidden relative">
@@ -118,6 +117,16 @@ function AuthContent() {
             {isLogin ? "New Member? Create Free Account" : "Already a member? Login"}
           </button>
         </form>
+
+        <div className="w-full border-t border-slate-100 mt-8 pt-6">
+          <Button 
+            onClick={() => router.push('/chat')} 
+            variant="outline" 
+            className="w-full h-12 border-slate-200 text-slate-400 font-black text-[10px] uppercase tracking-widest rounded-2xl"
+          >
+            VIEW ALL SERVICES FIRST
+          </Button>
+        </div>
       </div>
       <div className="mt-16 flex flex-col items-center gap-6">
         <div className="flex items-center gap-2.5 bg-white/80 backdrop-blur-md px-5 py-2.5 rounded-2xl border border-white shadow-sm">

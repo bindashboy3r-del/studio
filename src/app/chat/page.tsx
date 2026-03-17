@@ -15,30 +15,25 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { 
-  ChevronLeft, 
   ShoppingCart, 
-  Rocket, 
-  Layers, 
-  Package, 
-  TrendingDown, 
   Wallet, 
   CheckCircle2, 
-  QrCode, 
-  Copy, 
-  Download, 
   Loader2, 
-  MessageCircle,
   Link as LinkIcon,
   Trash2,
   Plus,
   Zap,
   Bell,
-  X
+  X,
+  Package,
+  TrendingDown,
+  QrCode,
+  LogIn
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
-import { SMMService, PLATFORMS, Platform } from "@/app/lib/constants";
+import { SMMService, Platform } from "@/app/lib/constants";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -68,9 +63,12 @@ export default function DashboardPage() {
   const router = useRouter();
   const { toast } = useToast();
 
+  // Guest State
+  const isGuest = !currentUser && !isUserLoading;
+
   // Order Settings
   const [orderType, setOrderType] = useState<'single' | 'combo' | 'bulk'>('single');
-  const [selectedPlatform, setSelectedPlatform] = useState<Platform>('instagram');
+  const selectedPlatform: Platform = 'instagram'; // Hardcoded to Instagram
   const [selectedServiceId, setSelectedServiceId] = useState<string>("");
   const [quantity, setQuantity] = useState<string>("");
   const [targetLink, setTargetLink] = useState<string>("");
@@ -85,17 +83,20 @@ export default function DashboardPage() {
   const [checkoutStep, setCheckoutStep] = useState<'form' | 'summary' | 'payment'>('form');
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'upi' | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
 
-  // Data
+  // Data - Services
   const servicesQuery = useMemoFirebase(() => {
-    if (!db || !currentUser) return null;
+    if (!db) return null;
     return query(collection(db, "services"), orderBy("order", "asc"));
-  }, [db, currentUser]);
+  }, [db]);
   const { data: rawServices } = useCollection<SMMService>(servicesQuery);
-  const activeServices = useMemo(() => (rawServices || []).filter(s => s.isActive !== false), [rawServices]);
+  
+  // Filter only Instagram services
+  const activeServices = useMemo(() => 
+    (rawServices || []).filter(s => s.isActive !== false && s.platform === 'instagram'), 
+  [rawServices]);
   
   const { data: userData } = useDoc(useMemoFirebase(() => currentUser && db ? doc(db, "users", currentUser.uid) : null, [db, currentUser]));
   const walletBalance = userData?.balance || 0;
@@ -104,7 +105,7 @@ export default function DashboardPage() {
   const [paymentConfig, setPaymentConfig] = useState<any>(null);
 
   useEffect(() => {
-    if (!db || !currentUser) return;
+    if (!db) return;
     onSnapshot(doc(db, "globalSettings", "discounts"), (snap) => {
       if (snap.exists()) setGlobalDiscounts({ 
         single: snap.data().single || 0, 
@@ -114,8 +115,10 @@ export default function DashboardPage() {
     });
     onSnapshot(doc(db, "globalSettings", "payment"), (snap) => { if (snap.exists()) setPaymentConfig(snap.data()); });
     
-    const qNotif = query(collection(db, "users", currentUser.uid, "notifications"), orderBy("createdAt", "desc"));
-    onSnapshot(qNotif, (snap) => setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    if (currentUser) {
+      const qNotif = query(collection(db, "users", currentUser.uid, "notifications"), orderBy("createdAt", "desc"));
+      onSnapshot(qNotif, (snap) => setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    }
   }, [db, currentUser]);
 
   const selectedService = useMemo(() => activeServices.find(s => s.id === selectedServiceId), [activeServices, selectedServiceId]);
@@ -125,7 +128,7 @@ export default function DashboardPage() {
   const calcPrices = () => {
     let raw = 0;
     if (orderType === 'combo') {
-      raw = comboItems.reduce((acc, item) => acc + (parseInt(item.quantity) / 1000) * item.pricePer1000, 0);
+      raw = comboItems.reduce((acc, item) => acc + (parseInt(item.quantity || "0") / 1000) * item.pricePer1000, 0);
     } else {
       const qty = parseInt(quantity) || 0;
       const rate = selectedService?.pricePer1000 || 0;
@@ -140,6 +143,7 @@ export default function DashboardPage() {
 
   // Handlers
   const handlePlaceOrder = async () => {
+    if (isGuest) { router.push('/'); return; }
     if (!currentUser || !db) return;
     if (orderType !== 'combo' && !selectedService) return;
     if (orderType === 'combo' && comboItems.length === 0) return;
@@ -162,7 +166,7 @@ export default function DashboardPage() {
       const orderPayload = {
         orderId, 
         service: orderType === 'combo' ? `Combo (${comboItems.length} items)` : selectedService?.name, 
-        quantity: orderType === 'combo' ? comboItems.reduce((a, b) => a + parseInt(b.quantity), 0) : parseInt(quantity), 
+        quantity: orderType === 'combo' ? comboItems.reduce((a, b) => a + parseInt(b.quantity || "0"), 0) : parseInt(quantity), 
         price: finalPrice,
         status: paymentMethod === 'wallet' ? 'Processing' : 'Pending', 
         type: paymentMethod === 'wallet' ? 'API' : 'Manual',
@@ -196,7 +200,7 @@ export default function DashboardPage() {
       quantity: s.minQuantity.toString(),
       pricePer1000: s.pricePer1000
     }]);
-    setSelectedServiceId(""); // Reset selection dropdown
+    setSelectedServiceId(""); 
   };
 
   const removeComboItem = (id: string) => {
@@ -216,8 +220,6 @@ export default function DashboardPage() {
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  if (isUserLoading) return <div className="min-h-screen flex items-center justify-center bg-[#030712]"><Zap className="animate-pulse text-[#312ECB]" size={40} /></div>;
-
   return (
     <div className="min-h-[100dvh] bg-[#030712] font-body text-slate-100 pb-24 overflow-x-hidden">
       {/* Dynamic Header */}
@@ -227,25 +229,33 @@ export default function DashboardPage() {
             <ShoppingCart size={20} className="fill-current" />
           </div>
           <div>
-            <h1 className="text-base font-black italic tracking-tighter text-white uppercase">CREATE NEW ORDER</h1>
+            <h1 className="text-base font-black italic tracking-tighter text-white uppercase">INSTAGRAM SERVICES</h1>
             <div className="flex items-center gap-2 mt-0.5">
               <Wallet size={10} className="text-emerald-400" />
-              <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Balance: ₹{walletBalance.toFixed(2)}</p>
+              <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">
+                {isGuest ? 'Login to View Balance' : `Balance: ₹${walletBalance.toFixed(2)}`}
+              </p>
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button 
-            onClick={() => setIsNotifOpen(true)} 
-            className="relative p-2.5 bg-white/5 rounded-xl border border-white/5 text-slate-400"
-          >
-            <Bell size={20} />
-            {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-[8px] font-black border-2 border-[#030712]">
-                {unreadCount}
-              </span>
-            )}
-          </button>
+          {isGuest ? (
+            <Button onClick={() => router.push('/')} size="sm" className="bg-[#312ECB] rounded-xl font-black text-[9px] uppercase tracking-widest px-4">
+              <LogIn size={12} className="mr-1.5" /> LOGIN
+            </Button>
+          ) : (
+            <button 
+              onClick={() => setIsNotifOpen(true)} 
+              className="relative p-2.5 bg-white/5 rounded-xl border border-white/5 text-slate-400"
+            >
+              <Bell size={20} />
+              {unreadCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-[8px] font-black border-2 border-[#030712]">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+          )}
         </div>
       </header>
 
@@ -264,39 +274,26 @@ export default function DashboardPage() {
               </TabsList>
 
               <div className="mt-6 space-y-5">
-                {/* Platform Selector */}
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Platform</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {Object.entries(PLATFORMS).map(([key, label]) => (
-                      <button 
-                        key={key} 
-                        onClick={() => {
-                          setSelectedPlatform(key as Platform);
-                          setSelectedServiceId("");
-                          setComboItems([]);
-                        }}
-                        className={cn(
-                          "h-12 rounded-xl border font-black text-[9px] uppercase transition-all",
-                          selectedPlatform === key ? "bg-[#312ECB]/10 border-[#312ECB] text-white shadow-lg" : "bg-white/5 border-white/5 text-slate-500"
-                        )}
-                      >
-                        {label}
-                      </button>
-                    ))}
+                {/* Info Alert for Guest */}
+                {isGuest && (
+                  <div className="bg-[#312ECB]/10 border border-[#312ECB]/20 p-4 rounded-2xl flex items-start gap-3">
+                    <Zap className="text-[#312ECB] shrink-0" size={18} />
+                    <p className="text-[10px] font-bold text-slate-300 leading-relaxed uppercase">
+                      You are in <span className="text-white font-black">Preview Mode</span>. Browse Instagram services and rates below. Login to place orders.
+                    </p>
                   </div>
-                </div>
+                )}
 
                 {/* Service Selection */}
                 {orderType === 'combo' ? (
                   <div className="space-y-4">
-                    <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Build Your Combo Pack</label>
+                    <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Build Instagram Pack</label>
                     <Select onValueChange={addComboItem} value={selectedServiceId}>
                       <SelectTrigger className="h-14 bg-white/5 border-white/5 rounded-2xl font-bold text-sm text-white px-5 focus:ring-[#312ECB]">
-                        <SelectValue placeholder="Add service to combo..." />
+                        <SelectValue placeholder="Add service to pack..." />
                       </SelectTrigger>
                       <SelectContent className="bg-[#030712] border-white/10 rounded-2xl">
-                        {activeServices.filter(s => s.platform === selectedPlatform).map(s => (
+                        {activeServices.map(s => (
                           <SelectItem key={s.id} value={s.id} className="text-sm font-bold p-4 focus:bg-[#312ECB] text-white">
                             {s.name} (₹{s.pricePer1000}/1k)
                           </SelectItem>
@@ -307,12 +304,13 @@ export default function DashboardPage() {
                     {/* Combo List */}
                     <div className="space-y-2">
                       {comboItems.map((item) => (
-                        <div key={item.id} className="bg-white/5 border border-white/5 rounded-2xl p-4 flex items-center justify-between gap-3 animate-in zoom-in-95">
+                        <div key={item.id} className="bg-white/5 border border-white/5 rounded-2xl p-4 flex items-center justify-between gap-3">
                           <div className="flex-1 min-w-0">
                             <p className="text-[11px] font-black text-white truncate uppercase">{item.serviceName}</p>
                             <div className="flex items-center gap-2 mt-1">
                               <Input 
                                 type="number" 
+                                disabled={isGuest}
                                 value={item.quantity} 
                                 onChange={(e) => updateComboItemQty(item.id, e.target.value)}
                                 className="h-8 w-20 bg-white/5 border-none rounded-lg text-[10px] font-black text-white px-2"
@@ -320,9 +318,11 @@ export default function DashboardPage() {
                               <span className="text-[9px] font-bold text-slate-500 uppercase">Qty</span>
                             </div>
                           </div>
-                          <button onClick={() => removeComboItem(item.id)} className="text-red-500/50 hover:text-red-500 p-2">
-                            <Trash2 size={16} />
-                          </button>
+                          {!isGuest && (
+                            <button onClick={() => removeComboItem(item.id)} className="text-red-500/50 hover:text-red-500 p-2">
+                              <Trash2 size={16} />
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -330,13 +330,13 @@ export default function DashboardPage() {
                 ) : (
                   <>
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Select Service</label>
+                      <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Select Instagram Service</label>
                       <Select onValueChange={setSelectedServiceId} value={selectedServiceId}>
                         <SelectTrigger className="h-14 bg-white/5 border-white/5 rounded-2xl font-bold text-sm text-white px-5 focus:ring-[#312ECB]">
                           <SelectValue placeholder="Pick a service..." />
                         </SelectTrigger>
                         <SelectContent className="bg-[#030712] border-white/10 rounded-2xl">
-                          {activeServices.filter(s => s.platform === selectedPlatform).map(s => (
+                          {activeServices.map(s => (
                             <SelectItem key={s.id} value={s.id} className="text-sm font-bold p-4 focus:bg-[#312ECB] text-white">
                               {s.name} (₹{s.pricePer1000}/1k)
                             </SelectItem>
@@ -351,7 +351,8 @@ export default function DashboardPage() {
                       </label>
                       <Input 
                         type="number" 
-                        placeholder="Enter amount..." 
+                        disabled={isGuest}
+                        placeholder={isGuest ? "Login to enter quantity" : "Enter amount..."}
                         value={quantity} 
                         onChange={(e) => setQuantity(e.target.value)}
                         className="h-14 bg-white/5 border-white/5 rounded-2xl px-5 text-base font-black text-white focus-visible:ring-[#312ECB]"
@@ -366,13 +367,14 @@ export default function DashboardPage() {
                     <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Target Links ({bulkLinks.length})</label>
                     <div className="flex gap-2">
                       <Input 
-                        placeholder="Add multiple links..." 
+                        disabled={isGuest}
+                        placeholder={isGuest ? "Login to add links" : "Add multiple links..."} 
                         value={currentBulkLink} 
                         onChange={(e) => setCurrentBulkLink(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && addBulkLink()}
                         className="h-14 bg-white/5 border-white/5 rounded-2xl px-5 text-sm font-bold text-white flex-1"
                       />
-                      <Button onClick={addBulkLink} size="icon" className="h-14 w-14 rounded-2xl bg-[#312ECB] shadow-lg shrink-0">
+                      <Button onClick={addBulkLink} disabled={isGuest} size="icon" className="h-14 w-14 rounded-2xl bg-[#312ECB] shadow-lg shrink-0">
                         <Plus size={24} />
                       </Button>
                     </div>
@@ -381,9 +383,11 @@ export default function DashboardPage() {
                         {bulkLinks.map((l, i) => (
                           <div key={i} className="flex items-center justify-between bg-white/5 p-2 rounded-lg group">
                             <span className="text-[10px] font-bold text-slate-400 truncate flex-1">{l}</span>
-                            <button onClick={() => setBulkLinks(bulkLinks.filter((_, idx) => idx !== i))} className="text-red-500/50 hover:text-red-500 transition-colors">
-                              <Trash2 size={14} />
-                            </button>
+                            {!isGuest && (
+                              <button onClick={() => setBulkLinks(bulkLinks.filter((_, idx) => idx !== i))} className="text-red-500/50 hover:text-red-500 transition-colors">
+                                <Trash2 size={14} />
+                              </button>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -395,7 +399,8 @@ export default function DashboardPage() {
                     <div className="relative">
                       <LinkIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600" size={18} />
                       <Input 
-                        placeholder="Paste link here..." 
+                        disabled={isGuest}
+                        placeholder={isGuest ? "Login to enter link" : "Paste link here..."} 
                         value={targetLink} 
                         onChange={(e) => setTargetLink(e.target.value)}
                         className="h-14 bg-white/5 border-white/5 rounded-2xl pl-12 text-sm font-bold text-white focus-visible:ring-[#312ECB]"
@@ -406,14 +411,16 @@ export default function DashboardPage() {
 
                 <Button 
                   disabled={
-                    (orderType === 'combo' && comboItems.length === 0) || 
-                    (orderType === 'single' && (!selectedService || !quantity || !targetLink)) ||
-                    (orderType === 'bulk' && (!selectedService || !quantity || bulkLinks.length === 0))
+                    !isGuest && (
+                      (orderType === 'combo' && comboItems.length === 0) || 
+                      (orderType === 'single' && (!selectedService || !quantity || !targetLink)) ||
+                      (orderType === 'bulk' && (!selectedService || !quantity || bulkLinks.length === 0))
+                    )
                   }
-                  onClick={() => setCheckoutStep('summary')}
+                  onClick={() => isGuest ? router.push('/') : setCheckoutStep('summary')}
                   className="w-full h-16 bg-[#312ECB] hover:bg-[#2825A6] text-white rounded-[1.8rem] font-black text-xs uppercase tracking-[0.2em] shadow-2xl mt-4"
                 >
-                  Confirm Selection
+                  {isGuest ? "Login to Place Order" : "Confirm Selection"}
                 </Button>
               </div>
             </Tabs>
