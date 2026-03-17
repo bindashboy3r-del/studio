@@ -18,7 +18,7 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Public Read Access for Services, Settings, and Announcements
+    // Public Read Access for Services and Global Settings (For Rate Card & Discounts)
     match /services/{serviceId} {
       allow read: if true;
       allow write: if isAdmin();
