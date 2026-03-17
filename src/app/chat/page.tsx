@@ -13,6 +13,7 @@ import {
   increment, 
   serverTimestamp, 
   Timestamp,
+  getDoc
 } from "firebase/firestore";
 import { 
   ShoppingCart, 
@@ -51,6 +52,7 @@ import { cn } from "@/lib/utils";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { placeApiOrder } from "@/app/actions/smm-api";
 
 interface ComboItem {
   id: string;
@@ -163,13 +165,53 @@ export default function DashboardPage() {
     const linksArr = orderType === 'bulk' ? bulkLinks : [targetLink];
     
     try {
-      const batch = writeBatch(db);
+      let apiOrderId = "";
+      let apiProviderId = "";
+
+      // 1. If paying with Wallet, attempt to place API order first
       if (paymentMethod === 'wallet') {
         if (walletBalance < finalPrice) { 
           toast({ variant: "destructive", title: "Low Balance" }); 
           setIsProcessing(false); 
           return; 
         }
+
+        // Fetch API settings to get provider and mapping
+        const apiSettingsSnap = await getDoc(doc(db, "globalSettings", "api"));
+        const apiSettings = apiSettingsSnap.data();
+        
+        const serviceIdToMap = orderType === 'combo' ? comboItems[0]?.serviceId : selectedServiceId;
+        const mapping = apiSettings?.mappings?.[serviceIdToMap];
+
+        if (mapping?.providerId && mapping?.remoteServiceId) {
+          const provider = apiSettings.providers?.find((p: any) => p.id === mapping.providerId);
+          if (provider?.url && provider?.key) {
+            const apiResult = await placeApiOrder({
+              apiUrl: provider.url,
+              apiKey: provider.key,
+              serviceId: mapping.remoteServiceId,
+              link: linksArr[0], // Currently API only supports one link at a time in standard add action
+              quantity: parseInt(quantity) || parseInt(comboItems[0]?.quantity || "0"),
+              runs: orderType === 'drip' ? parseInt(runs) : 1,
+              interval: orderType === 'drip' ? parseInt(interval) : 0
+            });
+
+            if (apiResult.success) {
+              apiOrderId = apiResult.order?.toString() || "";
+              apiProviderId = provider.id;
+            } else {
+              toast({ variant: "destructive", title: "API Provider Error", description: apiResult.error });
+              setIsProcessing(false);
+              return;
+            }
+          }
+        }
+      }
+
+      const batch = writeBatch(db);
+      
+      // Update balance if wallet payment
+      if (paymentMethod === 'wallet') {
         batch.update(doc(db, "users", currentUser.uid), { balance: increment(-finalPrice) });
       }
 
@@ -188,15 +230,18 @@ export default function DashboardPage() {
         comboItems: orderType === 'combo' ? comboItems : null,
         isDripFeed: orderType === 'drip',
         runs: orderType === 'drip' ? parseInt(runs) : 1,
-        interval: orderType === 'drip' ? parseInt(interval) : 0
+        interval: orderType === 'drip' ? parseInt(interval) : 0,
+        apiOrderId,
+        providerId: apiProviderId
       };
 
       batch.set(doc(collection(db, "users", currentUser.uid, "orders")), orderPayload);
 
       await batch.commit();
-      toast({ title: "Order Placed!", description: `Order #${orderId} is now queued.` });
+      toast({ title: "Order Placed!", description: apiOrderId ? `API Order ID: ${apiOrderId}` : `Order #${orderId} is now queued.` });
       router.push('/orders');
     } catch (e) {
+      console.error("Order error:", e);
       toast({ variant: "destructive", title: "Error", description: "Failed to place order." });
     } finally {
       setIsProcessing(false);

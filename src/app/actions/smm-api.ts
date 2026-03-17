@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -10,13 +11,15 @@ export interface ApiAddOrderParams {
   serviceId: string;
   link: string;
   quantity: number;
+  runs?: number;
+  interval?: number;
 }
 
 /**
  * Places an order on an external SMM Panel.
  */
 export async function placeApiOrder(params: ApiAddOrderParams) {
-  const { apiUrl, apiKey, serviceId, link, quantity } = params;
+  const { apiUrl, apiKey, serviceId, link, quantity, runs, interval } = params;
 
   try {
     const url = new URL(apiUrl);
@@ -25,6 +28,12 @@ export async function placeApiOrder(params: ApiAddOrderParams) {
     url.searchParams.append('service', serviceId);
     url.searchParams.append('link', link);
     url.searchParams.append('quantity', quantity.toString());
+
+    // Add Drip-Feed parameters if provided
+    if (runs && runs > 1) {
+      url.searchParams.append('runs', runs.toString());
+      url.searchParams.append('interval', interval?.toString() || '30');
+    }
 
     const response = await fetch(url.toString(), { method: 'POST' });
     const data = await response.json();
