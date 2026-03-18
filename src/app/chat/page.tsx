@@ -37,7 +37,10 @@ import {
   Sun,
   ArrowRight,
   Instagram,
-  PlusCircle
+  PlusCircle,
+  Download,
+  MessageCircle,
+  History
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,7 +58,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { BottomNav } from "@/components/layout/BottomNav";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { placeApiOrder } from "@/app/actions/smm-api";
 
@@ -91,10 +94,15 @@ export default function DashboardPage() {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [utrId, setUtrId] = useState("");
+  
+  // Success State
+  const [lastPlacedOrder, setLastPlacedOrder] = useState<any>(null);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
   // Global Settings
   const [globalDiscounts, setGlobalDiscounts] = useState({ single: 0, bulk: 0, combo: 0, drip: 0 });
   const [globalBonus, setGlobalBonus] = useState(0);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Theme Toggle
   useEffect(() => {
@@ -167,14 +175,28 @@ export default function DashboardPage() {
 
   const { raw: rawPrice, final: finalPrice, savings } = calcPrices();
 
-  const addBulkLink = () => {
-    if (!currentBulkLink.trim()) return;
-    setBulkLinks([...bulkLinks, currentBulkLink.trim()]);
-    setCurrentBulkLink("");
-  };
+  const upiId = "smmxpressbot@slc";
+  const finalQrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(`upi://pay?pa=${upiId}&pn=SocialBoost&am=${finalPrice.toFixed(2)}&cu=INR`)}&size=400&margin=1&format=png`;
 
-  const removeBulkLink = (index: number) => {
-    setBulkLinks(bulkLinks.filter((_, i) => i !== index));
+  const handleDownloadQR = async () => {
+    setIsDownloading(true);
+    try {
+      const response = await fetch(finalQrUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `SocialBoost_Pay_₹${finalPrice.toFixed(0)}.png`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast({ title: "QR Saved to Gallery!" });
+    } catch (e) { 
+      window.open(finalQrUrl, '_blank'); 
+    } finally { 
+      setIsDownloading(false); 
+    }
   };
 
   const handlePlaceOrder = async () => {
@@ -188,7 +210,6 @@ export default function DashboardPage() {
       let apiOrderId = "";
       let apiProviderId = "";
 
-      // PAYMENT: WALLET (Direct API Integration)
       if (paymentMethod === 'wallet') {
         if (walletBalance < finalPrice) { 
           toast({ variant: "destructive", title: "Low Balance" }); 
@@ -196,7 +217,6 @@ export default function DashboardPage() {
           return; 
         }
 
-        // Logic to trigger external API
         if (orderType !== 'combo') {
           const apiSettingsSnap = await getDoc(doc(db, "globalSettings", "api"));
           const apiSettings = apiSettingsSnap.data();
@@ -205,7 +225,6 @@ export default function DashboardPage() {
           if (mapping?.providerId && mapping?.remoteServiceId) {
             const provider = apiSettings.providers?.find((p: any) => p.id === mapping.providerId);
             if (provider?.url && provider?.key) {
-              // Standard API Placement
               const apiResult = await placeApiOrder({
                 apiUrl: provider.url, 
                 apiKey: provider.key, 
@@ -224,13 +243,7 @@ export default function DashboardPage() {
                 setIsProcessing(false); 
                 return; 
               }
-            } else {
-              toast({ variant: "destructive", title: "Config Error", description: "API Provider details missing in Admin Hub." });
-              setIsProcessing(false);
-              return;
             }
-          } else {
-            console.info("No API mapping found for this service. Order will be processed manually.");
           }
         }
       }
@@ -238,7 +251,7 @@ export default function DashboardPage() {
       const batch = writeBatch(db);
       if (paymentMethod === 'wallet') batch.update(doc(db, "users", currentUser.uid), { balance: increment(-finalPrice) });
       
-      batch.set(doc(collection(db, "users", currentUser.uid, "orders")), {
+      const orderData = {
         orderId, 
         service: orderType === 'combo' ? 'Combo Pack' : selectedService?.name, 
         quantity: orderType === 'combo' ? comboItems.reduce((a, b) => a + (parseInt(b.qty) || 0), 0) : parseInt(quantity), 
@@ -254,16 +267,52 @@ export default function DashboardPage() {
         apiOrderId, 
         providerId: apiProviderId,
         comboDetails: orderType === 'combo' ? comboItems : null
-      });
+      };
+
+      batch.set(doc(collection(db, "users", currentUser.uid, "orders")), orderData);
 
       await batch.commit();
-      toast({ title: "Order Placed!", description: `Order #${orderId} is queued.` });
-      router.push('/orders');
+      
+      setLastPlacedOrder(orderData);
+      setShowSuccessDialog(true);
+      
+      // Reset form
+      setCheckoutStep('form');
+      setTargetLink("");
+      setQuantity("");
+      setBulkLinks([]);
+      setUtrId("");
+      setPaymentMethod(null);
+
     } catch (e) { 
       toast({ variant: "destructive", title: "Order Placement Failed" }); 
     } finally { 
       setIsProcessing(false); 
     }
+  };
+
+  const handleWhatsAppConfirm = () => {
+    if (!lastPlacedOrder) return;
+    const adminNumber = "919116399517";
+    const serviceName = lastPlacedOrder.service;
+    const links = lastPlacedOrder.links?.join(', ');
+    const qty = lastPlacedOrder.quantity;
+    const utr = lastPlacedOrder.utrId || 'Wallet Payment';
+    const id = lastPlacedOrder.orderId;
+
+    const message = `🚀 *NEW ORDER PLACED!*\n\n🆔 *Order ID:* ${id}\n📊 *Service:* ${serviceName}\n🔢 *Quantity:* ${qty}\n🔗 *Target:* ${links}\n💳 *UTR ID:* ${utr}\n💰 *Price:* ₹${lastPlacedOrder.price.toFixed(2)}\n\nKripya order verify karke start karein. Dhanyawad!`;
+    
+    window.open(`https://wa.me/${adminNumber}?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
+  const addBulkLink = () => {
+    if (!currentBulkLink.trim()) return;
+    setBulkLinks([...bulkLinks, currentBulkLink.trim()]);
+    setCurrentBulkLink("");
+  };
+
+  const removeBulkLink = (index: number) => {
+    setBulkLinks(bulkLinks.filter((_, i) => i !== index));
   };
 
   const addComboItem = () => {
@@ -321,11 +370,14 @@ export default function DashboardPage() {
       <main className="max-w-md mx-auto p-5 space-y-6">
         {checkoutStep === 'form' && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary"><Package size={18} /></div>
-              <div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary"><Package size={18} /></div>
                 <h2 className="text-lg font-black uppercase tracking-tight">Place New Order</h2>
               </div>
+              <button onClick={() => router.push('/orders')} className="p-2.5 bg-secondary rounded-xl border border-border text-muted-foreground hover:text-primary transition-all">
+                <History size={18} />
+              </button>
             </div>
 
             <div className="bg-card rounded-[2.5rem] p-8 border border-border shadow-2xl space-y-8">
@@ -484,15 +536,31 @@ export default function DashboardPage() {
         {checkoutStep === 'payment' && (
           <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
             <div className="bg-card border border-border rounded-[2.5rem] p-8 text-center space-y-6 shadow-2xl">
-              <div className="bg-white p-4 rounded-[2rem] inline-block shadow-lg">
-                <img src={`https://quickchart.io/qr?text=${encodeURIComponent(`upi://pay?pa=smmxpressbot@slc&pn=SocialBoost&am=${finalPrice.toFixed(2)}&cu=INR`)}&size=400&margin=1&format=png`} alt="Payment QR" className="w-48 h-48" />
+              <div className="bg-white p-4 rounded-[2rem] inline-block shadow-lg relative group">
+                <img src={finalQrUrl} alt="Payment QR" className="w-48 h-48" />
+                <button 
+                  onClick={handleDownloadQR}
+                  disabled={isDownloading}
+                  className="absolute bottom-2 right-2 p-2 bg-primary text-white rounded-full shadow-lg active:scale-90 transition-transform"
+                >
+                  {isDownloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                </button>
               </div>
-              <div className="space-y-2"><p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Scan to Pay</p><h2 className="text-3xl font-black text-foreground italic">₹{finalPrice.toFixed(2)}</h2></div>
+              
+              <div className="flex flex-col items-center gap-2">
+                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Scan or Save to Pay</p>
+                <h2 className="text-3xl font-black text-foreground italic">₹{finalPrice.toFixed(2)}</h2>
+                <Button onClick={handleDownloadQR} variant="ghost" className="text-[9px] font-black text-primary uppercase gap-2">
+                  <Download size={14} /> Download QR Code
+                </Button>
+              </div>
+
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase text-destructive animate-pulse">Sahi UTR ID dalo varna verify nahi hoga</label>
                 <Input placeholder="Enter 12-Digit UTR ID" maxLength={12} value={utrId} onChange={(e) => setUtrId(e.target.value.replace(/[^0-9]/g, ''))} className="h-14 bg-input border-none rounded-2xl text-center text-lg font-black tracking-[0.3em] focus-visible:ring-emerald-500 shadow-inner" />
               </div>
             </div>
+            
             <Button onClick={handlePlaceOrder} disabled={isProcessing || utrId.length !== 12} className="w-full h-16 bg-emerald-500 hover:bg-emerald-600 text-white rounded-[1.8rem] font-black text-xs uppercase tracking-[0.2em] shadow-2xl gap-3">
               {isProcessing ? <Loader2 className="animate-spin" /> : <CheckCircle2 size={20} />}
               Verify & Complete Order
@@ -502,6 +570,7 @@ export default function DashboardPage() {
         )}
       </main>
 
+      {/* Notifications Drawer */}
       <Dialog open={isNotifOpen} onOpenChange={setIsNotifOpen}>
         <DialogContent className="max-w-[340px] rounded-[2.5rem] border-none shadow-2xl bg-card p-0 overflow-hidden">
           <header className="bg-primary p-5 text-white flex items-center justify-between">
@@ -523,6 +592,58 @@ export default function DashboardPage() {
               <div className="flex flex-col items-center justify-center h-full py-16 opacity-30"><Bell size={48} className="mb-3 text-muted-foreground" /><p className="text-[10px] font-black uppercase tracking-widest">No new updates</p></div>
             )}
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Success Dialog */}
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent className="max-w-[340px] rounded-[2.5rem] border-none shadow-2xl bg-card p-0 overflow-hidden">
+          <div className="p-8 text-center space-y-6">
+            <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto shadow-inner">
+              <CheckCircle2 size={48} className="text-emerald-500 animate-in zoom-in-50 duration-500" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-black uppercase tracking-tight">Order Placed!</h2>
+              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Aapka order line mein hai.</p>
+            </div>
+
+            <div className="bg-muted/50 rounded-[2rem] p-5 border border-border space-y-3.5 text-left">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-black text-muted-foreground uppercase">Order ID</span>
+                <span className="text-xs font-black text-primary">#{lastPlacedOrder?.orderId}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-black text-muted-foreground uppercase">Service</span>
+                <span className="text-xs font-bold truncate max-w-[120px]">{lastPlacedOrder?.service}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-black text-muted-foreground uppercase">Quantity</span>
+                <span className="text-xs font-bold">{lastPlacedOrder?.quantity}</span>
+              </div>
+              <div className="pt-2 border-t border-border">
+                <span className="text-[9px] font-black text-muted-foreground uppercase block mb-1">Target Link</span>
+                <p className="text-[10px] font-medium break-all text-foreground opacity-80 leading-relaxed">
+                  {lastPlacedOrder?.links?.[0]}
+                  {lastPlacedOrder?.links?.length > 1 && ` (+${lastPlacedOrder.links.length - 1} more)`}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-2">
+              <Button 
+                onClick={handleWhatsAppConfirm}
+                className="w-full h-14 bg-[#25D366] hover:bg-[#1EBE57] text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-xl gap-3 animate-pulse"
+              >
+                <MessageCircle size={20} /> SEND ADMIN CONFIRMATION
+              </Button>
+              <button 
+                onClick={() => setShowSuccessDialog(false)}
+                className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] py-2"
+              >
+                Close & Go Back
+              </button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
