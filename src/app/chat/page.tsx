@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -91,6 +92,10 @@ export default function DashboardPage() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [utrId, setUtrId] = useState("");
 
+  // Global Settings
+  const [globalDiscounts, setGlobalDiscounts] = useState({ single: 0, bulk: 0, combo: 0, drip: 0 });
+  const [globalBonus, setGlobalBonus] = useState(0);
+
   // Theme Toggle
   useEffect(() => {
     const html = document.documentElement;
@@ -111,9 +116,6 @@ export default function DashboardPage() {
   const { data: userData } = useDoc(userDocRef);
   const walletBalance = userData?.balance || 0;
 
-  // Global Settings
-  const [globalDiscounts, setGlobalDiscounts] = useState({ single: 0, bulk: 0, combo: 0, drip: 0 });
-
   useEffect(() => {
     if (!db) return;
     const unsubDiscounts = onSnapshot(doc(db, "globalSettings", "discounts"), (snap) => {
@@ -124,13 +126,17 @@ export default function DashboardPage() {
         drip: snap.data().drip || snap.data().single || 0 
       });
     });
+
+    const unsubFinance = onSnapshot(doc(db, "globalSettings", "finance"), (snap) => {
+      if (snap.exists()) setGlobalBonus(snap.data().bonusPercentage || 0);
+    });
     
     let unsubNotif = () => {};
     if (currentUser) {
       const qNotif = query(collection(db, "users", currentUser.uid, "notifications"), orderBy("createdAt", "desc"));
       unsubNotif = onSnapshot(qNotif, (snap) => setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     }
-    return () => { unsubDiscounts(); unsubNotif(); };
+    return () => { unsubDiscounts(); unsubFinance(); unsubNotif(); };
   }, [db, currentUser]);
 
   const selectedService = useMemo(() => activeServices.find(s => s.id === selectedServiceId), [activeServices, selectedServiceId]);
@@ -190,7 +196,7 @@ export default function DashboardPage() {
           return; 
         }
 
-        // Only auto-trigger for Single, Bulk, and Drip (Combo is multi-order)
+        // Logic to trigger external API
         if (orderType !== 'combo') {
           const apiSettingsSnap = await getDoc(doc(db, "globalSettings", "api"));
           const apiSettings = apiSettingsSnap.data();
@@ -199,8 +205,7 @@ export default function DashboardPage() {
           if (mapping?.providerId && mapping?.remoteServiceId) {
             const provider = apiSettings.providers?.find((p: any) => p.id === mapping.providerId);
             if (provider?.url && provider?.key) {
-              // If Bulk, we might need to loop API calls or handle per link
-              // For simplicity in prototype, we process the first link if multiple
+              // Standard API Placement
               const apiResult = await placeApiOrder({
                 apiUrl: provider.url, 
                 apiKey: provider.key, 
@@ -215,11 +220,15 @@ export default function DashboardPage() {
                 apiOrderId = apiResult.order?.toString() || ""; 
                 apiProviderId = provider.id; 
               } else { 
-                toast({ variant: "destructive", title: "API Placement Failed", description: apiResult.error }); 
+                toast({ variant: "destructive", title: "API Panel Error", description: apiResult.error }); 
                 setIsProcessing(false); 
                 return; 
               }
+            } else {
+              console.warn("API Provider details missing for mapping.");
             }
+          } else {
+            console.info("No API mapping found for this service. Order will be processed manually.");
           }
         }
       }
@@ -232,8 +241,8 @@ export default function DashboardPage() {
         service: orderType === 'combo' ? 'Combo Pack' : selectedService?.name, 
         quantity: orderType === 'combo' ? comboItems.reduce((a, b) => a + (parseInt(b.qty) || 0), 0) : parseInt(quantity), 
         price: finalPrice,
-        status: paymentMethod === 'wallet' ? 'Processing' : 'Pending', 
-        type: paymentMethod === 'wallet' ? 'API' : 'Manual',
+        status: paymentMethod === 'wallet' ? (apiOrderId ? 'Processing' : 'Pending') : 'Pending', 
+        type: paymentMethod === 'wallet' && apiOrderId ? 'API' : 'Manual',
         links: linksArr, 
         utrId: paymentMethod === 'upi' ? utrId : "", 
         platform: 'instagram', 
@@ -249,7 +258,7 @@ export default function DashboardPage() {
       toast({ title: "Order Placed!", description: `Order #${orderId} is queued.` });
       router.push('/orders');
     } catch (e) { 
-      toast({ variant: "destructive", title: "Order Error" }); 
+      toast({ variant: "destructive", title: "Order Placement Failed" }); 
     } finally { 
       setIsProcessing(false); 
     }
@@ -276,7 +285,22 @@ export default function DashboardPage() {
           </div>
           <div>
             <h1 className="text-[11px] font-black uppercase tracking-[0.2em] text-foreground/60 leading-none">SocialBoost Pro</h1>
-            <p className="text-base font-black italic tracking-tighter text-foreground mt-1">SMM ORDER PANEL</p>
+            <div className="flex items-center gap-2 mt-1">
+              <p className="text-base font-black italic tracking-tighter text-foreground">SMM ORDER PANEL</p>
+              {globalBonus > 0 && <Badge className="bg-emerald-500 text-white border-none text-[7px] font-black animate-pulse h-4 px-1.5">{globalBonus}% BONUS</Badge>}
+            </div>
+            
+            {currentUser && (
+              <button 
+                onClick={() => router.push('/add-funds')}
+                className="flex items-center gap-1.5 mt-1 hover:opacity-80 transition-opacity"
+              >
+                <span className="text-[10px] font-black text-primary uppercase">Wallet: ₹{walletBalance.toFixed(2)}</span>
+                <div className="w-4 h-4 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+                  <Plus size={10} />
+                </div>
+              </button>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -400,13 +424,6 @@ export default function DashboardPage() {
                     <div className="space-y-2"><label className="text-[8px] font-black uppercase text-muted-foreground">Batch Qty</label><Input type="number" value={batchQty} onChange={(e) => setBatchQty(e.target.value)} className="h-12 bg-background border-none rounded-xl" placeholder="e.g. 100" /></div>
                     <div className="space-y-2"><label className="text-[8px] font-black uppercase text-muted-foreground">Interval (Min)</label><Input type="number" value={interval} onChange={(e) => setInterval(e.target.value)} className="h-12 bg-background border-none rounded-xl" /></div>
                   </div>
-                </div>
-              )}
-
-              {currentUser && (
-                <div className="bg-emerald-500/5 rounded-2xl p-4 border border-emerald-500/10 flex items-center justify-between">
-                  <div className="flex items-center gap-3"><Wallet size={18} className="text-emerald-500" /><span className="text-[10px] font-black uppercase tracking-widest">Wallet Balance</span></div>
-                  <span className="text-sm font-black text-emerald-500">₹{walletBalance.toFixed(2)}</span>
                 </div>
               )}
 

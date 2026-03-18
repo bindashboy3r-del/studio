@@ -17,12 +17,13 @@ export interface ApiAddOrderParams {
 
 /**
  * Places an order on an external SMM Panel using standard API parameters.
- * Uses FormData for compatibility with most SMM panels.
+ * Uses FormData via URLSearchParams for compatibility with zyadatar SMM panels.
  */
 export async function placeApiOrder(params: ApiAddOrderParams) {
   const { apiUrl, apiKey, serviceId, link, quantity, runs, interval } = params;
 
   try {
+    // Standard SMM Panel parameters: key, action, service, link, quantity
     const formData = new URLSearchParams();
     formData.append('key', apiKey);
     formData.append('action', 'add');
@@ -36,6 +37,8 @@ export async function placeApiOrder(params: ApiAddOrderParams) {
       formData.append('interval', interval?.toString() || '15');
     }
 
+    console.log(`Connecting to SMM API: ${apiUrl} for service ${serviceId}`);
+
     const response = await fetch(apiUrl, {
       method: 'POST',
       body: formData,
@@ -44,6 +47,11 @@ export async function placeApiOrder(params: ApiAddOrderParams) {
       },
     });
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      return { success: false, error: `HTTP ${response.status}: ${errorText || 'Server Error'}` };
+    }
+
     const data = await response.json();
 
     if (data.error) {
@@ -51,13 +59,13 @@ export async function placeApiOrder(params: ApiAddOrderParams) {
     }
 
     if (!data.order) {
-      return { success: false, error: data.message || 'No order ID returned from API' };
+      return { success: false, error: data.message || 'No order ID returned from API panel.' };
     }
 
     return { success: true, order: data.order };
   } catch (error: any) {
-    console.error('API Placement Error:', error);
-    return { success: false, error: error.message || 'Failed to connect to SMM API provider' };
+    console.error('CRITICAL API ERROR:', error);
+    return { success: false, error: error.message || 'Failed to connect to SMM Provider. Check URL/Key.' };
   }
 }
 
