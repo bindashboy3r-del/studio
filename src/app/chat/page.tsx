@@ -225,7 +225,9 @@ export default function DashboardPage() {
                 return; 
               }
             } else {
-              console.warn("API Provider details missing for mapping.");
+              toast({ variant: "destructive", title: "Config Error", description: "API Provider details missing in Admin Hub." });
+              setIsProcessing(false);
+              return;
             }
           } else {
             console.info("No API mapping found for this service. Order will be processed manually.");
@@ -323,7 +325,6 @@ export default function DashboardPage() {
               <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary"><Package size={18} /></div>
               <div>
                 <h2 className="text-lg font-black uppercase tracking-tight">Place New Order</h2>
-                <p className="text-[9px] font-black text-primary uppercase tracking-[0.3em]">Direct API Submission • No Waiting</p>
               </div>
             </div>
 
