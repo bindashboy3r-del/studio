@@ -4,26 +4,48 @@
 
 @layer base {
   :root {
-    --background: 222 47% 6%;
+    --background: 210 20% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 188 100% 30%; /* Teal/Cyan from screenshot */
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222 47% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222 47% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 188 100% 30%;
+    --radius: 1.25rem;
+  }
+
+  .dark {
+    --background: 220 15% 5%; /* Very dark background */
     --foreground: 210 40% 98%;
-    --card: 222 47% 8%;
+    --card: 220 15% 8%; /* Slightly lighter charcoal card */
     --card-foreground: 210 40% 98%;
-    --popover: 222 47% 8%;
+    --popover: 220 15% 8%;
     --popover-foreground: 210 40% 98%;
-    --primary: 241 63% 49%; /* #312ECB */
-    --primary-foreground: 0 0% 100%;
-    --secondary: 142 70% 45%; /* #25D366 */
-    --secondary-foreground: 0 0% 100%;
-    --muted: 217.2 32.6% 12%;
+    --primary: 188 100% 35%; /* Teal/Cyan */
+    --primary-foreground: 210 40% 98%;
+    --secondary: 217.2 32.6% 12%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 12%;
+    --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 12%;
-    --input: 217.2 32.6% 12%;
-    --ring: 241 63% 49%;
-    --radius: 1.5rem;
+    --border: 217.2 32.6% 17.5%;
+    --input: 220 15% 12%; /* Dark grey input background */
+    --ring: 188 100% 35%;
   }
 }
 
@@ -36,7 +58,6 @@
   }
 }
 
-/* Enhanced 3D Neumorphic Shadows - Dark Mode Focus */
 .shadow-3d {
   box-shadow: 
     10px 10px 20px rgba(0, 0, 0, 0.6), 
@@ -55,45 +76,9 @@
     inset -2px -2px 8px rgba(255, 255, 255, 0.02);
 }
 
-.glass-header {
-  @apply bg-slate-900/90 backdrop-blur-xl border-b border-white/5 sticky top-0 z-50;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+.price-box {
+  @apply bg-slate-900/50 border-2 border-dashed border-primary/30 rounded-2xl p-4 transition-all;
 }
-
-.whatsapp-bg {
-  @apply bg-[#030712];
-  background-image: 
-    radial-gradient(circle at 2px 2px, rgba(255,255,255,0.03) 1px, transparent 0);
-  background-size: 24px 24px;
-}
-
-/* 3D Chat Bubbles */
-.bubble-bot {
-  @apply bg-slate-900 text-slate-100 rounded-[1.5rem] rounded-tl-none border border-white/5;
-  box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.5), -2px -2px 8px rgba(255, 255, 255, 0.01);
-}
-
-.bubble-user {
-  @apply bg-[#064E3B] text-emerald-50 rounded-[1.5rem] rounded-tr-none border border-emerald-500/10;
-  box-shadow: -8px 8px 16px rgba(0, 0, 0, 0.5), 2px -2px 8px rgba(255, 255, 255, 0.01);
-}
-
-@keyframes typing {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
-}
-
-.dot {
-  display: inline-block;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  @apply bg-slate-500 mx-0.5;
-  animation: typing 1s infinite ease-in-out;
-}
-
-.dot:nth-child(2) { animation-delay: 0.2s; }
-.dot:nth-child(3) { animation-delay: 0.4s; }
 
 .custom-scrollbar::-webkit-scrollbar {
   width: 3px;
